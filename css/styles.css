@@ -1,0 +1,117 @@
+/* =====================================
+        SPLASH SCREEN
+===================================== */
+
+.splash-screen{
+
+    height:100vh;
+
+    background:linear-gradient(135deg,#0f172a,#2563eb);
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    align-items:center;
+
+    color:white;
+
+}
+
+.logo-circle{
+
+    width:140px;
+
+    height:140px;
+
+    border-radius:50%;
+
+    background:white;
+
+    color:#2563eb;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-size:55px;
+
+    font-weight:bold;
+
+    box-shadow:0 0 40px rgba(255,255,255,.4);
+
+    animation:zoom 2s infinite alternate;
+
+}
+
+.splash-screen h1{
+
+    margin-top:25px;
+
+    font-size:45px;
+
+}
+
+.splash-screen p{
+
+    margin-top:10px;
+
+    font-size:20px;
+
+    opacity:.9;
+
+}
+
+.loader{
+
+    margin-top:40px;
+
+    width:55px;
+
+    height:55px;
+
+    border:6px solid rgba(255,255,255,.3);
+
+    border-top:6px solid white;
+
+    border-radius:50%;
+
+    animation:spin 1s linear infinite;
+
+}
+
+@keyframes spin{
+
+from{
+
+transform:rotate(0deg);
+
+}
+
+to{
+
+transform:rotate(360deg);
+
+}
+
+}
+
+@keyframes zoom{
+
+from{
+
+transform:scale(1);
+
+}
+
+to{
+
+transform:scale(1.15);
+
+}
+
+}
