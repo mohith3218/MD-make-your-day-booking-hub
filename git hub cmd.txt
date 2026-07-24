@@ -1,0 +1,6 @@
+git add .
+git commit -m "<some message>"
+git push
+
+
+run these in C:\Users\sktam\mohi\md booking hub> ok? ok everyday

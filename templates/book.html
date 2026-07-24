@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Book Tickets</title>
+</head>
+<body>
+    <h1>Book Tickets</h1>
+    <p><b>Movie:</b> {{ movie.title }}</p>
+    <p><b>Theater:</b> {{ showtime.theater }}</p>
+    <p><b>Date:</b> {{ showtime.show_date }}</p>
+    <p><b>Time:</b> {{ showtime.show_time }}</p>
+
+    <form method="POST">
+        <label>Enter seat numbers (example: A1, A2, B5):</label><br>
+        <input type="text" name="seats" required style="width: 300px;"><br><br>
+        <button type="submit">Confirm Booking</button>
+    </form>
+
+    <br>
+    <a href="{{ url_for('home') }}">Cancel</a>
+</body>
+</html>

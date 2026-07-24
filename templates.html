@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Movie Booking</title>
+    <style>
+        body { font-family: Arial; margin: 40px; background: #f5f5f5; }
+        .movie { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; }
+        a { text-decoration: none; color: #0066cc; }
+    </style>
+</head>
+<body>
+    <h1>🎬 Movie Booking App</h1>
+
+    {% if current_user.is_authenticated %}
+        <p>Welcome, <b>{{ current_user.username }}</b> | 
+        <a href="{{ url_for('dashboard') }}">My Bookings</a> | 
+        <a href="{{ url_for('logout') }}">Logout</a></p>
+    {% else %}
+        <p><a href="{{ url_for('login') }}">Login</a> | <a href="{{ url_for('register') }}">Register</a></p>
+    {% endif %}
+
+    <h2>Now Showing</h2>
+    {% for movie in movies %}
+        <div class="movie">
+            <h3>{{ movie.title }}</h3>
+            <p>{{ movie.description }}</p>
+            <p>Duration: {{ movie.duration }} minutes</p>
+            <a href="{{ url_for('movie_detail', movie_id=movie.id) }}">View showtime →</a>
+        </div>
+    {% endfor %}
+</body>
+</html>
