@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <style>
+        body { font-family: Arial; background: #f0f2f5; padding: 30px; }
+        .card { background: white; padding: 20px; margin: 15px 0; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
+        a.btn { display: inline-block; background: #e94560; color: white; padding: 10px 18px;
+                border-radius: 5px; text-decoration: none; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Admin Dashboard</h1>
+    <a href="{{ url_for('home') }}">← Back to Home</a>
+    <br><br>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}<p style="color:green;">{{ messages[0] }}</p>{% endif %}
+    {% endwith %}
+
+    <a class="btn" href="{{ url_for('add_movie') }}">+ Add Movie</a>
+    <a class="btn" href="{{ url_for('add_showtime') }}">+ Add Showtime</a>
+    <a class="btn" href="{{ url_for('add_theater') }}">+ Add Theater</a>
+
+    <div class="card">
+        <h2>Theaters ({{ theaters|length }})</h2>
+        <table>
+            <tr><th>ID</th><th>Name</th><th>Location</th></tr>
+            {% for t in theaters %}
+            <tr><td>{{ t.id }}</td><td>{{ t.name }}</td><td>{{ t.location or '—' }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">No theaters yet.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Movies</h2>
+        <table>
+            <tr><th>ID</th><th>Title</th><th>Duration</th></tr>
+            {% for m in movies %}
+            <tr><td>{{ m.id }}</td><td>{{ m.title }}</td><td>{{ m.duration }} min</td></tr>
+            {% else %}
+            <tr><td colspan="3">No movies yet.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Showtimes</h2>
+        <table>
+            <tr><th>ID</th><th>Movie ID</th><th>Theater</th><th>Date</th><th>Time</th></tr>
+            {% for s in showtimes %}
+            <tr>
+                <td>{{ s.id }}</td>
+                <td>{{ s.movie_id }}</td>
+                <td>{{ s.theater }}</td>
+                <td>{{ s.show_date }}</td>
+                <td>{{ s.show_time }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">No showtimes yet.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>

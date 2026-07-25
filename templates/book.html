@@ -1,22 +1,278 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Book Tickets</title>
+    <title>Select Seats — {{ movie.title }}</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: radial-gradient(ellipse at top, #1b1b2f 0%, #0d0d17 70%);
+            color: #eee;
+            text-align: center;
+            padding: 24px 16px 60px;
+            margin: 0;
+        }
+        .header h2 { margin: 0 0 4px; font-size: 24px; }
+        .header p { margin: 0; color: #999; font-size: 14px; }
+
+        .screen-wrap { margin: 40px auto 30px; max-width: 620px; }
+        .screen {
+            height: 8px;
+            background: linear-gradient(90deg, transparent, #6dd5ff, transparent);
+            border-radius: 50%;
+            box-shadow: 0 0 25px 6px rgba(109, 213, 255, 0.55);
+            margin: 0 auto;
+        }
+        .screen-label {
+            color: #6dd5ff;
+            font-size: 12px;
+            letter-spacing: 4px;
+            margin-top: 10px;
+        }
+
+        #seat-map { max-width: 700px; margin: 0 auto; }
+
+        .class-group { margin-bottom: 22px; }
+        .class-title {
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .class-price { font-weight: 400; opacity: 0.65; letter-spacing: 0; text-transform: none; }
+
+        .row { display: flex; align-items: center; justify-content: center; margin: 5px 0; }
+        .row-label {
+            width: 22px;
+            font-size: 12px;
+            color: #888;
+            text-align: right;
+            margin-right: 10px;
+        }
+        .block { display: flex; }
+        .block + .block { margin-left: 22px; } /* aisle gap */
+
+        .seat {
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            margin: 3px;
+            border-radius: 7px 7px 3px 3px;
+            font-size: 11px;
+            cursor: pointer;
+            user-select: none;
+            border: 1.5px solid transparent;
+            transition: transform 0.08s ease;
+        }
+        .seat:hover:not(.booked) { transform: translateY(-2px); }
+        .seat.booked {
+            background-color: #3a3a45 !important;
+            color: #666;
+            cursor: not-allowed;
+            border-color: transparent;
+        }
+        .seat.selected {
+            background-color: #ffd93d !important;
+            border-color: #fff;
+            color: #111;
+            font-weight: bold;
+        }
+
+        .legend {
+            margin: 30px auto 10px;
+            font-size: 13px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 18px;
+            max-width: 700px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-box {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .summary-bar {
+            position: sticky;
+            bottom: 0;
+            margin-top: 34px;
+            background: #16161f;
+            border-top: 1px solid #2a2a38;
+            padding: 16px 20px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .summary-seats { font-size: 13px; color: #aaa; text-align: left; }
+        .summary-total { font-size: 20px; font-weight: bold; }
+        .summary-total span { color: #6dd5ff; }
+
+        button {
+            padding: 13px 36px;
+            font-size: 15px;
+            background: linear-gradient(135deg, #e94560, #c73a52);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        button:not(:disabled):hover { filter: brightness(1.1); }
+
+        a.back-link {
+            color: #888;
+            display: inline-block;
+            margin-top: 24px;
+            font-size: 13px;
+            text-decoration: none;
+        }
+    </style>
 </head>
 <body>
-    <h1>Book Tickets</h1>
-    <p><b>Movie:</b> {{ movie.title }}</p>
-    <p><b>Theater:</b> {{ showtime.theater }}</p>
-    <p><b>Date:</b> {{ showtime.show_date }}</p>
-    <p><b>Time:</b> {{ showtime.show_time }}</p>
 
-    <form method="POST">
-        <label>Enter seat numbers (example: A1, A2, B5):</label><br>
-        <input type="text" name="seats" required style="width: 300px;"><br><br>
-        <button type="submit">Confirm Booking</button>
+    <div class="header">
+        <h2>{{ movie.title }}</h2>
+        <p>{{ showtime.theater }} &nbsp;·&nbsp; {{ showtime.show_date }} &nbsp;·&nbsp; {{ showtime.show_time }}</p>
+    </div>
+
+    <div class="screen-wrap">
+        <div class="screen"></div>
+        <div class="screen-label">SCREEN THIS WAY</div>
+    </div>
+
+    <div id="seat-map"></div>
+
+    <div class="legend" id="legend"></div>
+
+    <form method="POST" id="booking-form">
+        <input type="hidden" name="selected_seats" id="selected_seats" value="">
+        <div class="summary-bar">
+            <div class="summary-seats" id="summary-seats">No seats selected</div>
+            <div class="summary-total">Total: <span id="summary-total">₹0</span></div>
+            <button type="submit" id="confirm-btn" disabled>Confirm Booking</button>
+        </div>
     </form>
 
-    <br>
-    <a href="{{ url_for('home') }}">Cancel</a>
+    <a class="back-link" href="{{ url_for('home') }}">← Back to Home</a>
+
+    <script>
+
+        const totalSeatsPerRow = 12;
+        // 3 seats | aisle | 6 seats | aisle | 3 seats -- mirrors a real theater layout
+        const blockSizes = [3, 6, 3];
+
+        let selectedSeats = [];
+        let selectedTotal = 0;
+
+        const seatMap = document.getElementById('seat-map');
+        const legend = document.getElementById('legend');
+
+        function classForRow(rowLetter) {
+            return seatClasses.find(c => c.rows.indexOf(rowLetter) !== -1);
+        }
+
+        // Build seat map, grouped visually by class
+        seatClasses.forEach(function(cls) {
+            const group = document.createElement('div');
+            group.className = 'class-group';
+
+            const title = document.createElement('div');
+            title.className = 'class-title';
+            title.style.color = cls.color;
+            title.innerHTML = cls.name + ' <span class="class-price">— ₹' + cls.price + ' / seat</span>';
+            group.appendChild(title);
+
+            cls.rows.forEach(function(rowName) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+
+                const label = document.createElement('span');
+                label.className = 'row-label';
+                label.innerText = rowName;
+                rowDiv.appendChild(label);
+
+                let seatNum = 1;
+                blockSizes.forEach(function(blockSize) {
+                    const blockDiv = document.createElement('div');
+                    blockDiv.className = 'block';
+
+                    for (let i = 0; i < blockSize; i++) {
+                        const seatId = rowName + seatNum;
+                        const seatDiv = document.createElement('div');
+                        seatDiv.className = 'seat';
+                        seatDiv.innerText = seatNum;
+                        seatDiv.setAttribute('data-id', seatId);
+                        seatDiv.setAttribute('data-price', cls.price);
+                        seatDiv.style.backgroundColor = cls.color;
+
+                        if (bookedSeats.indexOf(seatId) !== -1) {
+                            seatDiv.className += ' booked';
+                        } else {
+                            seatDiv.onclick = function() {
+                                const id = this.getAttribute('data-id');
+                                const price = parseInt(this.getAttribute('data-price'), 10);
+
+                                if (selectedSeats.indexOf(id) === -1) {
+                                    selectedSeats.push(id);
+                                    selectedTotal += price;
+                                    this.className = 'seat selected';
+                                } else {
+                                    selectedSeats = selectedSeats.filter(s => s !== id);
+                                    selectedTotal -= price;
+                                    this.className = 'seat';
+                                    this.style.backgroundColor = cls.color;
+                                }
+                                updateSummary();
+                            };
+                        }
+
+                        blockDiv.appendChild(seatDiv);
+                        seatNum++;
+                    }
+                    rowDiv.appendChild(blockDiv);
+                });
+
+                group.appendChild(rowDiv);
+            });
+
+            seatMap.appendChild(group);
+        });
+
+        // Build legend: seat classes + selected/booked states
+        seatClasses.forEach(function(cls) {
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            item.innerHTML = '<span class="legend-box" style="background:' + cls.color + ';"></span>' +
+                              cls.name + ' (₹' + cls.price + ')';
+            legend.appendChild(item);
+        });
+        legend.innerHTML += '<div class="legend-item"><span class="legend-box" style="background:#ffd93d;"></span>Selected</div>';
+        legend.innerHTML += '<div class="legend-item"><span class="legend-box" style="background:#3a3a45;"></span>Booked</div>';
+
+        function updateSummary() {
+            document.getElementById('selected_seats').value = selectedSeats.join(',');
+            document.getElementById('summary-total').innerText = '₹' + selectedTotal;
+            document.getElementById('confirm-btn').disabled = selectedSeats.length === 0;
+            document.getElementById('summary-seats').innerText = selectedSeats.length
+                ? selectedSeats.length + ' seat(s): ' + selectedSeats.sort().join(', ')
+                : 'No seats selected';
+        }
+    </script>
+
 </body>
 </html>

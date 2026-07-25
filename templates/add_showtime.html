@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Showtime</title>
+    <style>
+        body { font-family: Arial; background: #f0f2f5; display: flex; justify-content: center; padding-top: 60px; }
+        .box { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        select, input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Add Showtime</h2>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}<p style="color:red;">{{ messages[0] }}</p>{% endif %}
+        {% endwith %}
+        {% if not theaters %}
+        <p style="color:#c0392b;">No theaters yet — you need to add one before you can create a showtime.</p>
+        <p style="margin-top:15px;"><a href="{{ url_for('add_theater') }}">+ Add a theater</a> &nbsp;|&nbsp; <a href="{{ url_for('admin') }}">← Back to Admin</a></p>
+        {% else %}
+        <form method="POST">
+            <select name="movie_id" required>
+                <option value="" disabled selected>Select movie</option>
+                {% for m in movies %}
+                <option value="{{ m.id }}">{{ m.title }}</option>
+                {% endfor %}
+            </select>
+            <select name="theater" required>
+                <option value="" disabled selected>Select theater</option>
+                {% for t in theaters %}
+                <option value="{{ t.name }}">{{ t.name }}{% if t.location %} — {{ t.location }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <input type="date" name="show_date" required>
+            <input type="text" name="show_time" placeholder="e.g. 6:30 PM" required>
+            <button type="submit">Add Showtime</button>
+        </form>
+        <p style="margin-top:15px;"><a href="{{ url_for('admin') }}">← Back to Admin</a> &nbsp;|&nbsp; <a href="{{ url_for('add_theater') }}">+ Add a new theater</a></p>
+        {% endif %}
+    </div>
+</body>
+</html>

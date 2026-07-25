@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Theater</title>
+    <style>
+        body { font-family: Arial; background: #f0f2f5; display: flex; justify-content: center; padding-top: 60px; }
+        .box { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Add Theater</h2>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}<p style="color:red;">{{ messages[0] }}</p>{% endif %}
+        {% endwith %}
+        <form method="POST">
+            <input type="text" name="name" placeholder="Theater name (e.g. INOX Varun Beach)" required>
+            <input type="text" name="location" placeholder="Location / area (e.g. RK Beach Road)">
+            <button type="submit">Add Theater</button>
+        </form>
+        <p style="margin-top:15px;"><a href="{{ url_for('admin') }}">← Back to Admin</a></p>
+    </div>
+</body>
+</html>
