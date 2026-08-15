@@ -1,0 +1,6 @@
+Flask>=3.0
+Flask-SQLAlchemy>=3.1
+Flask-Login>=0.6
+requests>=2.31
+qrcode[pil]>=7.4          # e-ticket QR code
+razorpay>=1.4             # only needed for live payments; mock mode works without it

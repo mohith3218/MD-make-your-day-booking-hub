@@ -222,6 +222,10 @@ def main():
         rev = A.db.session.query(A.db.func.sum(A.Booking.total_amount)) \
                           .filter(A.Booking.status == 'PAID').scalar()
         seats = sum(s.total_seats for s in A.Screen.query.all())
+        assert A.Theater.query.count() >= 23 and A.Screen.query.count() >= 40
+        aaa = A.Theater.query.filter_by(name='AAA Cinemas').one()
+        assert sorted(s.total_seats for s in aaa.screens) == \
+            [34, 58, 76, 130, 130, 197, 436, 491], 'AAA seat counts drifted'
         print(f"\nSeeded {A.Theater.query.count()} Vizag theatres, "
               f"{A.Screen.query.count()} screens, {seats} total seats")
         print(f"Revenue from paid bookings: ₹{rev:.2f}")
