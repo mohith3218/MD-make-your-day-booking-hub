@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Add Movie · Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6">
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-xl font-bold text-white">Add Movie</h1>
+    <a href="{{ url_for('admin') }}" class="text-xs text-slate-400 hover:text-white">← Admin</a>
+  </div>
+
+  <form method="POST" class="space-y-4">
+    <input type="text" name="title" placeholder="Movie title" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+    <textarea name="description" rows="3" placeholder="Description" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]"></textarea>
+    <input type="number" name="duration" placeholder="Duration (minutes)" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+    <div class="flex gap-3">
+      <select name="language" class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        {% for l in ['Telugu', 'Hindi', 'English', 'Tamil', 'Malayalam', 'Kannada'] %}<option>{{ l }}</option>{% endfor %}
+      </select>
+      <select name="certificate" class="w-32 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        {% for c in ['U', 'U/A', 'A'] %}<option>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <input type="text" name="poster" placeholder="Poster URL (https://...jpg)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+    <button type="submit" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">Add Movie</button>
+  </form>
+</div>
+{% endblock %}

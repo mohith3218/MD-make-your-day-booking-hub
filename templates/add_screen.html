@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Add Screen · Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto glass-card rounded-3xl p-8 space-y-6">
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-xl font-bold text-white">Add Screen</h1>
+    <a href="{{ url_for('screens') }}" class="text-xs text-slate-400 hover:text-white">← Screens</a>
+  </div>
+
+  {% if not theaters %}
+    <div class="text-center space-y-3 py-4">
+      <p class="text-xs text-amber-400">Add a theatre first.</p>
+      <a href="{{ url_for('add_theater') }}" class="inline-block px-4 py-2 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">+ Add Theatre</a>
+    </div>
+  {% else %}
+    <form method="POST" class="space-y-4">
+      <select name="theater_id" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <option value="" disabled selected>Select theatre</option>
+        {% for t in theaters %}<option value="{{ t.id }}">{{ t.display_name }}</option>{% endfor %}
+      </select>
+
+      <div class="flex gap-3">
+        <input type="text" name="name" placeholder="Screen name (e.g. Screen 1)" required
+               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <select name="screen_type" class="w-40 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+          {% for t in ['2D', '3D', 'IMAX', '4DX', 'Recliner', '70MM', '4K Laser'] %}<option>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="space-y-2">
+        <label class="block text-xs text-slate-400">Seating arrangement (JSON) — edit rows to match the real audi</label>
+        <textarea name="layout_json" rows="18" spellcheck="false"
+                  class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-[11px] leading-relaxed text-slate-300 font-mono focus:outline-none focus:border-[#FF2E63]">{{ sample }}</textarea>
+      </div>
+
+      <button type="submit" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+        Create screen
+      </button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Payment · {{ booking.reference }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-2xl font-bold text-white">Complete your payment</h1>
+  <div class="glass-card rounded-xl px-4 py-2 text-right">
+    <p class="text-[10px] uppercase tracking-wider text-slate-500">Seats held for</p>
+    <p id="timer" class="text-lg font-black text-amber-400">--:--</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+  <!-- order summary -->
+  <section class="lg:col-span-2 glass-card rounded-2xl p-6 space-y-4 h-fit">
+    <div class="flex gap-4">
+      {% if movie.poster %}
+        <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-20 rounded-xl border border-slate-800">
+      {% endif %}
+      <div class="min-w-0">
+        <h2 class="text-base font-bold text-white break-words">{{ movie.title }}</h2>
+        <p class="text-[11px] text-slate-400 mt-1">{{ showtime.theater }}</p>
+        <p class="text-[11px] text-slate-400">{{ showtime.screen_label }} · {{ showtime.show_date.strftime('%d %b %Y') }} · {{ showtime.show_time }}</p>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-800 pt-4 space-y-2">
+      {% for s in booking.seat_meta %}
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-slate-300"><span class="font-bold text-white">{{ s.id }}</span> · {{ s['class'] }}</span>
+          <span class="text-slate-300">₹{{ '%.0f'|format(s.price) }}</span>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="border-t border-slate-800 pt-4 space-y-2 text-xs">
+      <div class="flex justify-between text-slate-400"><span>Tickets ({{ booking.seat_list|length }})</span><span>₹{{ '%.2f'|format(booking.ticket_amount) }}</span></div>
+      <div class="flex justify-between text-slate-400"><span>Convenience fee</span><span>₹{{ '%.2f'|format(booking.convenience_fee) }}</span></div>
+      <div class="flex justify-between text-slate-400"><span>GST (18% on fee)</span><span>₹{{ '%.2f'|format(booking.gst) }}</span></div>
+      <div class="flex justify-between pt-2 border-t border-slate-800 text-sm font-bold text-white">
+        <span>Amount payable</span><span class="text-[#FF2E63]">₹{{ '%.2f'|format(booking.total_amount) }}</span>
+      </div>
+    </div>
+
+    <p class="text-[10px] text-slate-600">Booking ref {{ booking.reference }}</p>
+  </section>
+
+  <!-- payment methods -->
+  <section class="lg:col-span-3 space-y-4">
+
+    <!-- wallet -->
+    <form method="POST" action="{{ url_for('pay_with_wallet', reference=booking.reference) }}"
+          class="glass-card rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+      <div class="min-w-0">
+        <p class="text-sm font-bold text-white"><i class="fa-solid fa-wallet text-emerald-400 mr-2"></i>CineWave Wallet</p>
+        <p class="text-[11px] text-slate-400 mt-1">Balance ₹{{ '%.2f'|format(wallet.balance) }}
+          {% if not can_use_wallet %}<span class="text-amber-400">· ₹{{ '%.2f'|format(booking.total_amount - wallet.balance) }} short</span>{% endif %}
+        </p>
+      </div>
+      {% if can_use_wallet %}
+        <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition whitespace-nowrap">
+          Pay ₹{{ '%.0f'|format(booking.total_amount) }} from wallet
+        </button>
+      {% else %}
+        <a href="{{ url_for('wallet_page') }}" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition whitespace-nowrap">Recharge wallet</a>
+      {% endif %}
+    </form>
+
+    <!-- gateway -->
+    <div class="glass-card rounded-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-sm font-bold text-white"><i class="fa-solid fa-credit-card text-[#FF2E63] mr-2"></i>UPI / Card / Netbanking</p>
+        <span class="text-[10px] px-2 py-1 rounded-full {% if gateway == 'razorpay' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-amber-500/10 text-amber-500 border border-amber-500/20{% endif %} whitespace-nowrap">
+          {% if gateway == 'razorpay' %}Razorpay live{% else %}Sandbox mode{% endif %}
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {% for m, icon, label in [('upi','fa-mobile-screen','UPI / GPay / PhonePe'), ('card','fa-credit-card','Credit / Debit card'), ('netbanking','fa-building-columns','Netbanking')] %}
+          <form method="POST" action="{{ url_for('pay_gateway', reference=booking.reference) }}">
+            <input type="hidden" name="method" value="{{ m }}">
+            <button type="submit" class="w-full h-full px-4 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-[#FF2E63] rounded-xl transition text-left">
+              <i class="fa-solid {{ icon }} text-[#FF2E63]"></i>
+              <p class="text-xs font-semibold text-white mt-2 leading-snug">{{ label }}</p>
+            </button>
+          </form>
+        {% endfor %}
+      </div>
+
+      {% if gateway != 'razorpay' %}
+        <p class="text-[10px] text-slate-500 leading-relaxed">
+          No Razorpay keys found, so payments run through the built-in sandbox: it creates a real
+          order record, returns a signed response and verifies the signature exactly like the live
+          gateway. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to switch to real Razorpay Checkout.
+        </p>
+      {% endif %}
+    </div>
+
+    <form method="POST" action="{{ url_for('cancel_booking', reference=booking.reference) }}">
+      <button type="submit" class="text-[11px] text-slate-500 hover:text-[#FF2E63] transition">Cancel and release seats</button>
+    </form>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let left = {{ booking.seconds_left }};
+  const out = document.getElementById('timer');
+  function tick() {
+    if (left <= 0) {
+      out.textContent = 'Expired';
+      window.location.href = "{{ url_for('book', showtime_id=booking.showtime_id) }}";
+      return;
+    }
+    const m = String(Math.floor(left / 60)).padStart(2, '0');
+    const s = String(left % 60).padStart(2, '0');
+    out.textContent = `${m}:${s}`;
+    left--;
+    setTimeout(tick, 1000);
+  }
+  tick();
+</script>
+{% endblock %}

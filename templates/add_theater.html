@@ -1,26 +1,20 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Theater</title>
-    <style>
-        body { font-family: Arial; background: #f0f2f5; display: flex; justify-content: center; padding-top: 60px; }
-        .box { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h2>Add Theater</h2>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}<p style="color:red;">{{ messages[0] }}</p>{% endif %}
-        {% endwith %}
-        <form method="POST">
-            <input type="text" name="name" placeholder="Theater name (e.g. INOX Varun Beach)" required>
-            <input type="text" name="location" placeholder="Location / area (e.g. RK Beach Road)">
-            <button type="submit">Add Theater</button>
-        </form>
-        <p style="margin-top:15px;"><a href="{{ url_for('admin') }}">← Back to Admin</a></p>
-    </div>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Add Theatre · Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6">
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-xl font-bold text-white">Add Theatre</h1>
+    <a href="{{ url_for('screens') }}" class="text-xs text-slate-400 hover:text-white">← Screens</a>
+  </div>
+
+  <form method="POST" class="space-y-4">
+    <input type="text" name="name" placeholder="Theatre name (e.g. INOX Varun Beach)" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+    <input type="text" name="location" placeholder="Area (e.g. Beach Road)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+    <input type="text" name="city" value="Visakhapatnam" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+    <textarea name="address" rows="2" placeholder="Full address" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]"></textarea>
+    <button type="submit" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">Add Theatre</button>
+  </form>
+  <p class="text-[10px] text-slate-500">After this, add screens and set each one's seating arrangement.</p>
+</div>
+{% endblock %}

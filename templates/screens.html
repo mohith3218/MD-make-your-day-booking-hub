@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Theatres & Screens · Admin{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-2xl font-black text-white">Theatres &amp; Screens</h1>
+  <div class="flex flex-wrap gap-3">
+    <a href="{{ url_for('admin') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">← Admin</a>
+    <a href="{{ url_for('add_theater') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">+ Theatre</a>
+    <a href="{{ url_for('add_screen') }}" class="px-4 py-2 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">+ Screen</a>
+    <form method="POST" action="{{ url_for('seed_vizag') }}">
+      <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition">
+        Load Vizag theatres
+      </button>
+    </form>
+  </div>
+</div>
+
+{% for t in theaters %}
+  <section class="glass-card rounded-2xl p-6 space-y-4">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <div class="min-w-0">
+        <h2 class="text-lg font-bold text-white break-words">{{ t.name }}</h2>
+        <p class="text-[11px] text-slate-400">{{ t.location or '—' }}{% if t.city %} · {{ t.city }}{% endif %}</p>
+      </div>
+      <p class="text-[11px] text-slate-500">{{ t.screens|length }} screen(s)</p>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-300">
+        <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+          <tr>
+            <th class="p-3">Screen</th><th class="p-3">Type</th>
+            <th class="p-3">Seats</th><th class="p-3">Classes</th><th class="p-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for s in t.screens %}
+            <tr>
+              <td class="p-3 font-semibold text-white whitespace-nowrap">{{ s.name }}</td>
+              <td class="p-3 whitespace-nowrap">{{ s.screen_type }}</td>
+              <td class="p-3 font-bold text-[#FF2E63]">{{ s.total_seats }}</td>
+              <td class="p-3 text-slate-400">{{ s.classes_summary or '—' }}</td>
+              <td class="p-3 text-right whitespace-nowrap">
+                <a href="{{ url_for('edit_layout', screen_id=s.id) }}" class="text-[#FF2E63] hover:underline font-semibold">Edit layout</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="p-3 text-slate-500">No screens yet — add one to enable bookings.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% else %}
+  <div class="glass-card rounded-2xl p-10 text-center space-y-3">
+    <p class="text-slate-400 text-sm">No theatres yet.</p>
+    <form method="POST" action="{{ url_for('seed_vizag') }}">
+      <button type="submit" class="px-6 py-2.5 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">
+        Load the Vizag theatre set
+      </button>
+    </form>
+  </div>
+{% endfor %}
+{% endblock %}

@@ -1,43 +1,83 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Showtime</title>
-    <style>
-        body { font-family: Arial; background: #f0f2f5; display: flex; justify-content: center; padding-top: 60px; }
-        .box { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        select, input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h2>Add Showtime</h2>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}<p style="color:red;">{{ messages[0] }}</p>{% endif %}
-        {% endwith %}
-        {% if not theaters %}
-        <p style="color:#c0392b;">No theaters yet — you need to add one before you can create a showtime.</p>
-        <p style="margin-top:15px;"><a href="{{ url_for('add_theater') }}">+ Add a theater</a> &nbsp;|&nbsp; <a href="{{ url_for('admin') }}">← Back to Admin</a></p>
-        {% else %}
-        <form method="POST">
-            <select name="movie_id" required>
-                <option value="" disabled selected>Select movie</option>
-                {% for m in movies %}
-                <option value="{{ m.id }}">{{ m.title }}</option>
-                {% endfor %}
-            </select>
-            <select name="theater" required>
-                <option value="" disabled selected>Select theater</option>
-                {% for t in theaters %}
-                <option value="{{ t.name }}">{{ t.name }}{% if t.location %} — {{ t.location }}{% endif %}</option>
-                {% endfor %}
-            </select>
-            <input type="date" name="show_date" required>
-            <input type="text" name="show_time" placeholder="e.g. 6:30 PM" required>
-            <button type="submit">Add Showtime</button>
-        </form>
-        <p style="margin-top:15px;"><a href="{{ url_for('admin') }}">← Back to Admin</a> &nbsp;|&nbsp; <a href="{{ url_for('add_theater') }}">+ Add a new theater</a></p>
-        {% endif %}
+{% extends "base.html" %}
+{% block title %}Add Showtime · Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto glass-card rounded-3xl p-8 space-y-6">
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-xl font-bold text-white">Add Showtime</h1>
+    <a href="{{ url_for('admin') }}" class="text-xs text-slate-400 hover:text-white">← Admin</a>
+  </div>
+
+  {% if not screens %}
+    <div class="text-center space-y-3 py-4">
+      <p class="text-xs text-amber-400">You need at least one theatre screen before scheduling shows.</p>
+      <a href="{{ url_for('screens') }}" class="inline-block px-4 py-2 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">Set up screens</a>
     </div>
-</body>
-</html>
+  {% elif not movies %}
+    <div class="text-center space-y-3 py-4">
+      <p class="text-xs text-amber-400">Add a movie first.</p>
+      <a href="{{ url_for('add_movie') }}" class="inline-block px-4 py-2 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">+ Add Movie</a>
+    </div>
+  {% else %}
+    <form method="POST" class="space-y-4">
+      <select name="movie_id" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <option value="" disabled selected>Select movie</option>
+        {% for m in movies %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}
+      </select>
+
+      <select name="screen_id" id="screen-select" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <option value="" disabled selected>Select theatre &amp; screen</option>
+        {% for t in theaters %}
+          {% if t.screens %}
+            <optgroup label="{{ t.display_name }}">
+              {% for s in t.screens %}
+                <option value="{{ s.id }}">{{ s.name }} · {{ s.screen_type }} · {{ s.total_seats }} seats</option>
+              {% endfor %}
+            </optgroup>
+          {% endif %}
+        {% endfor %}
+      </select>
+
+      <div class="flex gap-3">
+        <input type="date" name="show_date" required value="{{ today }}"
+               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <input type="text" name="show_time" placeholder="e.g. 6:30 PM" required
+               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      </div>
+
+      <div id="price-box" class="hidden space-y-2">
+        <label class="block text-xs text-slate-400">Ticket price per class (leave blank to keep the screen's default)</label>
+        <div id="price-fields" class="space-y-2"></div>
+      </div>
+
+      <button type="submit" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+        Add Showtime
+      </button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const sel = document.getElementById('screen-select');
+  if (sel) {
+    sel.addEventListener('change', async () => {
+      const res = await fetch(`/api/screen/${sel.value}/classes`);
+      const data = await res.json();
+      const box = document.getElementById('price-box');
+      const fields = document.getElementById('price-fields');
+      fields.innerHTML = '';
+      data.classes.forEach(c => {
+        fields.insertAdjacentHTML('beforeend', `
+          <div class="flex items-center gap-3">
+            <span class="flex-1 text-xs text-slate-300">${c.name}</span>
+            <input type="number" name="price_${c.code}" min="0" step="1" placeholder="${c.price}"
+                   class="w-28 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+          </div>`);
+      });
+      box.classList.toggle('hidden', data.classes.length === 0);
+    });
+  }
+</script>
+{% endblock %}

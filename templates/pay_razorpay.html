@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Razorpay Checkout · {{ booking.reference }}{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6 text-center">
+  <p class="text-[10px] uppercase tracking-[0.2em] text-emerald-400">Razorpay secure checkout</p>
+  <h1 class="text-3xl font-black text-white">₹{{ '%.2f'|format(booking.total_amount) }}</h1>
+  <p class="text-xs text-slate-400 break-words">{{ movie.title }} · {{ showtime.theater }} · {{ booking.seats }}</p>
+
+  <p class="text-xs text-slate-400">The payment window should open automatically.</p>
+  <button id="pay-btn" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+    Open payment window
+  </button>
+
+  <form id="success-form" method="POST" action="{{ url_for('payment_callback') }}" class="hidden">
+    <input type="hidden" name="reference" value="{{ booking.reference }}">
+    <input type="hidden" name="razorpay_order_id" id="f_order">
+    <input type="hidden" name="razorpay_payment_id" id="f_payment">
+    <input type="hidden" name="razorpay_signature" id="f_signature">
+  </form>
+
+  <form id="fail-form" method="POST" action="{{ url_for('payment_callback') }}" class="hidden">
+    <input type="hidden" name="reference" value="{{ booking.reference }}">
+    <input type="hidden" name="failed" value="1">
+    <input type="hidden" name="error_message" id="f_error">
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+  const options = {
+    key: "{{ order.key_id }}",
+    amount: {{ order.amount_paise }},
+    currency: "{{ order.currency }}",
+    name: "CineWave",
+    description: "{{ movie.title }} · {{ booking.seats }}",
+    order_id: "{{ order.order_id }}",
+    prefill: {
+      name: "{{ user.username }}",
+      email: "{{ user.email or '' }}",
+      contact: "{{ user.phone or '' }}"
+    },
+    notes: { reference: "{{ booking.reference }}" },
+    theme: { color: "#FF2E63" },
+    handler: function (response) {
+      document.getElementById('f_order').value = response.razorpay_order_id;
+      document.getElementById('f_payment').value = response.razorpay_payment_id;
+      document.getElementById('f_signature').value = response.razorpay_signature;
+      document.getElementById('success-form').submit();
+    },
+    modal: {
+      ondismiss: function () {
+        document.getElementById('f_error').value = 'Payment window was closed.';
+        document.getElementById('fail-form').submit();
+      }
+    }
+  };
+
+  const rzp = new Razorpay(options);
+  rzp.on('payment.failed', function (resp) {
+    document.getElementById('f_error').value =
+      (resp.error && resp.error.description) || 'Payment failed.';
+    document.getElementById('fail-form').submit();
+  });
+
+  document.getElementById('pay-btn').addEventListener('click', () => rzp.open());
+  window.addEventListener('load', () => rzp.open());
+</script>
+{% endblock %}

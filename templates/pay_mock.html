@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Sandbox Payment · {{ booking.reference }}{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6">
+  <div class="text-center space-y-1">
+    <p class="text-[10px] uppercase tracking-[0.2em] text-amber-500">Sandbox gateway</p>
+    <h1 class="text-2xl font-black text-white">₹{{ '%.2f'|format(booking.total_amount) }}</h1>
+    <p class="text-xs text-slate-400 break-words">{{ movie.title }} · {{ booking.seats }}</p>
+  </div>
+
+  <div class="bg-slate-900/70 rounded-2xl p-4 space-y-2 text-[11px] text-slate-400">
+    <div class="flex justify-between gap-3"><span>Order ID</span><span class="text-slate-200 font-mono break-all text-right">{{ order.order_id }}</span></div>
+    <div class="flex justify-between gap-3"><span>Amount (paise)</span><span class="text-slate-200 font-mono">{{ order.amount_paise }}</span></div>
+    <div class="flex justify-between gap-3"><span>Method</span><span class="text-slate-200 uppercase">{{ method }}</span></div>
+    <div class="flex justify-between gap-3"><span>Payer</span><span class="text-slate-200">{{ user.username }}</span></div>
+  </div>
+
+  {% if method == 'upi' %}
+    <div class="text-center space-y-2">
+      <div class="w-32 h-32 mx-auto bg-white rounded-xl flex items-center justify-center">
+        <i class="fa-solid fa-qrcode text-6xl text-slate-900"></i>
+      </div>
+      <p class="text-[11px] text-slate-500">Scan with any UPI app (simulated)</p>
+    </div>
+  {% elif method == 'card' %}
+    <div class="space-y-3">
+      <input value="4111 1111 1111 1111" readonly class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-300 font-mono">
+      <div class="flex gap-3">
+        <input value="12/28" readonly class="w-1/2 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-300 font-mono">
+        <input value="123" readonly class="w-1/2 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-300 font-mono">
+      </div>
+      <p class="text-[10px] text-slate-600">Test card, no real charge.</p>
+    </div>
+  {% else %}
+    <p class="text-xs text-slate-400 text-center">Redirecting to your bank (simulated).</p>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('simulate', reference=booking.reference) }}" class="space-y-3">
+    <button type="submit" name="outcome" value="success"
+            class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+      Pay ₹{{ '%.2f'|format(booking.total_amount) }}
+    </button>
+    <button type="submit" name="outcome" value="fail"
+            class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition">
+      Simulate a failed payment
+    </button>
+  </form>
+
+  <p class="text-[10px] text-center text-slate-600 leading-relaxed">
+    The response is signed with HMAC-SHA256 and verified server side, same as Razorpay.
+  </p>
+</div>
+{% endblock %}

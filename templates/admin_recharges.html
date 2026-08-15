@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Recharge Requests · Admin{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3">
+  <h1 class="text-2xl font-black text-white">Wallet Recharge Requests</h1>
+  <a href="{{ url_for('admin') }}" class="text-xs text-slate-400 hover:text-white">← Admin</a>
+</div>
+
+<section class="glass-card rounded-2xl p-6">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">ID</th><th class="p-3">User</th><th class="p-3">Amount</th><th class="p-3">Requested</th><th class="p-3">Status</th><th class="p-3 text-right">Action</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for r in requests %}
+          {% set c = {'APPROVED':'emerald','PENDING':'amber','REJECTED':'rose'}.get(r.status,'slate') %}
+          <tr>
+            <td class="p-3">{{ r.id }}</td>
+            <td class="p-3 font-semibold text-white">{{ r.user.username }}</td>
+            <td class="p-3 font-bold text-[#FF2E63]">₹{{ '%.0f'|format(r.amount) }}</td>
+            <td class="p-3 whitespace-nowrap">{{ r.created_at.strftime('%d %b %Y, %I:%M %p') }}</td>
+            <td class="p-3"><span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ c }}-500/10 text-{{ c }}-400 border border-{{ c }}-500/20">{{ r.status }}</span></td>
+            <td class="p-3 text-right">
+              {% if r.status == 'PENDING' %}
+                <div class="flex gap-2 justify-end">
+                  <form method="POST" action="{{ url_for('handle_recharge', req_id=r.id, action='approve') }}">
+                    <button class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold rounded-lg transition">Approve</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('handle_recharge', req_id=r.id, action='reject') }}">
+                    <button class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg transition">Reject</button>
+                  </form>
+                </div>
+              {% else %}
+                <span class="text-slate-600">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="p-3 text-slate-500">No recharge requests.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

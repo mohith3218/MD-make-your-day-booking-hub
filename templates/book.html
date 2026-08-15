@@ -1,278 +1,159 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Select Seats — {{ movie.title }}</title>
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: radial-gradient(ellipse at top, #1b1b2f 0%, #0d0d17 70%);
-            color: #eee;
-            text-align: center;
-            padding: 24px 16px 60px;
-            margin: 0;
-        }
-        .header h2 { margin: 0 0 4px; font-size: 24px; }
-        .header p { margin: 0; color: #999; font-size: 14px; }
+{% extends "base.html" %}
+{% block title %}Select Seats · {{ movie.title }}{% endblock %}
 
-        .screen-wrap { margin: 40px auto 30px; max-width: 620px; }
-        .screen {
-            height: 8px;
-            background: linear-gradient(90deg, transparent, #6dd5ff, transparent);
-            border-radius: 50%;
-            box-shadow: 0 0 25px 6px rgba(109, 213, 255, 0.55);
-            margin: 0 auto;
-        }
-        .screen-label {
-            color: #6dd5ff;
-            font-size: 12px;
-            letter-spacing: 4px;
-            margin-top: 10px;
-        }
+{% block content %}
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="text-xs text-slate-400 hover:text-white transition">← Back to movie</a>
+    <h1 class="text-2xl font-bold text-white mt-2">{{ movie.title }}</h1>
+    <p class="text-xs text-slate-400 mt-1">
+      {{ showtime.theater }}{% if showtime.screen.theater.location %} · {{ showtime.screen.theater.location }}{% endif %}
+      · {{ screen.name }} ({{ screen.screen_type }})
+    </p>
+    <p class="text-xs text-slate-400">{{ showtime.show_date.strftime('%a, %d %b %Y') }} · {{ showtime.show_time }}</p>
+  </div>
+  <div class="glass-card rounded-xl px-4 py-3 text-right">
+    <p class="text-[10px] uppercase tracking-wider text-slate-500">Seats available</p>
+    <p class="text-lg font-black text-white">{{ stats.left }} <span class="text-xs font-medium text-slate-500">/ {{ stats.total }}</span></p>
+  </div>
+</div>
 
-        #seat-map { max-width: 700px; margin: 0 auto; }
+<!-- legend -->
+<div class="flex flex-wrap items-center gap-4 text-[11px] text-slate-400">
+  <span class="flex items-center gap-2"><span class="seat seat-avail inline-block"></span> Available</span>
+  <span class="flex items-center gap-2"><span class="seat seat-sel inline-block"></span> Selected</span>
+  <span class="flex items-center gap-2"><span class="seat seat-held inline-block"></span> Being booked</span>
+  <span class="flex items-center gap-2"><span class="seat seat-booked inline-block"></span> Sold</span>
+  <span class="ml-auto">Max {{ max_seats }} seats per booking</span>
+</div>
 
-        .class-group { margin-bottom: 22px; }
-        .class-title {
-            font-size: 12px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-        .class-price { font-weight: 400; opacity: 0.65; letter-spacing: 0; text-transform: none; }
+<form id="booking-form" method="POST" class="space-y-6">
+  <input type="hidden" name="selected_seats" id="selected_seats_input">
 
-        .row { display: flex; align-items: center; justify-content: center; margin: 5px 0; }
-        .row-label {
-            width: 22px;
-            font-size: 12px;
-            color: #888;
-            text-align: right;
-            margin-right: 10px;
-        }
-        .block { display: flex; }
-        .block + .block { margin-left: 22px; } /* aisle gap */
-
-        .seat {
-            width: 28px;
-            height: 28px;
-            line-height: 28px;
-            margin: 3px;
-            border-radius: 7px 7px 3px 3px;
-            font-size: 11px;
-            cursor: pointer;
-            user-select: none;
-            border: 1.5px solid transparent;
-            transition: transform 0.08s ease;
-        }
-        .seat:hover:not(.booked) { transform: translateY(-2px); }
-        .seat.booked {
-            background-color: #3a3a45 !important;
-            color: #666;
-            cursor: not-allowed;
-            border-color: transparent;
-        }
-        .seat.selected {
-            background-color: #ffd93d !important;
-            border-color: #fff;
-            color: #111;
-            font-weight: bold;
-        }
-
-        .legend {
-            margin: 30px auto 10px;
-            font-size: 13px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 18px;
-            max-width: 700px;
-        }
-        .legend-item { display: flex; align-items: center; gap: 6px; }
-        .legend-box {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-
-        .summary-bar {
-            position: sticky;
-            bottom: 0;
-            margin-top: 34px;
-            background: #16161f;
-            border-top: 1px solid #2a2a38;
-            padding: 16px 20px;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
-            border-radius: 12px 12px 0 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .summary-seats { font-size: 13px; color: #aaa; text-align: left; }
-        .summary-total { font-size: 20px; font-weight: bold; }
-        .summary-total span { color: #6dd5ff; }
-
-        button {
-            padding: 13px 36px;
-            font-size: 15px;
-            background: linear-gradient(135deg, #e94560, #c73a52);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-        button:disabled {
-            background: #444;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        button:not(:disabled):hover { filter: brightness(1.1); }
-
-        a.back-link {
-            color: #888;
-            display: inline-block;
-            margin-top: 24px;
-            font-size: 13px;
-            text-decoration: none;
-        }
-    </style>
-</head>
-<body>
-
-    <div class="header">
-        <h2>{{ movie.title }}</h2>
-        <p>{{ showtime.theater }} &nbsp;·&nbsp; {{ showtime.show_date }} &nbsp;·&nbsp; {{ showtime.show_time }}</p>
-    </div>
-
-    <div class="screen-wrap">
-        <div class="screen"></div>
-        <div class="screen-label">SCREEN THIS WAY</div>
-    </div>
-
-    <div id="seat-map"></div>
-
-    <div class="legend" id="legend"></div>
-
-    <form method="POST" id="booking-form">
-        <input type="hidden" name="selected_seats" id="selected_seats" value="">
-        <div class="summary-bar">
-            <div class="summary-seats" id="summary-seats">No seats selected</div>
-            <div class="summary-total">Total: <span id="summary-total">₹0</span></div>
-            <button type="submit" id="confirm-btn" disabled>Confirm Booking</button>
+  <div class="glass-card rounded-2xl p-4 sm:p-6 rowscroll">
+    <div class="min-w-max mx-auto space-y-1">
+      {% for cls in grid %}
+        <div class="pt-4 pb-1 flex items-center gap-3">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300">{{ cls.name }}</span>
+          <span class="text-[10px] text-[#FF2E63] font-bold">₹{{ '%.0f'|format(cls.price) }}</span>
+          <span class="flex-1 border-t border-dashed border-slate-800"></span>
+          <span class="text-[10px] text-slate-600">{{ cls.seats }} seats</span>
         </div>
-    </form>
 
-    <a class="back-link" href="{{ url_for('home') }}">← Back to Home</a>
+        {% for row in cls.rows %}
+          <div class="flex items-center gap-1.5 justify-center">
+            <span class="w-8 text-[10px] text-slate-500 font-bold text-right pr-1">{{ row.label }}</span>
+            {% for cell in row.cells %}
+              {% if cell.kind == 'aisle' %}
+                <span class="aisle inline-block"></span>
+              {% elif cell.kind == 'pad' %}
+                <span class="pad inline-block"></span>
+              {% elif cell.kind == 'blocked' %}
+                <span class="seat seat-blocked inline-flex items-center justify-center">×</span>
+              {% else %}
+                <button type="button"
+                        data-seat="{{ cell.id }}"
+                        data-price="{{ cell.price }}"
+                        data-class="{{ cell.cls }}"
+                        {% if cell.status == 'available' %}
+                          class="seat seat-avail seat-btn font-semibold transition {% if cell.span == 2 %}seat-wide{% endif %}"
+                        {% elif cell.status == 'held' %}
+                          disabled title="Someone is booking this seat"
+                          class="seat seat-held font-semibold {% if cell.span == 2 %}seat-wide{% endif %}"
+                        {% else %}
+                          disabled title="Sold"
+                          class="seat seat-booked font-semibold {% if cell.span == 2 %}seat-wide{% endif %}"
+                        {% endif %}>{{ cell.num }}</button>
+              {% endif %}
+            {% endfor %}
+            <span class="w-8 text-[10px] text-slate-500 font-bold pl-1">{{ row.label }}</span>
+          </div>
+        {% endfor %}
+      {% endfor %}
 
-    <script>
+      <div class="pt-8 pb-2">
+        <div class="h-2 bg-gradient-to-r from-[#FF2E63]/10 via-[#FF2E63] to-[#FF2E63]/10 rounded-full screen-glow w-2/3 mx-auto"></div>
+        <p class="text-[10px] tracking-[0.3em] text-center text-slate-500 uppercase mt-2">All eyes this way</p>
+      </div>
+    </div>
+  </div>
 
-        const totalSeatsPerRow = 12;
-        // 3 seats | aisle | 6 seats | aisle | 3 seats -- mirrors a real theater layout
-        const blockSizes = [3, 6, 3];
+  <div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 sticky bottom-4">
+    <div class="min-w-0">
+      <p class="text-[11px] text-slate-400">Selected seats</p>
+      <p id="selected-display" class="text-sm font-bold text-white break-words">None</p>
+      <p id="selected-classes" class="text-[10px] text-slate-500"></p>
+    </div>
+    <div class="text-right">
+      <p class="text-[11px] text-slate-400">Ticket total</p>
+      <p id="total-price" class="text-xl font-black text-[#FF2E63]">₹0</p>
+    </div>
+    <button type="submit" id="confirm-btn" disabled
+            class="px-6 py-3 bg-[#FF2E63] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30 whitespace-nowrap">
+      Proceed to Pay
+    </button>
+  </div>
+</form>
+{% endblock %}
 
-        let selectedSeats = [];
-        let selectedTotal = 0;
+{% block scripts %}
+<script>
+  const MAX_SEATS = {{ max_seats }};
+  const selected = new Map();
+  const input = document.getElementById('selected_seats_input');
+  const display = document.getElementById('selected-display');
+  const classLine = document.getElementById('selected-classes');
+  const priceOut = document.getElementById('total-price');
+  const btn = document.getElementById('confirm-btn');
 
-        const seatMap = document.getElementById('seat-map');
-        const legend = document.getElementById('legend');
+  function paint() {
+    const seats = [...selected.keys()];
+    const total = [...selected.values()].reduce((a, s) => a + s.price, 0);
+    input.value = seats.join(',');
+    display.textContent = seats.length ? seats.join(', ') : 'None';
+    priceOut.textContent = '₹' + total.toFixed(0);
+    btn.disabled = seats.length === 0;
 
-        function classForRow(rowLetter) {
-            return seatClasses.find(c => c.rows.indexOf(rowLetter) !== -1);
+    const counts = {};
+    selected.forEach(s => { counts[s.cls] = (counts[s.cls] || 0) + 1; });
+    classLine.textContent = Object.entries(counts).map(([c, n]) => `${n} × ${c}`).join('  ·  ');
+  }
+
+  document.querySelectorAll('.seat-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const id = b.dataset.seat;
+      if (selected.has(id)) {
+        selected.delete(id);
+        b.classList.remove('seat-sel');
+        b.classList.add('seat-avail');
+      } else {
+        if (selected.size >= MAX_SEATS) {
+          alert('You can select up to ' + MAX_SEATS + ' seats in one booking.');
+          return;
         }
+        selected.set(id, { price: parseFloat(b.dataset.price), cls: b.dataset.class });
+        b.classList.remove('seat-avail');
+        b.classList.add('seat-sel');
+      }
+      paint();
+    });
+  });
 
-        // Build seat map, grouped visually by class
-        seatClasses.forEach(function(cls) {
-            const group = document.createElement('div');
-            group.className = 'class-group';
-
-            const title = document.createElement('div');
-            title.className = 'class-title';
-            title.style.color = cls.color;
-            title.innerHTML = cls.name + ' <span class="class-price">— ₹' + cls.price + ' / seat</span>';
-            group.appendChild(title);
-
-            cls.rows.forEach(function(rowName) {
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'row';
-
-                const label = document.createElement('span');
-                label.className = 'row-label';
-                label.innerText = rowName;
-                rowDiv.appendChild(label);
-
-                let seatNum = 1;
-                blockSizes.forEach(function(blockSize) {
-                    const blockDiv = document.createElement('div');
-                    blockDiv.className = 'block';
-
-                    for (let i = 0; i < blockSize; i++) {
-                        const seatId = rowName + seatNum;
-                        const seatDiv = document.createElement('div');
-                        seatDiv.className = 'seat';
-                        seatDiv.innerText = seatNum;
-                        seatDiv.setAttribute('data-id', seatId);
-                        seatDiv.setAttribute('data-price', cls.price);
-                        seatDiv.style.backgroundColor = cls.color;
-
-                        if (bookedSeats.indexOf(seatId) !== -1) {
-                            seatDiv.className += ' booked';
-                        } else {
-                            seatDiv.onclick = function() {
-                                const id = this.getAttribute('data-id');
-                                const price = parseInt(this.getAttribute('data-price'), 10);
-
-                                if (selectedSeats.indexOf(id) === -1) {
-                                    selectedSeats.push(id);
-                                    selectedTotal += price;
-                                    this.className = 'seat selected';
-                                } else {
-                                    selectedSeats = selectedSeats.filter(s => s !== id);
-                                    selectedTotal -= price;
-                                    this.className = 'seat';
-                                    this.style.backgroundColor = cls.color;
-                                }
-                                updateSummary();
-                            };
-                        }
-
-                        blockDiv.appendChild(seatDiv);
-                        seatNum++;
-                    }
-                    rowDiv.appendChild(blockDiv);
-                });
-
-                group.appendChild(rowDiv);
-            });
-
-            seatMap.appendChild(group);
-        });
-
-        // Build legend: seat classes + selected/booked states
-        seatClasses.forEach(function(cls) {
-            const item = document.createElement('div');
-            item.className = 'legend-item';
-            item.innerHTML = '<span class="legend-box" style="background:' + cls.color + ';"></span>' +
-                              cls.name + ' (₹' + cls.price + ')';
-            legend.appendChild(item);
-        });
-        legend.innerHTML += '<div class="legend-item"><span class="legend-box" style="background:#ffd93d;"></span>Selected</div>';
-        legend.innerHTML += '<div class="legend-item"><span class="legend-box" style="background:#3a3a45;"></span>Booked</div>';
-
-        function updateSummary() {
-            document.getElementById('selected_seats').value = selectedSeats.join(',');
-            document.getElementById('summary-total').innerText = '₹' + selectedTotal;
-            document.getElementById('confirm-btn').disabled = selectedSeats.length === 0;
-            document.getElementById('summary-seats').innerText = selectedSeats.length
-                ? selectedSeats.length + ' seat(s): ' + selectedSeats.sort().join(', ')
-                : 'No seats selected';
+  // live availability: grey out seats other people take while you are choosing
+  setInterval(async () => {
+    try {
+      const res = await fetch('{{ url_for("seat_availability", showtime_id=showtime.id) }}');
+      const data = await res.json();
+      const gone = new Set([...data.booked, ...data.held]);
+      document.querySelectorAll('.seat-btn').forEach(b => {
+        const id = b.dataset.seat;
+        if (gone.has(id) && !selected.has(id)) {
+          b.disabled = true;
+          b.classList.remove('seat-avail', 'seat-btn');
+          b.classList.add(data.booked.includes(id) ? 'seat-booked' : 'seat-held');
         }
-    </script>
-
-</body>
-</html>
+      });
+    } catch (e) { /* offline is fine, server re-checks on submit */ }
+  }, 10000);
+</script>
+{% endblock %}

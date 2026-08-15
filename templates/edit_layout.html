@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Layout · {{ screen.name }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-start justify-between gap-3">
+  <div class="min-w-0">
+    <a href="{{ url_for('screens') }}" class="text-xs text-slate-400 hover:text-white">← Theatres &amp; screens</a>
+    <h1 class="text-2xl font-black text-white mt-1 break-words">{{ screen.theater.name }} · {{ screen.name }}</h1>
+    <p class="text-[11px] text-slate-400">{{ screen.screen_type }} · {{ screen.total_seats }} seats · {{ screen.classes_summary or 'no classes' }}</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+  <!-- editor -->
+  <form method="POST" class="glass-card rounded-2xl p-5 space-y-4">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="text-sm font-bold text-white">Seating arrangement (JSON)</h2>
+      <button type="submit" class="px-4 py-2 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">Save layout</button>
+    </div>
+    <textarea name="layout_json" rows="26" spellcheck="false"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-[11px] leading-relaxed text-slate-300 font-mono focus:outline-none focus:border-[#FF2E63]">{{ layout_json }}</textarea>
+
+    <div class="text-[10px] text-slate-500 leading-relaxed space-y-1">
+      <p><span class="text-slate-300 font-semibold">label</span> row letter · <span class="text-slate-300 font-semibold">count</span> seats in that row (rows can differ)</p>
+      <p><span class="text-slate-300 font-semibold">aisles_after</span> put a walkway after these seat numbers</p>
+      <p><span class="text-slate-300 font-semibold">blocked</span> seat ids that do not exist, e.g. ["A7"]</p>
+      <p><span class="text-slate-300 font-semibold">offset</span> shift a short row to centre it · <span class="text-slate-300 font-semibold">seat_span</span> 2 for couple sofas</p>
+      <p>Reload after saving to see the preview update.</p>
+    </div>
+  </form>
+
+  <!-- live preview -->
+  <div class="glass-card rounded-2xl p-5 space-y-3">
+    <h2 class="text-sm font-bold text-white">Preview (exactly what users see)</h2>
+    <div class="rowscroll">
+      <div class="min-w-max mx-auto space-y-1">
+        {% for cls in grid %}
+          <div class="pt-3 pb-1 flex items-center gap-2">
+            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300">{{ cls.name }}</span>
+            <span class="text-[10px] text-[#FF2E63] font-bold">₹{{ '%.0f'|format(cls.price) }}</span>
+            <span class="flex-1 border-t border-dashed border-slate-800"></span>
+            <span class="text-[10px] text-slate-600">{{ cls.seats }}</span>
+          </div>
+          {% for row in cls.rows %}
+            <div class="flex items-center gap-1.5 justify-center">
+              <span class="w-8 text-[10px] text-slate-500 font-bold text-right pr-1">{{ row.label }}</span>
+              {% for cell in row.cells %}
+                {% if cell.kind == 'aisle' %}<span class="aisle inline-block"></span>
+                {% elif cell.kind == 'pad' %}<span class="pad inline-block"></span>
+                {% elif cell.kind == 'blocked' %}<span class="seat seat-blocked inline-flex items-center justify-center">×</span>
+                {% else %}
+                  <span class="seat seat-avail inline-flex items-center justify-center font-semibold {% if cell.span == 2 %}seat-wide{% endif %}">{{ cell.num }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% endfor %}
+        {% endfor %}
+        <div class="pt-6">
+          <div class="h-2 bg-gradient-to-r from-[#FF2E63]/10 via-[#FF2E63] to-[#FF2E63]/10 rounded-full screen-glow w-2/3 mx-auto"></div>
+          <p class="text-[10px] tracking-[0.3em] text-center text-slate-500 uppercase mt-2">Screen</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,32 +1,48 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Movie Booking</title>
-    <style>
-        body { font-family: Arial; margin: 40px; background: #f5f5f5; }
-        .movie { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; }
-        a { text-decoration: none; color: #0066cc; }
-    </style>
-</head>
-<body>
-    <h1>🎬 Movie Booking App</h1>
+{% extends "base.html" %}
+{% block title %}CineWave · Movie tickets in Vizag{% endblock %}
 
-    {% if current_user.is_authenticated %}
-        <p>Welcome, <b>{{ current_user.username }}</b> | 
-        <a href="{{ url_for('dashboard') }}">My Bookings</a> | 
-        <a href="{{ url_for('logout') }}">Logout</a></p>
-    {% else %}
-        <p><a href="{{ url_for('login') }}">Login</a> | <a href="{{ url_for('register') }}">Register</a></p>
-    {% endif %}
+{% block content %}
+<div class="flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h2 class="text-3xl font-black text-white">Now Showing</h2>
+    <p class="text-xs text-slate-500 mt-1">Theatres across Visakhapatnam · real seat maps · instant e-tickets</p>
+  </div>
+</div>
 
-    <h2>Now Showing</h2>
-    {% for movie in movies %}
-        <div class="movie">
-            <h3>{{ movie.title }}</h3>
-            <p>{{ movie.description }}</p>
-            <p>Duration: {{ movie.duration }} minutes</p>
-            <a href="{{ url_for('movie_detail', movie_id=movie.id) }}">View Showtimes →</a>
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+  {% for movie in movies %}
+    <div class="group glass-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700">
+      <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+        {% if movie.poster %}
+          <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+        {% else %}
+          <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
+            <i class="fa-solid fa-film text-4xl"></i>
+            <span class="text-xs">No Poster</span>
+          </div>
+        {% endif %}
+      </div>
+      <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-[11px] text-slate-400 font-medium">
+            <i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} mins
+            {% if movie.language %} · {{ movie.language }}{% endif %}
+          </p>
+          <h3 class="text-base font-bold text-white group-hover:text-[#FF2E63] transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
         </div>
-    {% endfor %}
-</body>
-</html>
+        <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="w-full py-2.5 bg-slate-800 hover:bg-[#FF2E63] text-center text-white text-sm font-semibold rounded-xl transition duration-200">
+          View Showtimes
+        </a>
+      </div>
+    </div>
+  {% else %}
+    <div class="col-span-full glass-card rounded-2xl p-12 text-center text-slate-400 space-y-3">
+      <i class="fa-solid fa-film text-4xl text-slate-600"></i>
+      <p>No movies listed yet.</p>
+      {% if current_user.is_authenticated and current_user.is_admin %}
+        <a href="{{ url_for('import_movie') }}" class="inline-block px-5 py-2.5 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">Import from TMDb</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

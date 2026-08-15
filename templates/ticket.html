@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Ticket · {{ booking.reference }}{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto space-y-4">
+
+  {% if booking.status == 'PAID' %}
+    <div class="text-center space-y-1">
+      <div class="w-14 h-14 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+        <i class="fa-solid fa-check text-emerald-400 text-xl"></i>
+      </div>
+      <h1 class="text-xl font-bold text-white">Booking confirmed</h1>
+      <p class="text-xs text-slate-400">Show this ticket at the entrance.</p>
+    </div>
+  {% else %}
+    <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs text-center">
+      This booking is {{ booking.status|lower }}.
+    </div>
+  {% endif %}
+
+  <!-- ticket -->
+  <div class="glass-card rounded-3xl overflow-hidden">
+    <div class="p-6 flex gap-4">
+      {% if movie.poster %}
+        <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-24 rounded-xl border border-slate-800 shrink-0">
+      {% endif %}
+      <div class="min-w-0 space-y-1">
+        <h2 class="text-lg font-black text-white break-words leading-tight">{{ movie.title }}</h2>
+        <p class="text-[11px] text-slate-400">{{ movie.language or '' }}{% if movie.certificate %} · {{ movie.certificate }}{% endif %} · {{ movie.duration }} min</p>
+        <p class="text-[11px] text-slate-300 font-semibold mt-2">{{ showtime.theater }}</p>
+        <p class="text-[11px] text-slate-400">{{ showtime.screen_label }}{% if showtime.screen %} · {{ showtime.screen.theater.location }}{% endif %}</p>
+      </div>
+    </div>
+
+    <div class="px-6 pb-6 grid grid-cols-2 gap-4 text-xs">
+      <div>
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Date</p>
+        <p class="font-bold text-white">{{ showtime.show_date.strftime('%a, %d %b %Y') }}</p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Time</p>
+        <p class="font-bold text-white">{{ showtime.show_time }}</p>
+      </div>
+      <div class="col-span-2">
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Seats</p>
+        <p class="font-bold text-[#FF2E63] break-words">{{ booking.seats }}</p>
+        <p class="text-[10px] text-slate-500 mt-1">
+          {% for s in booking.seat_meta %}{{ s.id }} {{ s['class'] }} ₹{{ '%.0f'|format(s.price) }}{% if not loop.last %} · {% endif %}{% endfor %}
+        </p>
+      </div>
+    </div>
+
+    <!-- perforation -->
+    <div class="relative border-t border-dashed border-slate-700">
+      <span class="absolute -left-3 -top-3 w-6 h-6 rounded-full bg-[#0F1016]"></span>
+      <span class="absolute -right-3 -top-3 w-6 h-6 rounded-full bg-[#0F1016]"></span>
+    </div>
+
+    <div class="p-6 flex items-center justify-between gap-4">
+      <div class="space-y-1 min-w-0">
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Booking ID</p>
+        <p class="font-mono font-bold text-white break-all">{{ booking.reference }}</p>
+        <p class="text-[10px] text-slate-500">Total paid ₹{{ '%.2f'|format(booking.total_amount) }}</p>
+        {% if payment %}
+          <p class="text-[10px] text-slate-500 break-all">
+            {{ payment.gateway|upper }} · {{ payment.method or '—' }} · {{ payment.payment_id or '—' }}
+          </p>
+        {% endif %}
+      </div>
+      <img src="{{ url_for('ticket_qr', reference=booking.reference) }}" alt="QR code"
+           class="w-24 h-24 rounded-lg bg-white p-1 shrink-0">
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-3 justify-center">
+    <button onclick="window.print()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
+      <i class="fa-solid fa-print mr-1"></i> Print ticket
+    </button>
+    <a href="{{ url_for('dashboard') }}" class="px-5 py-2.5 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">My bookings</a>
+    <a href="{{ url_for('home') }}" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">Book another movie</a>
+  </div>
+</div>
+{% endblock %}

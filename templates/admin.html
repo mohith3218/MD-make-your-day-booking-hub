@@ -1,69 +1,109 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Admin Dashboard</title>
-    <style>
-        body { font-family: Arial; background: #f0f2f5; padding: 30px; }
-        .card { background: white; padding: 20px; margin: 15px 0; border-radius: 10px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
-        a.btn { display: inline-block; background: #e94560; color: white; padding: 10px 18px;
-                border-radius: 5px; text-decoration: none; margin-right: 10px; }
-    </style>
-</head>
-<body>
-    <h1>Admin Dashboard</h1>
-    <a href="{{ url_for('home') }}">← Back to Home</a>
-    <br><br>
+{% extends "base.html" %}
+{% block title %}Admin Panel · CineWave{% endblock %}
 
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}<p style="color:green;">{{ messages[0] }}</p>{% endif %}
-    {% endwith %}
+{% block content %}
+<h1 class="text-2xl font-black text-white flex items-center gap-2">
+  <i class="fa-solid fa-user-shield text-amber-400"></i> Admin Panel
+</h1>
 
-    <a class="btn" href="{{ url_for('add_movie') }}">+ Add Movie</a>
-    <a class="btn" href="{{ url_for('add_showtime') }}">+ Add Showtime</a>
-    <a class="btn" href="{{ url_for('add_theater') }}">+ Add Theater</a>
-
-    <div class="card">
-        <h2>Theaters ({{ theaters|length }})</h2>
-        <table>
-            <tr><th>ID</th><th>Name</th><th>Location</th></tr>
-            {% for t in theaters %}
-            <tr><td>{{ t.id }}</td><td>{{ t.name }}</td><td>{{ t.location or '—' }}</td></tr>
-            {% else %}
-            <tr><td colspan="3">No theaters yet.</td></tr>
-            {% endfor %}
-        </table>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  {% for label, value, icon in [
+      ('Paid bookings', paid_count, 'fa-ticket'),
+      ('Revenue', '₹%.0f'|format(revenue), 'fa-indian-rupee-sign'),
+      ('Screens', screens|length, 'fa-display'),
+      ('Pending recharges', pending_recharges, 'fa-wallet')] %}
+    <div class="glass-card rounded-2xl p-4">
+      <p class="text-[10px] uppercase tracking-wider text-slate-500">{{ label }}</p>
+      <p class="text-2xl font-black text-white mt-1">{{ value }}</p>
+      <i class="fa-solid {{ icon }} text-[#FF2E63] text-xs mt-2"></i>
     </div>
+  {% endfor %}
+</div>
 
-    <div class="card">
-        <h2>Movies</h2>
-        <table>
-            <tr><th>ID</th><th>Title</th><th>Duration</th></tr>
-            {% for m in movies %}
-            <tr><td>{{ m.id }}</td><td>{{ m.title }}</td><td>{{ m.duration }} min</td></tr>
-            {% else %}
-            <tr><td colspan="3">No movies yet.</td></tr>
-            {% endfor %}
-        </table>
-    </div>
+<div class="flex flex-wrap gap-3">
+  <a href="{{ url_for('add_movie') }}" class="px-4 py-2 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">+ Add Movie</a>
+  <a href="{{ url_for('import_movie') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-magnifying-glass mr-1"></i>TMDb Import</a>
+  <a href="{{ url_for('add_showtime') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Showtime</a>
+  <a href="{{ url_for('screens') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Theatres &amp; Screens</a>
+  <a href="{{ url_for('admin_bookings') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Bookings</a>
+  <a href="{{ url_for('admin_recharges') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">
+    Recharges{% if pending_recharges %} <span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">{{ pending_recharges }}</span>{% endif %}
+  </a>
+</div>
 
-    <div class="card">
-        <h2>Showtimes</h2>
-        <table>
-            <tr><th>ID</th><th>Movie ID</th><th>Theater</th><th>Date</th><th>Time</th></tr>
-            {% for s in showtimes %}
-            <tr>
-                <td>{{ s.id }}</td>
-                <td>{{ s.movie_id }}</td>
-                <td>{{ s.theater }}</td>
-                <td>{{ s.show_date }}</td>
-                <td>{{ s.show_time }}</td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5">No showtimes yet.</td></tr>
-            {% endfor %}
-        </table>
-    </div>
-</body>
-</html>
+<section class="glass-card rounded-2xl p-6 space-y-4">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="text-lg font-bold text-white">Theatres ({{ theaters|length }})</h2>
+    <a href="{{ url_for('screens') }}" class="text-xs text-[#FF2E63] hover:underline">Manage seating</a>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Location</th><th class="p-3">Screens</th><th class="p-3">Seats</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for t in theaters %}
+          <tr>
+            <td class="p-3">{{ t.id }}</td>
+            <td class="p-3 font-semibold text-white">{{ t.name }}</td>
+            <td class="p-3">{{ t.location or '—' }}</td>
+            <td class="p-3">{{ t.screens|length }}</td>
+            <td class="p-3">{{ t.screens|sum(attribute='total_seats') }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="p-3 text-slate-500">No theatres registered yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="glass-card rounded-2xl p-6 space-y-4">
+  <h2 class="text-lg font-bold text-white">Movies ({{ movies|length }})</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">ID</th><th class="p-3">Title</th><th class="p-3">Language</th><th class="p-3">Duration</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for m in movies %}
+          <tr>
+            <td class="p-3">{{ m.id }}</td>
+            <td class="p-3 font-semibold text-white">{{ m.title }}</td>
+            <td class="p-3">{{ m.language or '—' }}</td>
+            <td class="p-3">{{ m.duration }} min</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="p-3 text-slate-500">No movies added yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="glass-card rounded-2xl p-6 space-y-4">
+  <h2 class="text-lg font-bold text-white">Showtimes ({{ showtimes|length }})</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">ID</th><th class="p-3">Movie</th><th class="p-3">Theatre</th><th class="p-3">Screen</th><th class="p-3">Date</th><th class="p-3">Time</th><th class="p-3">Left</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for s in showtimes %}
+          <tr>
+            <td class="p-3">{{ s.id }}</td>
+            <td class="p-3 font-semibold text-white">{{ s.movie.title }}</td>
+            <td class="p-3">{{ s.theater }}</td>
+            <td class="p-3">{{ s.screen_label }}</td>
+            <td class="p-3 whitespace-nowrap">{{ s.show_date.strftime('%d %b %Y') }}</td>
+            <td class="p-3 whitespace-nowrap">{{ s.show_time }}</td>
+            <td class="p-3">{{ s.seats_left }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="p-3 text-slate-500">No showtimes configured yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

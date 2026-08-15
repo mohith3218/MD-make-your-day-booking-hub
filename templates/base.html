@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CineWave{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .glass-card { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+    .screen-glow { box-shadow: 0 15px 30px -5px rgba(255,46,99,0.4); }
+    .seat { width: 26px; height: 26px; border-radius: 6px 6px 3px 3px; font-size: 10px; line-height: 1; }
+    .seat-wide { width: 58px; }
+    .aisle { width: 18px; }
+    .pad { width: 13px; }
+    .seat-avail { background:#1e293b; color:#cbd5e1; border:1px solid #334155; }
+    .seat-avail:hover { background:#334155; }
+    .seat-sel { background:#FF2E63; color:#fff; border:1px solid #FF2E63; }
+    .seat-booked { background:#0b1120; color:#475569; border:1px solid #1e293b; cursor:not-allowed; }
+    .seat-held { background:#3f2d1a; color:#b98a44; border:1px solid #6b4a20; cursor:not-allowed; }
+    .seat-blocked { background:transparent; border:1px dashed #1e293b; color:#1e293b; cursor:default; }
+    .rowscroll { overflow-x: auto; }
+    .rowscroll::-webkit-scrollbar { height: 6px; }
+    .rowscroll::-webkit-scrollbar-thumb { background:#334155; border-radius: 3px; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+
+  <header class="sticky top-0 z-50 glass-card border-b border-slate-800/50">
+    <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
+      <a href="{{ url_for('home') }}" class="flex items-center space-x-3 shrink-0">
+        <div class="w-10 h-10 bg-gradient-to-tr from-[#FF2E63] to-rose-400 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20">
+          <i class="fa-solid fa-film text-white text-lg"></i>
+        </div>
+        <span class="text-2xl font-black tracking-wider text-white">CINE<span class="text-[#FF2E63]">WAVE</span></span>
+      </a>
+
+      <div class="flex items-center gap-3 sm:gap-5 text-sm">
+        {% if current_user.is_authenticated %}
+          {% if current_user.is_admin %}
+            <a href="{{ url_for('admin') }}" class="font-semibold text-amber-400 hover:text-amber-300 whitespace-nowrap">
+              <i class="fa-solid fa-user-shield mr-1"></i>Admin
+            </a>
+          {% endif %}
+          <a href="{{ url_for('wallet_page') }}" class="font-semibold text-slate-300 hover:text-white whitespace-nowrap">
+            <i class="fa-solid fa-wallet mr-1 text-emerald-400"></i>₹{{ '%.0f'|format(wallet_balance or 0) }}
+          </a>
+          <a href="{{ url_for('dashboard') }}" class="font-semibold text-slate-300 hover:text-white whitespace-nowrap">My Bookings</a>
+          <a href="{{ url_for('logout') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 font-semibold rounded-xl transition whitespace-nowrap">Logout</a>
+        {% else %}
+          <a href="{{ url_for('login') }}" class="font-semibold text-slate-300 hover:text-white">Login</a>
+          <a href="{{ url_for('register') }}" class="px-4 py-2 bg-[#FF2E63] hover:bg-rose-600 font-semibold rounded-xl transition shadow-lg shadow-rose-600/20">Register</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full">
+    <div class="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for m in messages %}
+            <div class="p-3 rounded-xl bg-[#FF2E63]/10 border border-[#FF2E63]/30 text-[#FF2E63] text-sm">{{ m }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-800/50 py-6 text-center text-[11px] text-slate-600">
+    CineWave · Movie ticket booking for Visakhapatnam theatres
+    {% if not gateway_live %}<span class="ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Sandbox payments</span>{% endif %}
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

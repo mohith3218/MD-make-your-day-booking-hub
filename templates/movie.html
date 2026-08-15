@@ -1,35 +1,65 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{{ movie.title }}</title>
-    <style>
-        body { font-family: Arial; background: #f0f2f5; padding: 30px; }
-        .card { background: white; padding: 25px; border-radius: 10px; max-width: 600px; margin: auto; }
-        .show { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 8px; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>{{ movie.title }}</h1>
-        <p>{{ movie.description }}</p>
-        <p><b>Duration:</b> {{ movie.duration }} minutes</p>
+{% extends "base.html" %}
+{% block title %}{{ movie.title }} · CineWave{% endblock %}
 
-        <h2>Showtimes</h2>
-        {% for show in showtimes %}
-        <div class="show">
-            <p><b>{{ show.theater }}</b> — {{ show.show_date }} at {{ show.show_time }}</p>
-            {% if current_user.is_authenticated %}
-                <a href="{{ url_for('book', showtime_id=show.id) }}">Book Tickets</a>
-            {% else %}
-                <a href="{{ url_for('login') }}">Login to Book</a>
-            {% endif %}
-        </div>
-        {% else %}
-            <p>No showtimes available.</p>
-        {% endfor %}
-
-        <br>
-        <a href="{{ url_for('home') }}">← Back to Home</a>
+{% block content %}
+<div class="glass-card rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row gap-8 items-start">
+  {% if movie.poster %}
+    <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full md:w-56 aspect-[2/3] object-cover rounded-2xl border border-slate-800">
+  {% else %}
+    <div class="w-full md:w-56 aspect-[2/3] bg-slate-900 rounded-2xl flex items-center justify-center text-slate-600 border border-slate-800">
+      <i class="fa-solid fa-film text-5xl"></i>
     </div>
-</body>
-</html>
+  {% endif %}
+
+  <div class="space-y-3 flex-1 min-w-0">
+    <h1 class="text-3xl sm:text-4xl font-black text-white break-words leading-tight">{{ movie.title }}</h1>
+    <div class="flex flex-wrap gap-2 text-[11px]">
+      <span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300"><i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} min</span>
+      {% if movie.language %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ movie.language }}</span>{% endif %}
+      {% if movie.certificate %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ movie.certificate }}</span>{% endif %}
+    </div>
+    <p class="text-slate-300 text-sm leading-relaxed">{{ movie.description or 'No description provided.' }}</p>
+  </div>
+</div>
+
+<section class="space-y-5">
+  <h2 class="text-xl font-bold text-white">Showtimes in Visakhapatnam</h2>
+
+  {% for show_date, theaters in grouped.items() %}
+    <div class="space-y-3">
+      <p class="text-xs font-bold uppercase tracking-wider text-[#FF2E63]">{{ show_date.strftime('%A, %d %b %Y') }}</p>
+
+      {% for theater_name, shows in theaters.items() %}
+        <div class="glass-card rounded-2xl p-5 space-y-3">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <p class="text-sm font-bold text-white break-words">{{ theater_name }}</p>
+            {% if shows[0].screen %}
+              <p class="text-[10px] text-slate-500">{{ shows[0].screen.theater.location }}</p>
+            {% endif %}
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            {% for s in shows %}
+              {% if current_user.is_authenticated %}
+                <a href="{{ url_for('book', showtime_id=s.id) }}"
+                   class="px-4 py-2.5 rounded-xl border border-slate-700 hover:border-[#FF2E63] bg-slate-900 hover:bg-slate-800 transition text-center">
+                  <p class="text-sm font-bold text-white">{{ s.show_time }}</p>
+                  <p class="text-[10px] text-slate-500">{{ s.screen_label }} · {{ s.seats_left }} left</p>
+                </a>
+              {% else %}
+                <a href="{{ url_for('login') }}"
+                   class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-center">
+                  <p class="text-sm font-bold text-slate-300">{{ s.show_time }}</p>
+                  <p class="text-[10px] text-slate-500">Login to book</p>
+                </a>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-slate-500 text-sm">No showtimes currently scheduled for this movie.</p>
+  {% endfor %}
+</section>
+{% endblock %}

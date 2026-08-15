@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}My Bookings · CineWave{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3">
+  <h1 class="text-2xl font-black text-white">My Bookings</h1>
+  <a href="{{ url_for('wallet_page') }}" class="text-xs text-slate-400 hover:text-white">Wallet ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
+</div>
+
+{% if bookings %}
+  <div class="space-y-4">
+    {% for b in bookings %}
+      {% set colour = {'PAID':'emerald','PENDING':'amber','FAILED':'rose','CANCELLED':'slate','EXPIRED':'slate'}.get(b.status,'slate') %}
+      <div class="glass-card rounded-2xl p-5 border-l-4 border-l-{{ colour }}-500 flex flex-col md:flex-row justify-between gap-4">
+        <div class="space-y-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="text-lg font-bold text-white break-words">{{ b.showtime.movie.title }}</h3>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ colour }}-500/10 text-{{ colour }}-400 border border-{{ colour }}-500/20 uppercase tracking-wider">{{ b.status }}</span>
+          </div>
+          <p class="text-[11px] text-slate-400"><i class="fa-solid fa-building-columns mr-1"></i>{{ b.showtime.theater }} · {{ b.showtime.screen_label }}</p>
+          <p class="text-[11px] text-slate-400"><i class="fa-regular fa-calendar-check mr-1"></i>{{ b.showtime.show_date.strftime('%d %b %Y') }} at {{ b.showtime.show_time }}</p>
+          <p class="text-[11px] text-slate-300 mt-2">Seats: <span class="text-[#FF2E63] font-bold">{{ b.seats }}</span></p>
+          <p class="text-[10px] text-slate-500 font-mono">{{ b.reference }}</p>
+        </div>
+
+        <div class="text-left md:text-right space-y-2 shrink-0">
+          <div>
+            <p class="text-[11px] text-slate-400">{{ 'Total paid' if b.status == 'PAID' else 'Amount' }}</p>
+            <p class="text-xl font-black text-white">₹{{ '%.2f'|format(b.total_amount) }}</p>
+            <p class="text-[10px] text-slate-500">{{ b.booked_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+          </div>
+          {% if b.status == 'PAID' %}
+            <a href="{{ url_for('ticket', reference=b.reference) }}" class="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">View ticket</a>
+          {% elif b.status == 'PENDING' and b.seconds_left > 0 %}
+            <a href="{{ url_for('checkout', reference=b.reference) }}" class="inline-block px-4 py-2 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">
+              Pay now · {{ b.seconds_left // 60 }}m left
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="glass-card rounded-2xl p-10 text-center space-y-4">
+    <p class="text-slate-400">You have no bookings yet.</p>
+    <a href="{{ url_for('home') }}" class="inline-block px-6 py-2.5 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">Browse movies</a>
+  </div>
+{% endif %}
+{% endblock %}

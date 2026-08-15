@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineWave - Booking Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Custom Styling for Glassmorphism & Screen Glow */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .screen-glow {
+      box-shadow: 0px 15px 30px -5px rgba(255, 46, 99, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-[#0F1016] text-slate-100 font-sans antialiased selection:bg-[#FF2E63] selection:text-white">
+
+  <header class="sticky top-0 z-50 glass-card border-b-0 border-b-slate-800/50">
+    <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+      <div class="flex items-center space-x-3 cursor-pointer">
+        <div class="w-10 h-10 bg-gradient-to-tr from-[#FF2E63] to-rose-400 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20">
+          <i class="fa-solid font-bold fa-film text-white text-lg"></i>
+        </div>
+        <span class="text-2xl font-black tracking-wider bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">CINE<span class="text-[#FF2E63]">WAVE</span></span>
+      </div>
+
+      <div class="hidden md:flex items-center relative w-96">
+        <i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400"></i>
+        <input type="text" placeholder="Search movies, theaters, genres..." class="w-full bg-slate-900/80 border border-slate-700/60 rounded-full py-2.5 pl-11 pr-4 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#FF2E63] transition-all">
+      </div>
+
+      <div class="flex items-center space-x-6">
+        <div class="hidden sm:flex items-center space-x-2 text-sm text-slate-300 hover:text-white cursor-pointer bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40">
+          <i class="fa-solid fa-location-dot text-[#FF2E63]"></i>
+          <span class="font-medium">New York, NY</span>
+          <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+        </div>
+
+        <div class="flex items-center space-x-3 cursor-pointer">
+          <div class="w-10 h-10 rounded-full ring-2 ring-[#FF2E63]/40 p-0.5">
+            <div class="w-full h-full bg-slate-700 rounded-full flex items-center justify-center overflow-hidden">
+              <i class="fa-solid fa-user text-slate-300"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-12">
+
+    <section class="relative rounded-3xl overflow-hidden glass-card border border-slate-800">
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0F1016] via-[#0F1016]/60 to-transparent z-10"></div>
+      <div class="absolute inset-0 bg-gradient-to-r from-[#0F1016] via-[#0F1016]/80 to-transparent z-10"></div>
+      
+      <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1600&auto=format&fit=crop" alt="Featured Movie" class="w-full h-[450px] object-cover object-center">
+
+      <div class="absolute bottom-0 left-0 z-20 p-8 md:p-12 max-w-2xl space-y-4">
+        <div class="flex items-center space-x-3 text-xs font-semibold uppercase tracking-wider">
+          <span class="px-2.5 py-1 bg-[#FF2E63] text-white rounded-md">Trending #1</span>
+          <span class="text-slate-300"><i class="fa-solid fa-star text-amber-400 mr-1"></i>8.9 / 10</span>
+          <span class="text-slate-400">• 2h 48m</span>
+          <span class="text-slate-400">• Sci-Fi / Action</span>
+        </div>
+
+        <h1 class="text-4xl md:text-6xl font-black text-white tracking-tight leading-tight">
+          CYBERPUNK 2099
+        </h1>
+
+        <p class="text-slate-300 text-sm md:text-base line-clamp-2">
+          In a neon-drenched metropolis, a rogue operative discovers a conspiracy that threatens to rewire human consciousness forever.
+        </p>
+
+        <div class="flex items-center space-x-4 pt-2">
+          <button class="px-7 py-3.5 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-rose-600/30 flex items-center space-x-2">
+            <i class="fa-solid fa-[#FF2E63] fa-ticket"></i>
+            <span>Book Tickets</span>
+          </button>
+          <button class="px-6 py-3.5 glass-card hover:bg-white/10 text-white font-semibold rounded-xl transition-all duration-200 flex items-center space-x-2">
+            <i class="fa-solid fa-play text-xs"></i>
+            <span>Watch Trailer</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center space-x-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
+        <button class="px-5 py-2.5 bg-[#FF2E63] text-white text-sm font-semibold rounded-xl shadow-lg shadow-rose-600/20 whitespace-nowrap">Now Showing</button>
+        <button class="px-5 py-2.5 glass-card hover:bg-white/5 text-slate-300 text-sm font-medium rounded-xl whitespace-nowrap">Coming Soon</button>
+        <button class="px-5 py-2.5 glass-card hover:bg-white/5 text-slate-300 text-sm font-medium rounded-xl whitespace-nowrap">IMAX 3D</button>
+        <button class="px-5 py-2.5 glass-card hover:bg-white/5 text-slate-300 text-sm font-medium rounded-xl whitespace-nowrap">VIP Lounges</button>
+      </div>
+
+      <div class="flex items-center space-x-2 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800">
+        <button class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold text-center">
+          <div>TODAY</div>
+          <div class="text-slate-400 text-[10px]">AUG 12</div>
+        </button>
+        <button class="px-4 py-2 hover:bg-slate-800/50 text-slate-400 hover:text-white rounded-xl text-xs font-semibold text-center transition">
+          <div>THU</div>
+          <div class="text-[10px]">AUG 13</div>
+        </button>
+        <button class="px-4 py-2 hover:bg-slate-800/50 text-slate-400 hover:text-white rounded-xl text-xs font-semibold text-center transition">
+          <div>FRI</div>
+          <div class="text-[10px]">AUG 14</div>
+        </button>
+      </div>
+    </section>
+
+    <section class="space-y-6">
+      <h2 class="text-2xl font-bold text-white tracking-wide">Explore Movies</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        
+        <div class="group glass-card rounded-2xl overflow-hidden hover:border-slate-700 transition-all duration-300 flex flex-col">
+          <div class="relative overflow-hidden aspect-[2/3]">
+            <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=800&auto=format&fit=crop" alt="Poster" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            <div class="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold text-amber-400">
+              <i class="fa-solid fa-star mr-1"></i>8.5
+            </div>
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+            <div>
+              <p class="text-xs text-slate-400 font-medium">Action • Adventure</p>
+              <h3 class="text-lg font-bold text-white group-hover:text-[#FF2E63] transition-colors mt-1">Shadows of the Past</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-2 text-xs text-slate-300">
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">12:30 PM</span>
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">04:15 PM</span>
+                <span class="px-2 py-1 bg-[#FF2E63]/20 border border-[#FF2E63]/40 text-[#FF2E63] rounded font-semibold">08:00 PM</span>
+              </div>
+              <button class="w-full py-2.5 bg-slate-800 hover:bg-[#FF2E63] text-white text-sm font-semibold rounded-xl transition-colors duration-200">
+                Select Seats
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group glass-card rounded-2xl overflow-hidden hover:border-slate-700 transition-all duration-300 flex flex-col">
+          <div class="relative overflow-hidden aspect-[2/3]">
+            <img src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop" alt="Poster" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            <div class="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold text-amber-400">
+              <i class="fa-solid fa-star mr-1"></i>9.1
+            </div>
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+            <div>
+              <p class="text-xs text-slate-400 font-medium">Sci-Fi • Thriller</p>
+              <h3 class="text-lg font-bold text-white group-hover:text-[#FF2E63] transition-colors mt-1">Interstellar Horizon</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-2 text-xs text-slate-300">
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">02:00 PM</span>
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">06:30 PM</span>
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">10:15 PM</span>
+              </div>
+              <button class="w-full py-2.5 bg-slate-800 hover:bg-[#FF2E63] text-white text-sm font-semibold rounded-xl transition-colors duration-200">
+                Select Seats
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group glass-card rounded-2xl overflow-hidden hover:border-slate-700 transition-all duration-300 flex flex-col">
+          <div class="relative overflow-hidden aspect-[2/3]">
+            <img src="https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=800&auto=format&fit=crop" alt="Poster" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            <div class="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold text-amber-400">
+              <i class="fa-solid fa-star mr-1"></i>7.8
+            </div>
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+            <div>
+              <p class="text-xs text-slate-400 font-medium">Animation • Fantasy</p>
+              <h3 class="text-lg font-bold text-white group-hover:text-[#FF2E63] transition-colors mt-1">Realm of Legends</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-2 text-xs text-slate-300">
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">11:00 AM</span>
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">01:45 PM</span>
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">05:00 PM</span>
+              </div>
+              <button class="w-full py-2.5 bg-slate-800 hover:bg-[#FF2E63] text-white text-sm font-semibold rounded-xl transition-colors duration-200">
+                Select Seats
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group glass-card rounded-2xl overflow-hidden hover:border-slate-700 transition-all duration-300 flex flex-col">
+          <div class="relative overflow-hidden aspect-[2/3]">
+            <img src="https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?q=80&w=800&auto=format&fit=crop" alt="Poster" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+            <div class="absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold text-amber-400">
+              <i class="fa-solid fa-star mr-1"></i>8.2
+            </div>
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+            <div>
+              <p class="text-xs text-slate-400 font-medium">Drama • Mystery</p>
+              <h3 class="text-lg font-bold text-white group-hover:text-[#FF2E63] transition-colors mt-1">The Midnight Enigma</h3>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-2 text-xs text-slate-300">
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">03:15 PM</span>
+                <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700">07:00 PM</span>
+                <span class="px-[#FF2E63]/20 border border-[#FF2E63]/40 text-[#FF2E63] py-1 bg-slate-800 rounded font-semibold">09:45 PM</span>
+              </div>
+              <button class="w-full py-2.5 bg-slate-800 hover:bg-[#FF2E63] text-white text-sm font-semibold rounded-xl transition-colors duration-200">
+                Select Seats
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="glass-card rounded-3xl p-8 border border-slate-800 space-y-8">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h3 class="text-xl font-bold text-white">Interactive Seat Selector</h3>
+          <p class="text-xs text-slate-400">Screen 4 — Cyberpunk 2099 (8:00 PM)</p>
+        </div>
+        <div class="flex items-center space-x-6 text-xs">
+          <div class="flex items-center space-x-2"><span class="w-3.5 h-3.5 bg-slate-700 rounded-sm"></span><span class="text-slate-400">Available</span></div>
+          <div class="flex items-center space-x-2"><span class="w-3.5 h-3.5 bg-[#FF2E63] rounded-sm"></span><span class="text-slate-400">Selected</span></div>
+          <div class="flex items-center space-x-2"><span class="w-3.5 h-3.5 bg-slate-900 border border-slate-800 rounded-sm"></span><span class="text-slate-500">Reserved</span></div>
+        </div>
+      </div>
+
+      <div class="space-y-12 py-4">
+        <div class="relative w-3/4 mx-auto">
+          <div class="h-2 bg-gradient-to-r from-[#FF2E63]/20 via-[#FF2E63] to-[#FF2E63]/20 rounded-full screen-glow"></div>
+          <p class="text-[10px] tracking-widest text-center text-slate-500 uppercase mt-3">Screen This Way</p>
+        </div>
+
+        <div class="flex flex-col items-center space-y-3">
+          <div class="flex space-x-2">
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">A1</span>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">A2</span>
+            <span class="w-6 h-6 rounded bg-slate-900 border border-slate-800 text-[10px] flex items-center justify-center text-slate-600">A3</span>
+            <span class="w-6 h-6 rounded bg-slate-900 border border-slate-800 text-[10px] flex items-center justify-center text-slate-600">A4</span>
+            <div class="w-6"></div>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">A5</span>
+            <span class="w-6 h-6 rounded bg-[#FF2E63] text-[10px] flex items-center justify-center text-white font-bold shadow-md shadow-rose-600/40">A6</span>
+            <span class="w-6 h-6 rounded bg-[#FF2E63] text-[10px] flex items-center justify-center text-white font-bold shadow-md shadow-rose-600/40">A7</span>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">A8</span>
+          </div>
+          <div class="flex space-x-2">
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">B1</span>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">B2</span>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">B3</span>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">B4</span>
+            <div class="w-6"></div>
+            <span class="w-6 h-6 rounded bg-slate-900 border border-slate-800 text-[10px] flex items-center justify-center text-slate-600">B5</span>
+            <span class="w-6 h-6 rounded bg-slate-900 border border-slate-800 text-[10px] flex items-center justify-center text-slate-600">B6</span>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">B7</span>
+            <span class="w-6 h-6 rounded bg-slate-800 text-[10px] flex items-center justify-center text-slate-400">B8</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between border border-slate-800 gap-4">
+        <div class="flex items-center space-x-4">
+          <div>
+            <p class="text-xs text-slate-400">Selected Seats (2)</p>
+            <p class="text-sm font-bold text-white">A6, A7 <span class="text-xs font-normal text-slate-400">(VIP Recliner)</span></p>
+          </div>
+          <div class="h-8 w-px bg-slate-800"></div>
+          <div>
+            <p class="text-xs text-slate-400">Total Price</p>
+            <p class="text-lg font-black text-[#FF2E63]">$32.00</p>
+          </div>
+        </div>
+
+        <button class="w-full sm:w-auto px-8 py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-rose-600/30">
+          Proceed to Payment
+        </button>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

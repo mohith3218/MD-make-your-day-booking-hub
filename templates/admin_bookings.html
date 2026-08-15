@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}All Bookings · Admin{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3">
+  <h1 class="text-2xl font-black text-white">All Bookings</h1>
+  <a href="{{ url_for('admin') }}" class="text-xs text-slate-400 hover:text-white">← Admin</a>
+</div>
+
+<section class="glass-card rounded-2xl p-6">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr>
+          <th class="p-3">Ref</th><th class="p-3">User</th><th class="p-3">Movie</th>
+          <th class="p-3">Theatre</th><th class="p-3">Show</th><th class="p-3">Seats</th>
+          <th class="p-3">Amount</th><th class="p-3">Method</th><th class="p-3">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for b in bookings %}
+          {% set c = {'PAID':'emerald','PENDING':'amber','FAILED':'rose','CANCELLED':'slate','EXPIRED':'slate'}.get(b.status,'slate') %}
+          <tr>
+            <td class="p-3 font-mono text-white whitespace-nowrap">{{ b.reference }}</td>
+            <td class="p-3">{{ b.user.username }}</td>
+            <td class="p-3 font-semibold text-white">{{ b.showtime.movie.title }}</td>
+            <td class="p-3">{{ b.showtime.theater }}</td>
+            <td class="p-3 whitespace-nowrap">{{ b.showtime.show_date.strftime('%d %b') }} · {{ b.showtime.show_time }}</td>
+            <td class="p-3">{{ b.seats }}</td>
+            <td class="p-3 font-bold text-[#FF2E63] whitespace-nowrap">₹{{ '%.0f'|format(b.total_amount) }}</td>
+            <td class="p-3">{{ b.payment.method if b.payment else '—' }}</td>
+            <td class="p-3"><span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ c }}-500/10 text-{{ c }}-400 border border-{{ c }}-500/20">{{ b.status }}</span></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="p-3 text-slate-500">No bookings yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
