@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" id="html-root">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,10 +22,111 @@
     .rowscroll { overflow-x: auto; }
     .rowscroll::-webkit-scrollbar { height: 6px; }
     .rowscroll::-webkit-scrollbar-thumb { background:#334155; border-radius: 3px; }
+
+    /* Light Theme Overrides */
+    body.light-mode {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+    }
+    body.light-mode header {
+      background-color: rgba(255, 255, 255, 0.96) !important;
+      border-bottom-color: #cbd5e1 !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+    body.light-mode .glass-card {
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      color: #0f172a !important;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06) !important;
+    }
+    body.light-mode .text-white {
+      color: #0f172a !important;
+    }
+    body.light-mode .text-slate-400,
+    body.light-mode .text-slate-500 {
+      color: #334155 !important;
+    }
+    body.light-mode .text-slate-300,
+    body.light-mode .text-slate-200,
+    body.light-mode .text-slate-100 {
+      color: #0f172a !important;
+    }
+    body.light-mode .text-slate-600 {
+      color: #475569 !important;
+    }
+    body.light-mode .bg-slate-900,
+    body.light-mode .bg-slate-900\/60,
+    body.light-mode .bg-slate-900\/80,
+    body.light-mode .bg-slate-900\/90,
+    body.light-mode .bg-slate-950 {
+      background-color: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+      color: #0f172a !important;
+    }
+    body.light-mode .bg-slate-800,
+    body.light-mode .bg-slate-800\/80 {
+      background-color: #e2e8f0 !important;
+      color: #0f172a !important;
+      border-color: #cbd5e1 !important;
+    }
+    body.light-mode .bg-slate-800:hover {
+      background-color: #cbd5e1 !important;
+    }
+    body.light-mode .border-slate-800,
+    body.light-mode .border-slate-700,
+    body.light-mode .border-slate-700\/60,
+    body.light-mode .border-slate-800\/50,
+    body.light-mode .border-slate-800\/80 {
+      border-color: #cbd5e1 !important;
+    }
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      border-color: #94a3b8 !important;
+    }
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color: #64748b !important;
+    }
+    body.light-mode thead {
+      background-color: #e2e8f0 !important;
+      color: #0f172a !important;
+    }
+    body.light-mode tr {
+      border-color: #e2e8f0 !important;
+    }
+    body.light-mode #seat-inspector {
+      background-color: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+    }
+    body.light-mode .seat-avail {
+      background: #e2e8f0 !important;
+      color: #0f172a !important;
+      border-color: #94a3b8 !important;
+      font-weight: 700 !important;
+    }
+    body.light-mode .seat-avail:hover {
+      background: #cbd5e1 !important;
+    }
+    body.light-mode .seat-booked {
+      background: #f1f5f9 !important;
+      color: #94a3b8 !important;
+      border-color: #e2e8f0 !important;
+    }
+    body.light-mode footer {
+      border-color: #cbd5e1 !important;
+      color: #475569 !important;
+    }
+    body.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+      border-color: #e2e8f0 !important;
+    }
   </style>
   {% block head %}{% endblock %}
 </head>
-<body class="bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+<body id="app-body" class="bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
 
   <header class="sticky top-0 z-50 glass-card border-b border-slate-800/50">
     <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
@@ -33,16 +134,24 @@
         <div class="w-10 h-10 bg-gradient-to-tr from-[#FF2E63] to-rose-400 rounded-xl flex items-center justify-center shadow-lg shadow-rose-500/20">
           <i class="fa-solid fa-film text-white text-lg"></i>
         </div>
-        <span class="text-2xl font-black tracking-wider text-white">CINE<span class="text-[#FF2E63]">WAVE</span></span>
+        <span class="text-2xl font-black tracking-wider text-white">MD CINE<span class="text-[#FF2E63]">WAVE</span></span>
       </a>
 
       <div class="flex items-center gap-3 sm:gap-5 text-sm">
+        <!-- Theme Toggle Button -->
+        <button id="theme-toggle" onclick="toggleTheme()" class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 hover:bg-slate-700 flex items-center justify-center text-amber-400 transition" title="Toggle Light/Dark Mode">
+          <i class="fa-solid fa-moon text-sm" id="theme-icon"></i>
+        </button>
+
         {% if current_user.is_authenticated %}
           {% if current_user.is_admin %}
             <a href="{{ url_for('admin') }}" class="font-semibold text-amber-400 hover:text-amber-300 whitespace-nowrap">
               <i class="fa-solid fa-user-shield mr-1"></i>Admin
             </a>
           {% endif %}
+          <span class="text-amber-400 font-bold whitespace-nowrap text-xs bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20">
+            <i class="fa-solid fa-coins mr-1 text-amber-400"></i>{{ user_points }} Pts
+          </span>
           <a href="{{ url_for('wallet_page') }}" class="font-semibold text-slate-300 hover:text-white whitespace-nowrap">
             <i class="fa-solid fa-wallet mr-1 text-emerald-400"></i>₹{{ '%.0f'|format(wallet_balance or 0) }}
           </a>
@@ -70,9 +179,37 @@
   </main>
 
   <footer class="border-t border-slate-800/50 py-6 text-center text-[11px] text-slate-600">
-    CineWave · Movie ticket booking for Visakhapatnam theatres
+    MD CineWave · Movie ticket booking for Visakhapatnam theatres
     {% if not gateway_live %}<span class="ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Sandbox payments</span>{% endif %}
   </footer>
+
+  <script>
+    function applyTheme(isLight) {
+      const body = document.getElementById('app-body');
+      const icon = document.getElementById('theme-icon');
+      if (isLight) {
+        body.classList.add('light-mode');
+        icon.classList.remove('fa-moon');
+        icon.classList.add('fa-sun');
+      } else {
+        body.classList.remove('light-mode');
+        icon.classList.remove('fa-sun');
+        icon.classList.add('fa-moon');
+      }
+    }
+
+    function toggleTheme() {
+      const isLight = !document.getElementById('app-body').classList.contains('light-mode');
+      localStorage.setItem('cinewave_theme', isLight ? 'light' : 'dark');
+      applyTheme(isLight);
+    }
+
+    // Load theme on startup
+    const savedTheme = localStorage.getItem('cinewave_theme');
+    if (savedTheme === 'light') {
+      applyTheme(true);
+    }
+  </script>
 
   {% block scripts %}{% endblock %}
 </body>

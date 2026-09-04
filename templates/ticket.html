@@ -47,6 +47,18 @@
         <p class="text-[10px] text-slate-500 mt-1">
           {% for s in booking.seat_meta %}{{ s.id }} {{ s['class'] }} ₹{{ '%.0f'|format(s.price) }}{% if not loop.last %} · {% endif %}{% endfor %}
         </p>
+        {% if booking.seat_list|length > 1 %}
+        <div class="mt-2 text-[10px] px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 w-fit flex items-center gap-1.5 font-medium">
+          <i class="fa-solid fa-users text-indigo-400"></i> Squad Pay Split: ₹{{ '%.2f'|format(booking.per_person_amount) }} / seat
+        </div>
+        {% endif %}
+
+        {% if booking.snacks_list %}
+        <div class="mt-2 text-[10px] px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 w-full flex items-center justify-between font-medium">
+          <span><i class="fa-solid fa-burger text-amber-400 mr-1"></i> Express Snacks Pass:</span>
+          <span class="font-bold">{{ booking.snacks_list|map(attribute='name')|join(', ') }}</span>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -73,6 +85,10 @@
   </div>
 
   <div class="flex flex-wrap gap-3 justify-center">
+    {% set wa_text = "🎟️ MD CineWave E-Ticket\n" ~ movie.title ~ "\n📍 " ~ showtime.theater ~ "\n📅 " ~ showtime.show_date.strftime('%a, %d %b %Y') ~ " at " ~ showtime.show_time ~ "\n💺 Seats: " ~ booking.seats ~ "\n🆔 Ref: " ~ booking.reference %}
+    <a href="https://api.whatsapp.com/send?text={{ wa_text|urlencode }}" target="_blank" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5">
+      <i class="fa-brands fa-whatsapp text-sm"></i> Share to WhatsApp
+    </a>
     <button onclick="window.print()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
       <i class="fa-solid fa-print mr-1"></i> Print ticket
     </button>

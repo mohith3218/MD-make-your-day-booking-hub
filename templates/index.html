@@ -1,48 +1,215 @@
 {% extends "base.html" %}
-{% block title %}CineWave · Movie tickets in Vizag{% endblock %}
+{% block title %}MD CineWave · Movie tickets in Vizag{% endblock %}
 
 {% block content %}
-<div class="flex flex-wrap items-end justify-between gap-3">
+<div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
   <div>
-    <h2 class="text-3xl font-black text-white">Now Showing</h2>
-    <p class="text-xs text-slate-500 mt-1">Theatres across Visakhapatnam · real seat maps · instant e-tickets</p>
+    <h2 class="text-3xl font-black text-white">Vizag Cinemas</h2>
+    <p class="text-xs text-slate-500 mt-1">Real seat maps · Dynamic Pricing · Squad Pay · Express Snacks</p>
+  </div>
+
+  <!-- Category Tabs -->
+  <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
+    <button id="tab-showing" onclick="switchCategory('showing')" class="px-4 py-2 rounded-lg text-xs font-bold transition bg-[#FF2E63] text-white">
+      🎬 Now Showing ({{ total_now_showing }})
+    </button>
+    <button id="tab-upcoming" onclick="switchCategory('upcoming')" class="px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+      🗓️ Coming Soon ({{ total_coming_soon }})
+    </button>
   </div>
 </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-  {% for movie in movies %}
-    <div class="group glass-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700">
-      <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-        {% if movie.poster %}
-          <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-        {% else %}
-          <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
-            <i class="fa-solid fa-film text-4xl"></i>
-            <span class="text-xs">No Poster</span>
+<!-- NOW SHOWING SECTION -->
+<div id="section-showing" class="space-y-10">
+  <!-- 1. Releases -->
+  <div class="space-y-4">
+    <div class="flex items-center gap-2 border-b border-slate-800/80 pb-2">
+      <span class="text-lg font-bold text-white tracking-wide">✨ Releases :-</span>
+      <span class="text-xs font-semibold text-slate-400">({{ now_showing_releases|length }})</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {% for movie in now_showing_releases %}
+        <div class="group glass-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            {% if movie.poster %}
+              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+            {% else %}
+              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
+                <i class="fa-solid fa-film text-4xl"></i>
+                <span class="text-xs">No Poster</span>
+              </div>
+            {% endif %}
           </div>
-        {% endif %}
-      </div>
-      <div class="p-5 flex-1 flex flex-col justify-between gap-4">
-        <div class="min-w-0">
-          <p class="text-[11px] text-slate-400 font-medium">
-            <i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} mins
-            {% if movie.language %} · {{ movie.language }}{% endif %}
-          </p>
-          <h3 class="text-base font-bold text-white group-hover:text-[#FF2E63] transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
+          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-[11px] text-slate-400 font-medium">
+                <i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} mins
+                {% if movie.language %} · {{ movie.language }}{% endif %}
+              </p>
+              <h3 class="text-base font-bold text-white group-hover:text-[#FF2E63] transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
+            </div>
+            <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="w-full py-2.5 bg-slate-800 hover:bg-[#FF2E63] text-center text-white text-sm font-semibold rounded-xl transition duration-200">
+              View Showtimes
+            </a>
+          </div>
         </div>
-        <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="w-full py-2.5 bg-slate-800 hover:bg-[#FF2E63] text-center text-white text-sm font-semibold rounded-xl transition duration-200">
-          View Showtimes
-        </a>
-      </div>
+      {% else %}
+        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
+          <p class="text-sm">No new releases currently showing.</p>
+        </div>
+      {% endfor %}
     </div>
-  {% else %}
-    <div class="col-span-full glass-card rounded-2xl p-12 text-center text-slate-400 space-y-3">
-      <i class="fa-solid fa-film text-4xl text-slate-600"></i>
-      <p>No movies listed yet.</p>
-      {% if current_user.is_authenticated and current_user.is_admin %}
-        <a href="{{ url_for('import_movie') }}" class="inline-block px-5 py-2.5 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">Import from TMDb</a>
-      {% endif %}
+  </div>
+
+  <!-- 2. Re-Releases -->
+  <div class="space-y-4 pt-2">
+    <div class="flex items-center gap-2 border-b border-purple-900/40 pb-2">
+      <span class="text-lg font-bold text-purple-300 tracking-wide">🔁 Re-Releases :-</span>
+      <span class="text-xs font-semibold text-purple-400">({{ now_showing_rereleases|length }})</span>
     </div>
-  {% endfor %}
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {% for movie in now_showing_rereleases %}
+        <div class="group glass-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-purple-500/50">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            {% if movie.poster %}
+              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+            {% else %}
+              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
+                <i class="fa-solid fa-film text-4xl"></i>
+                <span class="text-xs">No Poster</span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-[11px] text-purple-400 font-medium">
+                <i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} mins
+                {% if movie.language %} · {{ movie.language }}{% endif %}
+              </p>
+              <h3 class="text-base font-bold text-white group-hover:text-purple-400 transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
+            </div>
+            <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="w-full py-2.5 bg-slate-800 hover:bg-purple-600 text-center text-white text-sm font-semibold rounded-xl transition duration-200">
+              View Showtimes
+            </a>
+          </div>
+        </div>
+      {% else %}
+        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
+          <p class="text-sm">No re-releases currently showing.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- COMING SOON SECTION -->
+<div id="section-upcoming" class="hidden space-y-10">
+  <!-- 1. Upcoming Releases -->
+  <div class="space-y-4">
+    <div class="flex items-center gap-2 border-b border-slate-800/80 pb-2">
+      <span class="text-lg font-bold text-white tracking-wide">✨ Releases :-</span>
+      <span class="text-xs font-semibold text-slate-400">({{ coming_soon_releases|length }})</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {% for movie in coming_soon_releases %}
+        <div class="group glass-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            {% if movie.poster %}
+              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+            {% else %}
+              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
+                <i class="fa-solid fa-film text-4xl"></i>
+                <span class="text-xs">No Poster</span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-[11px] text-amber-400 font-bold">
+                <i class="fa-regular fa-calendar mr-1"></i>Releasing {{ movie.release_date.strftime('%d %b %Y') if movie.release_date else 'Soon' }}
+              </p>
+              <h3 class="text-base font-bold text-white transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
+              <p class="text-xs text-slate-400 mt-1 line-clamp-2">{{ movie.description }}</p>
+            </div>
+            <button onclick="alert('Notification set! We will notify you when tickets open for {{ movie.title }}.')" class="w-full py-2.5 bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 text-center text-amber-300 hover:text-white text-sm font-semibold rounded-xl transition duration-200">
+              <i class="fa-regular fa-bell mr-1"></i> Notify Me
+            </button>
+          </div>
+        </div>
+      {% else %}
+        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
+          <p class="text-sm">No new upcoming releases announced yet.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 2. Upcoming Re-Releases -->
+  <div class="space-y-4 pt-2">
+    <div class="flex items-center gap-2 border-b border-purple-900/40 pb-2">
+      <span class="text-lg font-bold text-purple-300 tracking-wide">🔁 Re-Releases :-</span>
+      <span class="text-xs font-semibold text-purple-400">({{ coming_soon_rereleases|length }})</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {% for movie in coming_soon_rereleases %}
+        <div class="group glass-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-purple-500/50">
+          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
+            {% if movie.poster %}
+              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+            {% else %}
+              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
+                <i class="fa-solid fa-film text-4xl"></i>
+                <span class="text-xs">No Poster</span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-[11px] text-purple-400 font-bold">
+                <i class="fa-solid fa-rotate-left mr-1"></i>Returning {{ movie.release_date.strftime('%d %b %Y') if movie.release_date else 'Soon' }}
+              </p>
+              <h3 class="text-base font-bold text-white group-hover:text-purple-400 transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
+              <p class="text-xs text-slate-400 mt-1 line-clamp-2">{{ movie.description }}</p>
+            </div>
+            <button onclick="alert('Notification set! We will notify you when tickets open for {{ movie.title }}.')" class="w-full py-2.5 bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 text-center text-purple-300 hover:text-white text-sm font-semibold rounded-xl transition duration-200">
+              <i class="fa-regular fa-bell mr-1"></i> Notify Me
+            </button>
+          </div>
+        </div>
+      {% else %}
+        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
+          <p class="text-sm">No upcoming re-releases announced yet.</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+  function switchCategory(cat) {
+    const secShowing = document.getElementById('section-showing');
+    const secUpcoming = document.getElementById('section-upcoming');
+    const tabShowing = document.getElementById('tab-showing');
+    const tabUpcoming = document.getElementById('tab-upcoming');
+
+    if (cat === 'showing') {
+      secShowing.classList.remove('hidden');
+      secUpcoming.classList.add('hidden');
+      tabShowing.className = "px-4 py-2 rounded-lg text-xs font-bold transition bg-[#FF2E63] text-white";
+      tabUpcoming.className = "px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+    } else {
+      secShowing.classList.add('hidden');
+      secUpcoming.classList.remove('hidden');
+      tabUpcoming.className = "px-4 py-2 rounded-lg text-xs font-bold transition bg-[#FF2E63] text-white";
+      tabShowing.className = "px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+    }
+  }
+</script>
+{% endblock %}
+

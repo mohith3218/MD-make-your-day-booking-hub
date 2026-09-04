@@ -27,6 +27,49 @@
   <span class="ml-auto">Max {{ max_seats }} seats per booking</span>
 </div>
 
+{% if dynamic_info and dynamic_info.badge %}
+<div class="glass-card rounded-xl p-3 flex items-center justify-between border border-rose-500/20 bg-rose-500/10">
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-bold text-rose-400">{{ dynamic_info.badge }}</span>
+    <span class="text-[10px] text-slate-400">· Real-time demand engine pricing active</span>
+  </div>
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold uppercase tracking-wider">Dynamic Pricing</span>
+</div>
+{% endif %}
+
+<!-- Smart Seat POV & Acoustic Inspector Card -->
+<div id="seat-inspector" class="glass-card rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-4 border border-indigo-500/20 bg-slate-900/90 shadow-lg">
+  <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-sm shrink-0" id="insp-seat-id">
+      --
+    </div>
+    <div>
+      <p class="text-xs font-bold text-white flex items-center gap-2">
+        <span id="insp-zone-name">Hover or click a seat to inspect POV & Sound Quality</span>
+      </p>
+      <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+        <span class="text-[11px] text-indigo-300 font-medium" id="insp-badge">Smart Seat POV Inspector</span>
+        <span class="text-[11px] text-slate-500">·</span>
+        <span class="text-[11px] text-emerald-400 font-semibold" id="insp-sound-profile">Dolby Atmos Spatial Audio</span>
+      </div>
+    </div>
+  </div>
+  <div class="flex items-center gap-5 text-xs text-slate-400 shrink-0">
+    <div class="text-right">
+      <p class="text-[10px] text-slate-500 uppercase tracking-wider">Screen Distance</p>
+      <p class="font-bold text-white text-sm" id="insp-dist">--</p>
+    </div>
+    <div class="text-right">
+      <p class="text-[10px] text-slate-500 uppercase tracking-wider">Field of View</p>
+      <p class="font-bold text-white text-sm" id="insp-angle">--</p>
+    </div>
+    <div class="text-right pl-2 border-l border-slate-800">
+      <p class="text-[10px] text-purple-400 uppercase tracking-wider font-bold">Sound Quality</p>
+      <p class="font-black text-purple-300 text-sm" id="insp-sound-score">--</p>
+    </div>
+  </div>
+</div>
+
 <form id="booking-form" method="POST" class="space-y-6">
   <input type="hidden" name="selected_seats" id="selected_seats_input">
 
@@ -55,6 +98,14 @@
                         data-seat="{{ cell.id }}"
                         data-price="{{ cell.price }}"
                         data-class="{{ cell.cls }}"
+                        data-pov-name="{{ cell.pov.zone_name if cell.pov else 'Standard Seat' }}"
+                        data-pov-badge="{{ cell.pov.comfort_badge if cell.pov else '' }}"
+                        data-pov-angle="{{ cell.pov.view_angle if cell.pov else '35' }}°"
+                        data-pov-dist="{{ cell.pov.screen_dist_pct if cell.pov else '50' }}%"
+                        data-sound-score="{{ cell.pov.sound_score if cell.pov else '85' }}%"
+                        data-sound-exp="{{ cell.pov.sound_exp if cell.pov else 'Balanced Surround' }}"
+                        data-sound-badge="{{ cell.pov.sound_badge if cell.pov else '🔊 85% Spatial Audio' }}"
+                        data-sound-profile="{{ cell.pov.sound_profile if cell.pov else 'Dolby Atmos Spatial Audio' }}"
                         {% if cell.status == 'available' %}
                           class="seat seat-avail seat-btn font-semibold transition {% if cell.span == 2 %}seat-wide{% endif %}"
                         {% elif cell.status == 'held' %}
@@ -106,6 +157,17 @@
   const priceOut = document.getElementById('total-price');
   const btn = document.getElementById('confirm-btn');
 
+  function updateInspector(elem) {
+    if (!elem || !elem.dataset.seat) return;
+    document.getElementById('insp-seat-id').textContent = elem.dataset.seat;
+    document.getElementById('insp-zone-name').textContent = elem.dataset.povName || 'Standard Seat';
+    document.getElementById('insp-badge').textContent = elem.dataset.povBadge || 'Standard View';
+    document.getElementById('insp-angle').textContent = elem.dataset.povAngle || '35°';
+    document.getElementById('insp-dist').textContent = elem.dataset.povDist || '50%';
+    document.getElementById('insp-sound-score').textContent = elem.dataset.soundScore || '85%';
+    document.getElementById('insp-sound-profile').textContent = (elem.dataset.soundBadge || '🔊 Dolby Atmos') + ' · ' + (elem.dataset.soundProfile || 'Spatial Audio');
+  }
+
   function paint() {
     const seats = [...selected.keys()];
     const total = [...selected.values()].reduce((a, s) => a + s.price, 0);
@@ -120,7 +182,9 @@
   }
 
   document.querySelectorAll('.seat-btn').forEach(b => {
+    b.addEventListener('mouseenter', () => updateInspector(b));
     b.addEventListener('click', () => {
+      updateInspector(b);
       const id = b.dataset.seat;
       if (selected.has(id)) {
         selected.delete(id);

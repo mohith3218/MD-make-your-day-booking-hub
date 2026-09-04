@@ -89,6 +89,7 @@ class User(UserMixin, db.Model):
     phone = db.Column(db.String(15), nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    points = db.Column(db.Integer, default=100)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -105,6 +106,9 @@ class Movie(db.Model):
     poster = db.Column(db.String(500), nullable=True)
     language = db.Column(db.String(50), nullable=True, default='Telugu')
     certificate = db.Column(db.String(10), nullable=True, default='U/A')
+    is_upcoming = db.Column(db.Boolean, default=False)
+    is_rerelease = db.Column(db.Boolean, default=False)
+    release_date = db.Column(db.Date, nullable=True)
 
 
 class Theater(db.Model):
@@ -205,6 +209,50 @@ class Showtime(db.Model):
     def is_past(self):
         return self.show_date < date.today()
 
+    @property
+    def dynamic_pricing_info(self):
+        """
+        Calculates real-time surge or early-bird pricing adjustments based on occupancy and show time.
+        """
+        total = sl.count_seats(self.layout) or 1
+        booked_count = len(self.booked_seat_ids())
+        occupancy_pct = (booked_count / max(1, total)) * 100.0
+
+        today = date.today()
+        days_ahead = (self.show_date - today).days
+
+        if occupancy_pct >= 60.0:
+            return {
+                "factor": 1.15,
+                "badge": "🔥 High Demand Surge (+15%)",
+                "type": "SURGE",
+                "color": "rose",
+                "discount_pct": 15
+            }
+        elif days_ahead >= 2:
+            return {
+                "factor": 0.90,
+                "badge": "⚡ Early Bird Deal (-10%)",
+                "type": "EARLY_BIRD",
+                "color": "emerald",
+                "discount_pct": -10
+            }
+        elif occupancy_pct < 30.0 and days_ahead == 0:
+            return {
+                "factor": 0.80,
+                "badge": "🎉 Last-Minute Flash Deal (-20%)",
+                "type": "FLASH",
+                "color": "amber",
+                "discount_pct": -20
+            }
+        return {
+            "factor": 1.0,
+            "badge": None,
+            "type": "STANDARD",
+            "color": "slate",
+            "discount_pct": 0
+        }
+
 
 class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -220,6 +268,10 @@ class Booking(db.Model):
     gst = db.Column(db.Float, default=0)
     total_amount = db.Column(db.Float, nullable=False, default=0)   # charged amount
 
+    is_split_pay = db.Column(db.Boolean, default=False)
+    snacks_json = db.Column(db.Text, default='[]')
+    points_redeemed = db.Column(db.Integer, default=0)
+
     # PENDING -> PAID | FAILED | CANCELLED | EXPIRED
     status = db.Column(db.String(20), default='PENDING', nullable=False)
     lock_token = db.Column(db.String(40), nullable=True)
@@ -232,6 +284,18 @@ class Booking(db.Model):
     showtime = db.relationship('Showtime', backref=db.backref('bookings', lazy=True))
     payment = db.relationship('Payment', backref='booking', uselist=False,
                               cascade='all, delete-orphan')
+
+    @property
+    def per_person_amount(self):
+        count = max(1, len(self.seat_list))
+        return round(self.total_amount / count, 2)
+
+    @property
+    def snacks_list(self):
+        try:
+            return json.loads(self.snacks_json or '[]')
+        except json.JSONDecodeError:
+            return []
 
     @property
     def seat_list(self):
@@ -425,6 +489,10 @@ def finalise_paid_booking(booking, payment):
             lock = SeatLock.query.filter_by(token=booking.lock_token).first()
             if lock:
                 db.session.delete(lock)
+        # CinePass points reward: 10 points per ₹100 spent
+        earned_pts = int(booking.total_amount / 10)
+        if earned_pts > 0:
+            booking.user.points = (booking.user.points or 0) + earned_pts
         db.session.commit()
         return True, "Payment successful"
     except IntegrityError:
@@ -449,10 +517,13 @@ def finalise_paid_booking(booking, payment):
 def inject_globals():
     """Available in every template."""
     wallet_balance = None
+    user_points = 0
     if current_user.is_authenticated:
         w = Wallet.query.filter_by(user_id=current_user.id).first()
         wallet_balance = w.balance if w else 0
+        user_points = current_user.points or 0
     return {'wallet_balance': wallet_balance,
+            'user_points': user_points,
             'gateway_live': payments.is_live_gateway(),
             'today': date.today()}
 
@@ -461,8 +532,39 @@ def inject_globals():
 
 @app.route('/')
 def home():
-    movies = Movie.query.order_by(Movie.id.desc()).all()
-    return render_template('index.html', movies=movies)
+    # Now Showing
+    now_showing_releases = Movie.query.filter(
+        (Movie.is_upcoming.is_(False)) | (Movie.is_upcoming.is_(None)),
+        (Movie.is_rerelease.is_(False)) | (Movie.is_rerelease.is_(None))
+    ).order_by(Movie.id.desc()).all()
+    
+    now_showing_rereleases = Movie.query.filter(
+        (Movie.is_upcoming.is_(False)) | (Movie.is_upcoming.is_(None)),
+        Movie.is_rerelease.is_(True)
+    ).order_by(Movie.id.desc()).all()
+
+    # Coming Soon
+    coming_soon_releases = Movie.query.filter(
+        Movie.is_upcoming.is_(True),
+        (Movie.is_rerelease.is_(False)) | (Movie.is_rerelease.is_(None))
+    ).order_by(Movie.release_date.asc(), Movie.id.desc()).all()
+
+    coming_soon_rereleases = Movie.query.filter(
+        Movie.is_upcoming.is_(True),
+        Movie.is_rerelease.is_(True)
+    ).order_by(Movie.release_date.asc(), Movie.id.desc()).all()
+
+    return render_template(
+        'index.html',
+        now_showing_releases=now_showing_releases,
+        now_showing_rereleases=now_showing_rereleases,
+        coming_soon_releases=coming_soon_releases,
+        coming_soon_rereleases=coming_soon_rereleases,
+        # backward compat counts
+        total_now_showing=len(now_showing_releases) + len(now_showing_rereleases),
+        total_coming_soon=len(coming_soon_releases) + len(coming_soon_rereleases)
+    )
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -535,7 +637,7 @@ def movie_detail(movie_id):
                            grouped=grouped)
 
 
-# ====================== SEAT SELECTION ======================
+# ====================== SEAT SELECTION & HOLD ======================
 
 @app.route('/book/<int:showtime_id>', methods=['GET', 'POST'])
 @login_required
@@ -551,6 +653,7 @@ def book(showtime_id):
     layout = showtime.layout
     booked = showtime.booked_seat_ids()
     held = showtime.held_seat_ids()
+    dyn = showtime.dynamic_pricing_info
 
     if request.method == 'POST':
         raw = request.form.get('selected_seats', '')
@@ -589,12 +692,20 @@ def book(showtime_id):
 
         return redirect(url_for('checkout', reference=booking.reference))
 
+    effective_overrides = {}
+    base_overrides = showtime.price_overrides
+    for cls in layout.get("classes", []):
+        code = cls.get("code", "STD")
+        base_p = float(base_overrides.get(code, cls.get("price", 0)))
+        effective_overrides[code] = round(base_p * dyn['factor'], 2)
+
     grid = sl.build_layout(layout, booked=booked, held=held,
-                           price_overrides=showtime.price_overrides)
+                           price_overrides=effective_overrides)
     return render_template('book.html', movie=movie, showtime=showtime,
                            screen=showtime.screen, grid=grid,
                            max_seats=sl.MAX_SEATS_PER_BOOKING,
-                           stats=sl.availability(layout, booked | held))
+                           stats=sl.availability(layout, booked | held),
+                           dynamic_info=dyn)
 
 
 @app.route('/api/showtime/<int:showtime_id>/availability')
@@ -614,6 +725,14 @@ def _load_pending(reference):
     if booking.user_id != current_user.id and not current_user.is_admin:
         abort(403)
     return booking
+
+
+SNACK_ITEMS = [
+    {"id": "popcorn_lg", "name": "Large Butter Popcorn", "price": 180, "icon": "fa-bowl-food", "desc": "Fresh tub with extra butter"},
+    {"id": "pepsi_m", "name": "Chilled Pepsi 500ml", "price": 110, "icon": "fa-glass-water", "desc": "Ice-cold cinema beverage"},
+    {"id": "combo_sav", "name": "Saver Combo (Popcorn + 2 Pepsi)", "price": 260, "icon": "fa-box-open", "desc": "Best value for 2 viewers"},
+    {"id": "nachos_c", "name": "Cheese Nachos Extra Dip", "price": 160, "icon": "fa-stroopwafel", "desc": "Crispy corn chips with warm cheese"}
+]
 
 
 @app.route('/checkout/<reference>')
@@ -637,7 +756,45 @@ def checkout(reference):
                            movie=booking.showtime.movie,
                            wallet=wallet,
                            can_use_wallet=wallet.balance >= booking.total_amount,
-                           gateway=payments.gateway_name())
+                           gateway=payments.gateway_name(),
+                           snack_items=SNACK_ITEMS,
+                           user_points=current_user.points or 0)
+
+
+@app.route('/checkout/<reference>/update_extras', methods=['POST'])
+@login_required
+def update_booking_extras(reference):
+    booking = _load_pending(reference)
+    if booking.status != 'PENDING' or booking.is_expired:
+        flash("This booking is expired.")
+        return redirect(url_for('book', showtime_id=booking.showtime_id))
+
+    selected_snack_ids = set(request.form.getlist('snacks'))
+    redeem_pts = int(request.form.get('redeem_points', 0))
+
+    snacks_chosen = []
+    snack_total = 0.0
+    for s in SNACK_ITEMS:
+        if s['id'] in selected_snack_ids:
+            snacks_chosen.append(s)
+            snack_total += s['price']
+
+    user_pts = current_user.points or 0
+    if redeem_pts > user_pts:
+        redeem_pts = 0
+    discount = float(redeem_pts)
+
+    base_subtotal = booking.ticket_amount + snack_total
+    amounts = payments.compute_amounts(base_subtotal, len(booking.seat_list))
+    final_total = max(1.0, amounts['total'] - discount)
+
+    booking.snacks_json = json.dumps(snacks_chosen)
+    booking.points_redeemed = redeem_pts
+    booking.total_amount = round(final_total, 2)
+    db.session.commit()
+
+    flash("Booking updated with selected snacks and CinePass discount!")
+    return redirect(url_for('checkout', reference=booking.reference))
 
 
 @app.route('/pay/wallet/<reference>', methods=['POST'])
@@ -933,15 +1090,32 @@ def add_movie():
     if guard:
         return guard
     if request.method == 'POST':
+        category = request.form.get('category', 'showing')
+        is_upcoming = (category == 'upcoming')
+        is_rerelease = (request.form.get('release_type', 'fresh') == 'rerelease')
+
+        rel_date_str = request.form.get('release_date', '').strip()
+        rel_date = None
+        if rel_date_str:
+            try:
+                rel_date = datetime.strptime(rel_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                rel_date = None
+
         movie = Movie(title=request.form['title'],
                       description=request.form['description'],
                       duration=int(request.form['duration']),
                       poster=request.form.get('poster', '').strip() or None,
                       language=request.form.get('language', 'Telugu'),
-                      certificate=request.form.get('certificate', 'U/A'))
+                      certificate=request.form.get('certificate', 'U/A'),
+                      is_upcoming=is_upcoming,
+                      is_rerelease=is_rerelease,
+                      release_date=rel_date)
         db.session.add(movie)
         db.session.commit()
-        flash("Movie added successfully!")
+        cat_label = 'Coming Soon' if is_upcoming else 'Now Showing'
+        rel_label = ' (Re-Release)' if is_rerelease else ''
+        flash(f"Movie '{movie.title}' added to {cat_label}{rel_label}!")
         return redirect(url_for('admin'))
     return render_template('add_movie.html')
 
@@ -966,6 +1140,7 @@ def import_movie():
                     results.append({'tmdb_id': item['id'], 'title': item['title'],
                                     'overview': item.get('overview', ''),
                                     'poster_url': f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
+                                    'release_date': release_date,
                                     'year': release_date[:4] if release_date else ''})
             except Exception as e:
                 flash(f"Error fetching from TMDb: {e}")
@@ -982,16 +1157,61 @@ def import_movie_add(tmdb_id):
         res = requests.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}",
                            params={'api_key': TMDB_API_KEY}, timeout=10).json()
         poster_path = res.get('poster_path')
+        category = request.form.get('category', 'showing')
+        is_upcoming = (category == 'upcoming')
+        is_rerelease = (request.form.get('release_type', 'fresh') == 'rerelease')
+
+        rel_date_str = request.form.get('release_date', '').strip() or res.get('release_date', '')
+        rel_date = None
+        if rel_date_str:
+            try:
+                rel_date = datetime.strptime(rel_date_str[:10], '%Y-%m-%d').date()
+            except ValueError:
+                rel_date = None
+
         movie = Movie(title=res.get('title', 'Untitled'),
                       description=res.get('overview', 'No overview available.'),
                       duration=res.get('runtime') or 120,
                       poster=f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
-                      language=(res.get('original_language') or 'te').upper())
+                      language=(res.get('original_language') or 'te').upper(),
+                      is_upcoming=is_upcoming,
+                      is_rerelease=is_rerelease,
+                      release_date=rel_date)
         db.session.add(movie)
         db.session.commit()
-        flash(f'Imported "{movie.title}" successfully!')
+        cat_label = 'Coming Soon' if is_upcoming else 'Now Showing'
+        rel_label = ' (Re-Release)' if is_rerelease else ''
+        flash(f'Imported "{movie.title}" as {cat_label}{rel_label}!')
     except Exception as e:
         flash(f"Failed to import movie: {e}")
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/toggle_movie_status/<int:movie_id>', methods=['POST'])
+@login_required
+def toggle_movie_status(movie_id):
+    guard = admin_required()
+    if guard:
+        return guard
+    movie = Movie.query.get_or_404(movie_id)
+    movie.is_upcoming = not movie.is_upcoming
+    db.session.commit()
+    status_str = "Coming Soon" if movie.is_upcoming else "Now Showing"
+    flash(f"Movie '{movie.title}' status changed to {status_str}!")
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/toggle_rerelease/<int:movie_id>', methods=['POST'])
+@login_required
+def toggle_rerelease(movie_id):
+    guard = admin_required()
+    if guard:
+        return guard
+    movie = Movie.query.get_or_404(movie_id)
+    movie.is_rerelease = not movie.is_rerelease
+    db.session.commit()
+    rel_label = "Re-Release" if movie.is_rerelease else "Fresh Release"
+    flash(f"'{movie.title}' is now marked as {rel_label}!")
     return redirect(url_for('admin'))
 
 
@@ -1209,15 +1429,18 @@ def auto_migrate():
     """
     insp = inspect(db.engine)
     wanted = {
-        'user': [('phone', 'VARCHAR(15)')],
-        'movie': [('language', "VARCHAR(50)"), ('certificate', "VARCHAR(10)")],
+        'user': [('phone', 'VARCHAR(15)'), ('points', 'INTEGER DEFAULT 100')],
+        'movie': [('language', "VARCHAR(50)"), ('certificate', "VARCHAR(10)"),
+                  ('is_upcoming', 'BOOLEAN DEFAULT 0'), ('release_date', 'DATE'),
+                  ('is_rerelease', 'BOOLEAN DEFAULT 0')],
         'theater': [('city', "VARCHAR(80)"), ('address', "VARCHAR(400)")],
         'showtime': [('screen_id', 'INTEGER'), ('price_overrides_json', 'TEXT')],
         'booking': [('reference', 'VARCHAR(20)'), ('seat_meta_json', 'TEXT'),
                     ('ticket_amount', 'FLOAT'), ('convenience_fee', 'FLOAT'),
                     ('gst', 'FLOAT'), ('status', "VARCHAR(20)"),
                     ('lock_token', 'VARCHAR(40)'), ('paid_at', 'DATETIME'),
-                    ('expires_at', 'DATETIME')],
+                    ('expires_at', 'DATETIME'), ('is_split_pay', 'BOOLEAN DEFAULT 0'),
+                    ('snacks_json', 'TEXT'), ('points_redeemed', 'INTEGER DEFAULT 0')],
         'booked_seat': [('booking_id', 'INTEGER')],
     }
     for table, cols in wanted.items():
@@ -1237,10 +1460,16 @@ def auto_migrate():
     db.session.commit()
 
 
+def seed_sample_upcoming_movies():
+    # No auto-seeded upcoming movies - admin adds them manually via the admin panel
+    pass
+
+
 def init_db():
     with app.app_context():
         db.create_all()
         auto_migrate()
+        seed_sample_upcoming_movies()
 
         admin_user = User.query.filter_by(username='admin').first()
         if not admin_user:

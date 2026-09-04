@@ -49,11 +49,80 @@
   <!-- payment methods -->
   <section class="lg:col-span-3 space-y-4">
 
+    <!-- Squad Pay / Group Split-Bill Card -->
+    {% if booking.seat_list|length > 1 %}
+    <div class="glass-card rounded-2xl p-5 space-y-3 border border-indigo-500/20 bg-indigo-950/20">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-users text-indigo-400"></i>
+          <p class="text-sm font-bold text-white">Squad Pay (Split Bill with Friends)</p>
+        </div>
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold uppercase">Group Feature</span>
+      </div>
+      <p class="text-xs text-slate-300">
+        Booking <strong class="text-white">{{ booking.seat_list|length }} seats</strong>? Split the bill equally:
+        <strong class="text-indigo-400">₹{{ '%.2f'|format(booking.per_person_amount) }}</strong> per person.
+      </p>
+      <div class="flex items-center gap-2 pt-1">
+        <input type="text" readonly id="squad-link" value="{{ request.url }}" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 font-mono">
+        <button type="button" onclick="copySquadLink()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition whitespace-nowrap">
+          <i class="fa-solid fa-copy mr-1"></i> Copy Link
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- In-Seat Snacks & CinePass Redemption Form -->
+    <form method="POST" action="{{ url_for('update_booking_extras', reference=booking.reference) }}" class="glass-card rounded-2xl p-5 space-y-4 border border-amber-500/20 bg-amber-950/10">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-burger text-amber-400"></i>
+          <p class="text-sm font-bold text-white">Add In-Seat Snacks & Redeem CinePass Points</p>
+        </div>
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold uppercase">Express Counter</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        {% for s in snack_items %}
+          {% set selected = s.id in (booking.snacks_list|map(attribute='id')|list) %}
+          <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900/60 cursor-pointer hover:border-amber-500/50 transition">
+            <input type="checkbox" name="snacks" value="{{ s.id }}" {% if selected %}checked{% endif %} class="w-4 h-4 rounded text-amber-500 bg-slate-800 border-slate-700">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-bold text-white"><i class="fa-solid {{ s.icon }} text-amber-400 mr-1.5"></i>{{ s.name }}</p>
+              <p class="text-[10px] text-slate-400">{{ s.desc }}</p>
+            </div>
+            <span class="text-xs font-bold text-amber-400">₹{{ s.price }}</span>
+          </label>
+        {% endfor %}
+      </div>
+
+      {% if user_points > 0 %}
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-coins text-amber-400"></i>
+          <div>
+            <p class="text-xs font-bold text-white">Redeem CinePass Points</p>
+            <p class="text-[10px] text-slate-400">Available: {{ user_points }} Pts (1 Pt = ₹1 Off)</p>
+          </div>
+        </div>
+        <select name="redeem_points" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+          <option value="0">Don't redeem points</option>
+          {% if user_points >= 50 %}<option value="50" {% if booking.points_redeemed == 50 %}selected{% endif %}>Redeem 50 Pts (-₹50)</option>{% endif %}
+          {% if user_points >= 100 %}<option value="100" {% if booking.points_redeemed == 100 %}selected{% endif %}>Redeem 100 Pts (-₹100)</option>{% endif %}
+        </select>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-xl transition">
+        Update Booking Extras & Recalculate Total
+      </button>
+    </form>
+
     <!-- wallet -->
     <form method="POST" action="{{ url_for('pay_with_wallet', reference=booking.reference) }}"
           class="glass-card rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
       <div class="min-w-0">
-        <p class="text-sm font-bold text-white"><i class="fa-solid fa-wallet text-emerald-400 mr-2"></i>CineWave Wallet</p>
+        <p class="text-sm font-bold text-white"><i class="fa-solid fa-wallet text-emerald-400 mr-2"></i>MD CineWave Wallet</p>
         <p class="text-[11px] text-slate-400 mt-1">Balance ₹{{ '%.2f'|format(wallet.balance) }}
           {% if not can_use_wallet %}<span class="text-amber-400">· ₹{{ '%.2f'|format(booking.total_amount - wallet.balance) }} short</span>{% endif %}
         </p>
@@ -106,6 +175,14 @@
 
 {% block scripts %}
 <script>
+  function copySquadLink() {
+    const input = document.getElementById('squad-link');
+    if (!input) return;
+    input.select();
+    navigator.clipboard.writeText(input.value);
+    alert('Squad Pay link copied! Share this with your friends to split the bill.');
+  }
+
   let left = {{ booking.seconds_left }};
   const out = document.getElementById('timer');
   function tick() {

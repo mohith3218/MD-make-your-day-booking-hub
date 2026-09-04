@@ -12,6 +12,28 @@
     <input type="text" name="title" placeholder="Movie title" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
     <textarea name="description" rows="3" placeholder="Description" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]"></textarea>
     <input type="number" name="duration" placeholder="Duration (minutes)" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+
+    <div class="space-y-1">
+      <label class="text-xs font-semibold text-slate-400">Listing Category</label>
+      <select name="category" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <option value="showing">🎬 Now Showing (Currently running)</option>
+        <option value="upcoming">🗓️ Coming Soon (Upcoming release)</option>
+      </select>
+    </div>
+
+    <div class="space-y-1">
+      <label class="text-xs font-semibold text-slate-400">Release Type</label>
+      <select name="release_type" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <option value="fresh">✨ Fresh Release (New movie)</option>
+        <option value="rerelease">🔁 Re-Release (Classic / returning to screens)</option>
+      </select>
+    </div>
+
+    <div class="space-y-1">
+      <label class="text-xs font-semibold text-slate-400">Release Date (Optional)</label>
+      <input type="date" name="release_date" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+    </div>
+
     <div class="flex gap-3">
       <select name="language" class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
         {% for l in ['Telugu', 'Hindi', 'English', 'Tamil', 'Malayalam', 'Kannada'] %}<option>{{ l }}</option>{% endfor %}
