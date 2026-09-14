@@ -40,18 +40,47 @@
 
           <div class="flex flex-wrap gap-3">
             {% for s in shows %}
-              {% if current_user.is_authenticated %}
-                <a href="{{ url_for('book', showtime_id=s.id) }}"
-                   class="px-4 py-2.5 rounded-xl border border-slate-700 hover:border-[#FF2E63] bg-slate-900 hover:bg-slate-800 transition text-center">
-                  <p class="text-sm font-bold text-white">{{ s.show_time }}</p>
-                  <p class="text-[10px] text-slate-500">{{ s.screen_label }} · {{ s.seats_left }} left</p>
-                </a>
+              {% set st = s.status %}
+              {% if st == 'ended' %}
+                {# ---- ENDED: greyed out, not clickable ---- #}
+                <div class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed text-center">
+                  <p class="text-sm font-bold text-slate-400">{{ s.show_time }}</p>
+                  <p class="text-[10px] text-slate-600">{{ s.screen_label }} · Show Over</p>
+                </div>
+              {% elif st == 'live' %}
+                {# ---- LIVE: pulsing red badge ---- #}
+                <div class="relative px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-500/10 text-center">
+                  <span class="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse whitespace-nowrap">
+                    🔴 LIVE NOW
+                  </span>
+                  <p class="text-sm font-bold text-white mt-1">{{ s.show_time }}</p>
+                  <p class="text-[10px] text-red-400">{{ s.screen_label }} · In Progress</p>
+                </div>
               {% else %}
-                <a href="{{ url_for('login') }}"
-                   class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-center">
-                  <p class="text-sm font-bold text-slate-300">{{ s.show_time }}</p>
-                  <p class="text-[10px] text-slate-500">Login to book</p>
-                </a>
+                {# ---- UPCOMING: normal booking card with countdown ---- #}
+                {% if current_user.is_authenticated %}
+                  <a href="{{ url_for('book', showtime_id=s.id) }}"
+                     class="relative px-4 py-2.5 rounded-xl border border-slate-700 hover:border-[#FF2E63] bg-slate-900 hover:bg-slate-800 transition text-center group">
+                    <p class="text-sm font-bold text-white">{{ s.show_time }}</p>
+                    <p class="text-[10px] text-slate-500">
+                      {{ s.screen_label }} ·
+                      <span id="seats-{{ s.id }}">{{ s.seats_left }} left</span>
+                    </p>
+                    {% if s.show_datetime %}
+                      <p class="text-[9px] text-emerald-400 font-mono mt-0.5"
+                         id="countdown-{{ s.id }}"
+                         data-target="{{ s.show_datetime.strftime('%Y-%m-%dT%H:%M:00') }}">
+                        ⏳ ...
+                      </p>
+                    {% endif %}
+                  </a>
+                {% else %}
+                  <a href="{{ url_for('login') }}"
+                     class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-center">
+                    <p class="text-sm font-bold text-slate-300">{{ s.show_time }}</p>
+                    <p class="text-[10px] text-slate-500">Login to book</p>
+                  </a>
+                {% endif %}
               {% endif %}
             {% endfor %}
           </div>
@@ -63,3 +92,45 @@
   {% endfor %}
 </section>
 {% endblock %}
+
+{% block scripts %}
+<script>
+  // ---- Countdown timers ----
+  document.querySelectorAll('[id^="countdown-"]').forEach(el => {
+    const target = new Date(el.dataset.target);
+    function tick() {
+      const diff = target - new Date();
+      if (diff <= 0) { el.textContent = '🔴 Show Started!'; el.className = 'text-[9px] text-red-400 font-mono mt-0.5 animate-pulse'; return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      el.textContent = h > 0
+        ? `⏳ Starts in ${h}h ${m}m ${s}s`
+        : `⏳ Starts in ${m}m ${s}s`;
+    }
+    tick();
+    setInterval(tick, 1000);
+  });
+
+  // ---- Live seat count refresh every 20 seconds ----
+  async function refreshSeats() {
+    const seatsEls = document.querySelectorAll('[id^="seats-"]');
+    for (const el of seatsEls) {
+      const showId = el.id.replace('seats-', '');
+      try {
+        const res = await fetch(`/api/showtime/${showId}/live-info`);
+        const d = await res.json();
+        el.textContent = `${d.seats_left} left`;
+        if (d.seats_left <= 5 && d.seats_left > 0) {
+          el.className = 'text-red-400 font-bold animate-pulse';
+        } else if (d.seats_left === 0) {
+          el.textContent = 'Houseful';
+          el.className = 'text-rose-600 font-bold';
+        }
+      } catch(e) { /* ignore if offline */ }
+    }
+  }
+  setInterval(refreshSeats, 20000);
+</script>
+{% endblock %}
+

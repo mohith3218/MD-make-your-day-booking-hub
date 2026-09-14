@@ -41,8 +41,9 @@
       <div class="flex gap-3">
         <input type="date" name="show_date" required value="{{ today }}"
                class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
-        <input type="text" name="show_time" placeholder="e.g. 6:30 PM" required
-               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+        <input type="time" name="show_time" required
+               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]
+                      [color-scheme:dark]">
       </div>
 
       <div id="price-box" class="hidden space-y-2">

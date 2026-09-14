@@ -152,6 +152,43 @@ def compute_seat_pov(cell_id: str, row_label: str, seat_num: int, row_index: int
         comfort_badge = f"✨ Elevated Recliner / Back Row View"
         zone_color = "purple"
 
+    # Vibe Zone Calculations:
+    # 1. Couples Corner (span == 2 or corner recliners/back row pairs)
+    # 2. Quiet Zone (back rows, high privacy)
+    # 3. Fun & Social Zone (center middle crowd rows)
+    # 4. Family & Easy-Exit Zone (aisle-adjacent or front-mid rows)
+    if front_pct < 0.25 and (col_pct < 0.2 or col_pct > 0.8):
+        vibe_code = "COUPLES"
+        vibe_name = "Couples Corner"
+        vibe_icon = "💑"
+        vibe_badge = "💑 Cozy & Private Pair"
+        vibe_desc = "Spacious corner seating with extra privacy and great ambiance."
+        vibe_color = "rose"
+    elif front_pct < 0.35:
+        vibe_code = "QUIET"
+        vibe_name = "Quiet Zone"
+        vibe_icon = "🔇"
+        vibe_badge = "🔇 Distraction-Free Quiet"
+        vibe_desc = "Top-tier viewing position with minimal foot traffic."
+        vibe_color = "purple"
+    elif 0.35 <= front_pct <= 0.75 and 0.25 <= col_pct <= 0.75:
+        vibe_code = "FUN"
+        vibe_name = "Fun & Social Zone"
+        vibe_icon = "😂"
+        vibe_badge = "😂 High Energy & Laughs"
+        vibe_desc = "Heart of the cinema crowd — best for blockbusters and comedy!"
+        vibe_color = "amber"
+    else:
+        vibe_code = "FAMILY"
+        vibe_name = "Family & Easy-Exit Zone"
+        vibe_icon = "👨‍👩‍👧"
+        vibe_badge = "👨‍👩‍👧 Family Friendly & Easy Access"
+        vibe_desc = "Convenient exit access for kids, families, and quick snack runs."
+        vibe_color = "emerald"
+
+    # Overall seat quality score (0 to 100) combining acoustics, center alignment & view distance
+    overall_score = max(50, min(99, int((sound_score_raw * 0.4) + (max(0, 100 - off_center_deg * 3) * 0.35) + (screen_dist_pct * 0.25))))
+
     return {
         "zone": zone,
         "zone_name": zone_name,
@@ -164,7 +201,14 @@ def compute_seat_pov(cell_id: str, row_label: str, seat_num: int, row_index: int
         "sound_exp": sound_exp,
         "sound_badge": sound_badge,
         "sound_profile": sound_profile,
-        "sound_tier": sound_tier
+        "sound_tier": sound_tier,
+        "vibe_code": vibe_code,
+        "vibe_name": vibe_name,
+        "vibe_icon": vibe_icon,
+        "vibe_badge": vibe_badge,
+        "vibe_desc": vibe_desc,
+        "vibe_color": vibe_color,
+        "score": overall_score
     }
 
 

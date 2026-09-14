@@ -11,10 +11,59 @@
       · {{ screen.name }} ({{ screen.screen_type }})
     </p>
     <p class="text-xs text-slate-400">{{ showtime.show_date.strftime('%a, %d %b %Y') }} · {{ showtime.show_time }}</p>
+    {# Live countdown to show start #}
+    {% if showtime.show_datetime %}
+      <p class="text-[10px] text-emerald-400 font-mono mt-1"
+         id="book-countdown"
+         data-target="{{ showtime.show_datetime.strftime('%Y-%m-%dT%H:%M:00') }}"
+         data-movie-url="{{ url_for('movie_detail', movie_id=movie.id) }}">
+        ⏳ ...
+      </p>
+    {% endif %}
   </div>
-  <div class="glass-card rounded-xl px-4 py-3 text-right">
-    <p class="text-[10px] uppercase tracking-wider text-slate-500">Seats available</p>
-    <p class="text-lg font-black text-white">{{ stats.left }} <span class="text-xs font-medium text-slate-500">/ {{ stats.total }}</span></p>
+
+  <div class="flex flex-col items-end gap-2">
+    <div class="glass-card rounded-xl px-4 py-3 text-right">
+      <p class="text-[10px] uppercase tracking-wider text-slate-500">Seats available</p>
+      <p class="text-lg font-black text-white" id="live-seats-left">{{ stats.left }} <span class="text-xs font-medium text-slate-500">/ {{ stats.total }}</span></p>
+    </div>
+
+    <!-- 🎉 WATCH TOGETHER PARTY BUTTON -->
+    <button type="button" onclick="initOrShowParty()" class="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-600/20 flex items-center gap-2">
+      <span>🎉 Watch Together Party</span>
+      <span class="text-[9px] px-1.5 py-0.5 bg-white/20 rounded-full font-mono" id="party-btn-badge">
+        {% if party_code %}Code: {{ party_code }}{% else %}Start Squad{% endif %}
+      </span>
+    </button>
+  </div>
+</div>
+
+<!-- 👥 WATCH TOGETHER SQUAD BANNER (Active when party_code present or created) -->
+<div id="party-squad-banner" class="glass-card rounded-2xl p-4 border border-purple-500/30 bg-purple-950/20 space-y-3 {% if not party_code %}hidden{% endif %}">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-lg">
+        👥
+      </div>
+      <div>
+        <p class="text-xs font-extrabold text-white flex items-center gap-2">
+          <span>Squad Watch Party Room</span>
+          <span class="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-bold" id="squad-room-code">{{ party_code or '' }}</span>
+        </p>
+        <p class="text-[11px] text-slate-400">Seats picked by squad members will sync live on your screen!</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" onclick="copySquadLink()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+        <i class="fa-regular fa-copy"></i>
+        <span>Copy Party Link</span>
+      </button>
+    </div>
+  </div>
+  <!-- Squad member live status bar -->
+  <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-purple-900/40" id="squad-member-roster">
+    <span class="text-[11px] text-slate-400 font-semibold">Squad Members:</span>
+    <span class="text-xs text-purple-300 font-mono" id="squad-loading">Syncing active friends...</span>
   </div>
 </div>
 
@@ -24,6 +73,7 @@
   <span class="flex items-center gap-2"><span class="seat seat-sel inline-block"></span> Selected</span>
   <span class="flex items-center gap-2"><span class="seat seat-held inline-block"></span> Being booked</span>
   <span class="flex items-center gap-2"><span class="seat seat-booked inline-block"></span> Sold</span>
+  <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full border-2 border-purple-400 inline-block animate-pulse"></span> Squad Friend Pick</span>
   <span class="ml-auto">Max {{ max_seats }} seats per booking</span>
 </div>
 
@@ -37,6 +87,66 @@
 </div>
 {% endif %}
 
+<!-- 🎭 SEAT VIBE ZONE FILTER BAR -->
+<div class="glass-card rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 border border-slate-800 bg-slate-900/60">
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-bold text-slate-300">🎭 Seat Vibe Filter:</span>
+    <span class="text-[10px] text-slate-500">Highlight zones</span>
+  </div>
+  <div class="flex flex-wrap items-center gap-2" id="vibe-filter-bar">
+    <button type="button" onclick="filterVibe('ALL', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-[#FF2E63] text-white">
+      ✨ All Seats
+    </button>
+    <button type="button" onclick="filterVibe('COUPLES', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      💑 Couples Corner
+    </button>
+    <button type="button" onclick="filterVibe('QUIET', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      🔇 Quiet Zone
+    </button>
+    <button type="button" onclick="filterVibe('FUN', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      😂 Fun & Social
+    </button>
+    <button type="button" onclick="filterVibe('FAMILY', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      👨‍👩‍👧 Family & Easy Exit
+    </button>
+  </div>
+</div>
+
+<!-- 🎬 2D / 3D THEATER MAP SWITCHER & ✨ SMART SEAT SUGGESTION BAR -->
+<div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 border border-indigo-500/30 bg-indigo-950/20">
+  <!-- 2D / 3D View Switcher -->
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
+      <span>Map View Mode:</span>
+    </span>
+    <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/60">
+      <button type="button" id="btn-view-2d" onclick="toggleTheaterView('2d')" class="px-3 py-1 rounded-lg text-xs font-bold transition bg-[#FF2E63] text-white shadow">
+        🗺️ 2D Flat
+      </button>
+      <button type="button" id="btn-view-3d" onclick="toggleTheaterView('3d')" class="px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+        🎬 3D Theater
+      </button>
+    </div>
+  </div>
+
+  <!-- Smart AI Seat Suggestion Engine -->
+  <div class="flex flex-wrap items-center gap-2">
+    <span class="text-xs font-extrabold text-amber-300 flex items-center gap-1">
+      <span>✨ Smart AI Seat Suggestion:</span>
+    </span>
+    <select id="smart-party-size" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+      <option value="1">1 Person</option>
+      <option value="2" selected>2 People (Couple)</option>
+      <option value="3">3 People (Group)</option>
+      <option value="4">4 People (Squad)</option>
+      <option value="6">6 People (Party)</option>
+    </select>
+    <button type="button" onclick="suggestSmartSeats()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition shadow-lg shadow-amber-500/20 flex items-center gap-1.5">
+      <span>✨ Auto-Pick Best Seats</span>
+    </button>
+  </div>
+</div>
+
 <!-- Smart Seat POV & Acoustic Inspector Card -->
 <div id="seat-inspector" class="glass-card rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-4 border border-indigo-500/20 bg-slate-900/90 shadow-lg">
   <div class="flex items-center gap-3">
@@ -45,12 +155,14 @@
     </div>
     <div>
       <p class="text-xs font-bold text-white flex items-center gap-2">
-        <span id="insp-zone-name">Hover or click a seat to inspect POV & Sound Quality</span>
+        <span id="insp-zone-name">Hover or click a seat to inspect POV, Vibe & Sound</span>
       </p>
       <div class="flex items-center gap-2 mt-0.5 flex-wrap">
         <span class="text-[11px] text-indigo-300 font-medium" id="insp-badge">Smart Seat POV Inspector</span>
         <span class="text-[11px] text-slate-500">·</span>
-        <span class="text-[11px] text-emerald-400 font-semibold" id="insp-sound-profile">Dolby Atmos Spatial Audio</span>
+        <span class="text-[11px] text-emerald-400 font-semibold" id="insp-vibe-badge">🎭 Vibe Tag</span>
+        <span class="text-[11px] text-slate-500">·</span>
+        <span class="text-[11px] text-purple-400 font-semibold" id="insp-sound-profile">Dolby Atmos Spatial Audio</span>
       </div>
     </div>
   </div>
@@ -70,11 +182,107 @@
   </div>
 </div>
 
+<!-- 🎥 AR SEAT PREVIEW PANEL -->
+<div id="ar-preview-panel" class="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-slate-950/80 shadow-2xl">
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2">
+      <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
+      <div>
+        <p class="text-xs font-extrabold text-white">AR Seat Preview</p>
+        <p class="text-[10px] text-slate-400" id="ar-preview-subtitle">Hover or click any seat to see the view from that seat</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-[10px] text-slate-500">
+      <span id="ar-neck-label"   class="px-2 py-0.5 rounded-lg bg-slate-800 font-mono hidden">Neck Tilt: --</span>
+      <span id="ar-center-label" class="px-2 py-0.5 rounded-lg bg-slate-800 font-mono hidden">Off-Center: --</span>
+      <span id="ar-score-badge"  class="px-2.5 py-0.5 rounded-lg bg-emerald-900/60 text-emerald-300 font-black hidden">Score: --</span>
+    </div>
+  </div>
+
+  <!-- Theater Canvas -->
+  <div id="ar-theater-wrapper"
+       class="relative w-full rounded-xl overflow-hidden flex items-center justify-center bg-black/60 select-none"
+       style="height: 220px; perspective: 700px;">
+
+    <!-- Audience silhouettes (foreground) -->
+    <div id="ar-audience" class="absolute bottom-0 left-0 right-0 h-24 pointer-events-none z-10"
+         style="background: linear-gradient(to top, rgba(0,0,0,0.85) 40%, transparent 100%);">
+      <svg width="100%" height="100%" viewBox="0 0 800 96" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <g fill="rgba(30,30,40,0.95)">
+          {% for cx in [40,90,145,200,255,310,365,420,475,530,585,640,695,750,790] %}
+          <ellipse cx="{{ cx }}" cy="80" rx="14" ry="10"/>
+          <rect x="{{ cx - 7 }}" y="72" width="14" height="18" rx="2"/>
+          <ellipse cx="{{ cx }}" cy="70" rx="9"  ry="8"/>
+          {% endfor %}
+        </g>
+      </svg>
+    </div>
+
+    <!-- The main screen — dynamically scaled/positioned by JS -->
+    <div id="ar-screen-wrapper" class="absolute transition-all duration-500 ease-out z-0"
+         style="transform-style: preserve-3d; top: 8%;">
+      <div id="ar-screen" class="relative rounded-sm shadow-2xl transition-all duration-500"
+           style="width: 480px; height: 130px; overflow: hidden;
+                  box-shadow: 0 0 60px rgba(255,255,255,0.25), 0 0 120px rgba(200,200,255,0.1);">
+        <!-- Movie content inside screen -->
+        <div id="ar-screen-content" class="absolute inset-0 flex items-center justify-center"
+             style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%);">
+          <div class="absolute inset-0 opacity-70"
+               style="background: radial-gradient(ellipse at 30% 40%, rgba(255,100,60,0.4) 0%, transparent 50%),
+                                  radial-gradient(ellipse at 70% 60%, rgba(60,120,255,0.4) 0%, transparent 50%),
+                                  radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%);"></div>
+          <div class="relative text-center z-10">
+            <p class="text-white font-black tracking-widest" id="ar-movie-label"
+               style="font-size: 13px; text-shadow: 0 0 20px rgba(255,255,255,0.9); letter-spacing: 0.15em;">🎬 CINEWAVE</p>
+            <p class="text-slate-300 mt-0.5" style="font-size: 8px; letter-spacing: 0.3em;">NOW SHOWING</p>
+          </div>
+          <!-- Scan lines -->
+          <div class="absolute inset-0 pointer-events-none"
+               style="background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.015) 3px, rgba(255,255,255,0.015) 4px);"></div>
+        </div>
+        <!-- Glare -->
+        <div class="absolute inset-0 pointer-events-none rounded-sm"
+             style="background: linear-gradient(120deg, rgba(255,255,255,0.12) 0%, transparent 40%, rgba(255,255,255,0.06) 100%);"></div>
+      </div>
+    </div>
+
+    <!-- Zone ambient glow -->
+    <div id="ar-zone-glow" class="absolute inset-0 pointer-events-none z-0 transition-all duration-700"
+         style="background: radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 70%);"></div>
+
+    <!-- Empty state overlay -->
+    <div id="ar-empty-state" class="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/30 backdrop-blur-[1px]">
+      <div class="text-4xl mb-2 opacity-40">🎦</div>
+      <p class="text-xs text-slate-400 opacity-60">Select a seat to preview your view</p>
+    </div>
+  </div>
+
+  <!-- POV Info strip -->
+  <div id="ar-info-strip" class="hidden mt-3 grid grid-cols-4 gap-2">
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Zone</p>
+      <p class="text-xs font-black text-white" id="ar-info-zone">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Screen Distance</p>
+      <p class="text-xs font-black text-white" id="ar-info-dist">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Field of View</p>
+      <p class="text-xs font-black text-white" id="ar-info-angle">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Comfort Score</p>
+      <p class="text-xs font-black" id="ar-info-score">--</p>
+    </div>
+  </div>
+</div>
+
 <form id="booking-form" method="POST" class="space-y-6">
   <input type="hidden" name="selected_seats" id="selected_seats_input">
 
-  <div class="glass-card rounded-2xl p-4 sm:p-6 rowscroll">
-    <div class="min-w-max mx-auto space-y-1">
+  <div id="seating-viewport" class="glass-card rounded-2xl p-4 sm:p-6 rowscroll transition-all duration-700">
+    <div id="seating-grid-container" class="min-w-max mx-auto space-y-1 transition-all duration-700 origin-bottom">
       {% for cls in grid %}
         <div class="pt-4 pb-1 flex items-center gap-3">
           <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300">{{ cls.name }}</span>
@@ -98,6 +306,7 @@
                         data-seat="{{ cell.id }}"
                         data-price="{{ cell.price }}"
                         data-class="{{ cell.cls }}"
+                        data-score="{{ cell.pov.score if cell.pov else '80' }}"
                         data-pov-name="{{ cell.pov.zone_name if cell.pov else 'Standard Seat' }}"
                         data-pov-badge="{{ cell.pov.comfort_badge if cell.pov else '' }}"
                         data-pov-angle="{{ cell.pov.view_angle if cell.pov else '35' }}°"
@@ -106,6 +315,9 @@
                         data-sound-exp="{{ cell.pov.sound_exp if cell.pov else 'Balanced Surround' }}"
                         data-sound-badge="{{ cell.pov.sound_badge if cell.pov else '🔊 85% Spatial Audio' }}"
                         data-sound-profile="{{ cell.pov.sound_profile if cell.pov else 'Dolby Atmos Spatial Audio' }}"
+                        data-vibe-code="{{ cell.pov.vibe_code if cell.pov else 'FAMILY' }}"
+                        data-vibe-badge="{{ cell.pov.vibe_badge if cell.pov else '👨‍👩‍👧 Family Zone' }}"
+                        data-vibe-desc="{{ cell.pov.vibe_desc if cell.pov else '' }}"
                         {% if cell.status == 'available' %}
                           class="seat seat-avail seat-btn font-semibold transition {% if cell.span == 2 %}seat-wide{% endif %}"
                         {% elif cell.status == 'held' %}
@@ -157,15 +369,39 @@
   const priceOut = document.getElementById('total-price');
   const btn = document.getElementById('confirm-btn');
 
+  let activePartyCode = "{{ party_code or '' }}";
+  let myUserName = "{{ current_user.username if current_user.is_authenticated else 'Guest' }}";
+  let myAvatarColor = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+
   function updateInspector(elem) {
     if (!elem || !elem.dataset.seat) return;
     document.getElementById('insp-seat-id').textContent = elem.dataset.seat;
     document.getElementById('insp-zone-name').textContent = elem.dataset.povName || 'Standard Seat';
     document.getElementById('insp-badge').textContent = elem.dataset.povBadge || 'Standard View';
+    document.getElementById('insp-vibe-badge').textContent = elem.dataset.vibeBadge || '🎭 Standard Vibe';
     document.getElementById('insp-angle').textContent = elem.dataset.povAngle || '35°';
     document.getElementById('insp-dist').textContent = elem.dataset.povDist || '50%';
     document.getElementById('insp-sound-score').textContent = elem.dataset.soundScore || '85%';
     document.getElementById('insp-sound-profile').textContent = (elem.dataset.soundBadge || '🔊 Dolby Atmos') + ' · ' + (elem.dataset.soundProfile || 'Spatial Audio');
+  }
+
+  function filterVibe(vibeCode, btnElem) {
+    document.querySelectorAll('.vibe-filter-btn').forEach(b => {
+      b.className = "vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white";
+    });
+    btnElem.className = "vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-[#FF2E63] text-white";
+
+    document.querySelectorAll('.seat-btn').forEach(b => {
+      const v = b.dataset.vibeCode;
+      if (vibeCode === 'ALL' || v === vibeCode) {
+        b.style.opacity = '1.0';
+        b.style.transform = 'scale(1.0)';
+        b.classList.remove('ring-1', 'ring-slate-700');
+      } else {
+        b.style.opacity = '0.25';
+        b.style.transform = 'scale(0.9)';
+      }
+    });
   }
 
   function paint() {
@@ -179,12 +415,114 @@
     const counts = {};
     selected.forEach(s => { counts[s.cls] = (counts[s.cls] || 0) + 1; });
     classLine.textContent = Object.entries(counts).map(([c, n]) => `${n} × ${c}`).join('  ·  ');
+
+    // Trigger party sync instantly on seat selection change
+    if (activePartyCode) syncParty();
+  }
+
+  // ---- 👁️ AR SEAT PREVIEW ENGINE ----
+  function showSeatARPreview(elem) {
+    if (!elem || !elem.dataset.seat) return;
+
+    // Parse the raw data-* values coming from the seat buttons
+    // dist: "45%" → 45, angle: "38°" → 38
+    const rawDist  = elem.dataset.povDist  || '50%';
+    const rawAngle = elem.dataset.povAngle || '35°';
+    const score    = parseInt(elem.dataset.score  || '80');
+    const zoneName = elem.dataset.povName  || 'Standard Seat';
+    const seatId   = elem.dataset.seat;
+
+    const distPct  = parseFloat(rawDist);   // 0 = front, 90 = back
+    const neckDeg  = parseFloat(rawAngle);  // neck tilt angle
+
+    // --- Compute off-center from seat id (e.g. "C7") ---
+    // We don't have a direct data attribute for off-center, so approximate
+    // from screen-dist: just use the inspector values that are available.
+    // We use neckDeg as a proxy for viewing angle (larger = closer).
+
+    // --- Compute screen visual size from distance ---
+    // Front row (distPct ~5%) → screen fills 90% width, very tall
+    // Back row (distPct ~90%) → screen takes ~35% width, small
+    const sizeFactor = Math.max(0.28, Math.min(0.95, 1 - (distPct / 110)));
+    const baseW = 480;
+    const baseH = 130;
+    const screenW = Math.round(baseW * sizeFactor);
+    const screenH = Math.round(baseH * sizeFactor);
+
+    // --- Compute vertical position (higher on canvas = further back) ---
+    // Front: top ~4%, Back: top ~25%
+    const topPct = 4 + (distPct / 90) * 22;
+
+    // --- Perspective / tilt based on neck angle ---
+    // Heavy neck tilt (front) → strong rotateX on wrapper
+    const rotX = Math.max(-10, Math.min(28, (neckDeg - 26) * 0.8));
+
+    // --- Horizontal shift (off-center) ---
+    // Use sound score as proxy — lower sound score often means side seats
+    const soundScore = parseInt((elem.dataset.soundScore || '85%').replace('%', ''));
+    const offCenterShift = (soundScore < 70) ? (soundScore < 50 ? 80 : 40) : 0;
+    // Determine which side by seat column letter
+    const seatCol = parseInt(seatId.replace(/[A-Za-z]/g, '') || '0');
+    const shiftDir = seatCol > 5 ? 1 : -1;
+    const translateX = offCenterShift * shiftDir;
+
+    // --- Zone glow color ---
+    const zoneGlowMap = {
+      'GOLD Zone'  : 'rgba(234,179,8,0.12)',
+      'PRIME Zone' : 'rgba(16,185,129,0.12)',
+      'FRONT Zone' : 'rgba(245,158,11,0.1)',
+      'SIDE Zone'  : 'rgba(99,102,241,0.1)',
+      'Standard Seat': 'rgba(99,102,241,0.07)',
+    };
+    const glowColor = zoneGlowMap[zoneName] || 'rgba(99,102,241,0.08)';
+
+    // Score color
+    const scoreColor = score >= 85 ? '#34d399' : score >= 70 ? '#fbbf24' : '#f87171';
+
+    // --- Apply to DOM ---
+    const wrapper  = document.getElementById('ar-screen-wrapper');
+    const screen   = document.getElementById('ar-screen');
+    const glow     = document.getElementById('ar-zone-glow');
+    const empty    = document.getElementById('ar-empty-state');
+    const infoStrip = document.getElementById('ar-info-strip');
+
+    screen.style.width  = screenW + 'px';
+    screen.style.height = screenH + 'px';
+    wrapper.style.top   = topPct + '%';
+    wrapper.style.transform = `rotateX(${rotX}deg) translateX(${translateX}px)`;
+    glow.style.background = `radial-gradient(ellipse at 50% 0%, ${glowColor} 0%, transparent 70%)`;
+
+    // Neck tilt / off-center badges
+    const neckLbl   = document.getElementById('ar-neck-label');
+    const centerLbl = document.getElementById('ar-center-label');
+    const scoreBadge = document.getElementById('ar-score-badge');
+    neckLbl.textContent = `Neck Tilt: ${neckDeg.toFixed(0)}°`;
+    centerLbl.textContent = offCenterShift ? `Off-Center: ${offCenterShift}px` : 'Centered ✓';
+    scoreBadge.textContent = `Score: ${score}/100`;
+    scoreBadge.style.color = scoreColor;
+    [neckLbl, centerLbl, scoreBadge].forEach(el => el.classList.remove('hidden'));
+
+    // Update subtitle
+    document.getElementById('ar-preview-subtitle').textContent =
+      `Seat ${seatId} — ${zoneName} · ${rawDist} from screen`;
+
+    // Show info strip
+    infoStrip.classList.remove('hidden');
+    document.getElementById('ar-info-zone').textContent  = zoneName;
+    document.getElementById('ar-info-dist').textContent  = rawDist;
+    document.getElementById('ar-info-angle').textContent = rawAngle;
+    document.getElementById('ar-info-score').textContent = score + '/100';
+    document.getElementById('ar-info-score').style.color = scoreColor;
+
+    // Hide empty state
+    empty.style.opacity = '0';
+    empty.style.pointerEvents = 'none';
   }
 
   document.querySelectorAll('.seat-btn').forEach(b => {
-    b.addEventListener('mouseenter', () => updateInspector(b));
+    b.addEventListener('mouseenter', () => { updateInspector(b); showSeatARPreview(b); });
     b.addEventListener('click', () => {
-      updateInspector(b);
+      updateInspector(b); showSeatARPreview(b);
       const id = b.dataset.seat;
       if (selected.has(id)) {
         selected.delete(id);
@@ -203,6 +541,89 @@
     });
   });
 
+  // ---- WATCH TOGETHER PARTY ENGINE ----
+  async function initOrShowParty() {
+    if (!activePartyCode) {
+      try {
+        const res = await fetch('/api/party/create/{{ showtime.id }}', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          activePartyCode = data.party_code;
+          document.getElementById('squad-room-code').textContent = activePartyCode;
+          document.getElementById('party-btn-badge').textContent = 'Code: ' + activePartyCode;
+          document.getElementById('party-squad-banner').classList.remove('hidden');
+          // Add party parameter to URL without reloading page
+          const url = new URL(window.location);
+          url.searchParams.set('party', activePartyCode);
+          window.history.pushState({}, '', url);
+          syncParty();
+        }
+      } catch(e) { alert('Could not start Watch Together room.'); }
+    } else {
+      document.getElementById('party-squad-banner').classList.toggle('hidden');
+    }
+  }
+
+  function copySquadLink() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      alert('🎉 Squad Watch Party Link Copied!\n\nShare this link with your friends so they can pick seats with you live:\n' + url);
+    });
+  }
+
+  async function syncParty() {
+    if (!activePartyCode) return;
+    try {
+      const seatsArr = [...selected.keys()].join(',');
+      const res = await fetch(`/api/party/${activePartyCode}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_name: myUserName,
+          selected_seats: seatsArr,
+          avatar_color: myAvatarColor
+        })
+      });
+      const data = await res.json();
+
+      // Render Squad Member Roster Badges
+      const roster = document.getElementById('squad-member-roster');
+      if (roster && data.members) {
+        let html = '<span class="text-[11px] text-slate-400 font-semibold">Squad Members:</span>';
+        data.members.forEach(m => {
+          const seatTxt = m.seats.length ? `(${m.seats.join(', ')})` : '(Choosing...)';
+          html += `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-900 border border-slate-700 text-white">
+              <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${m.color}"></span>
+              <span>${m.user_name} ${m.is_me ? ' (You)' : ''}</span>
+              <span class="text-[10px] text-purple-400 font-mono">${seatTxt}</span>
+            </span>`;
+        });
+        roster.innerHTML = html;
+      }
+
+      // Highlight Squad Members' seats on seat map
+      document.querySelectorAll('.seat-btn').forEach(b => {
+        const id = b.dataset.seat;
+        if (data.squad_seats && data.squad_seats[id] && !selected.has(id)) {
+          const sInfo = data.squad_seats[id];
+          b.style.border = `2px solid ${sInfo.color}`;
+          b.style.boxShadow = `0 0 10px ${sInfo.color}80`;
+          b.title = `${sInfo.user_name} is selecting seat ${id}`;
+        } else if (!selected.has(id)) {
+          b.style.border = '';
+          b.style.boxShadow = '';
+        }
+      });
+    } catch(e) {}
+  }
+
+  // Poll Party Session every 2 seconds if party room is active
+  if (activePartyCode) {
+    syncParty();
+    setInterval(syncParty, 2000);
+  }
+
   // live availability: grey out seats other people take while you are choosing
   setInterval(async () => {
     try {
@@ -219,5 +640,110 @@
       });
     } catch (e) { /* offline is fine, server re-checks on submit */ }
   }, 10000);
+
+  // ---- Live seats-left counter in header ----
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/showtime/{{ showtime.id }}/live-info');
+      const d = await res.json();
+      const el = document.getElementById('live-seats-left');
+      if (el) el.innerHTML = `${d.seats_left} <span class="text-xs font-medium text-slate-500">/ ${d.total_seats}</span>`;
+    } catch(e) {}
+  }, 15000);
+
+  // ---- 🎬 2D / 3D THEATER PERSPECTIVE SWITCHER ----
+  function toggleTheaterView(mode) {
+    const viewport = document.getElementById('seating-viewport');
+    const container = document.getElementById('seating-grid-container');
+    const btn2d = document.getElementById('btn-view-2d');
+    const btn3d = document.getElementById('btn-view-3d');
+
+    if (mode === '3d') {
+      btn3d.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-[#FF2E63] text-white shadow";
+      btn2d.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+
+      viewport.style.perspective = '1000px';
+      container.style.transform = 'rotateX(36deg) scale(0.92)';
+      container.style.transformStyle = 'preserve-3d';
+      container.style.boxShadow = '0 30px 60px rgba(0,0,0,0.8)';
+
+      document.querySelectorAll('.seat-btn').forEach(b => {
+        b.style.boxShadow = '0 6px 12px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.2)';
+        b.style.transform = 'translateZ(10px)';
+      });
+    } else {
+      btn2d.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-[#FF2E63] text-white shadow";
+      btn3d.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+
+      viewport.style.perspective = 'none';
+      container.style.transform = 'none';
+      container.style.boxShadow = 'none';
+
+      document.querySelectorAll('.seat-btn').forEach(b => {
+        b.style.boxShadow = '';
+        b.style.transform = '';
+      });
+    }
+  }
+
+  // ---- ✨ SMART AI SEAT SUGGESTION ENGINE ----
+  function suggestSmartSeats() {
+    const pSize = parseInt(document.getElementById('smart-party-size').value || '2');
+    const rows = document.querySelectorAll('#seating-grid-container .flex.items-center.justify-center');
+    let bestBlock = null;
+    let maxBlockScore = -1;
+
+    rows.forEach(row => {
+      const seatsInRow = [...row.querySelectorAll('.seat-avail')];
+      for (let i = 0; i <= seatsInRow.length - pSize; i++) {
+        const candidateBlock = seatsInRow.slice(i, i + pSize);
+        // Ensure candidates are contiguous seat numbers
+        let isContiguous = true;
+        for (let k = 0; k < candidateBlock.length - 1; k++) {
+          const num1 = parseInt(candidateBlock[k].textContent || '0');
+          const num2 = parseInt(candidateBlock[k+1].textContent || '0');
+          if (num2 !== num1 + 1) {
+            isContiguous = false;
+            break;
+          }
+        }
+
+        if (isContiguous) {
+          const avgScore = candidateBlock.reduce((acc, s) => acc + parseInt(s.dataset.score || '80'), 0) / pSize;
+          if (avgScore > maxBlockScore) {
+            maxBlockScore = avgScore;
+            bestBlock = candidateBlock;
+          }
+        }
+      }
+    });
+
+    if (bestBlock && bestBlock.length === pSize) {
+      // Clear existing selections
+      document.querySelectorAll('.seat-sel').forEach(b => {
+        const id = b.dataset.seat;
+        selected.delete(id);
+        b.classList.remove('seat-sel');
+        b.classList.add('seat-avail');
+      });
+
+      // Select recommended block
+      bestBlock.forEach(b => {
+        const id = b.dataset.seat;
+        selected.set(id, { price: parseFloat(b.dataset.price), cls: b.dataset.class });
+        b.classList.remove('seat-avail');
+        b.classList.add('seat-sel');
+        // Flash animation effect
+        b.classList.add('animate-bounce');
+        setTimeout(() => b.classList.remove('animate-bounce'), 1000);
+      });
+
+      paint();
+      updateInspector(bestBlock[0]);
+      alert(`✨ Smart AI found the top ${pSize} contiguous seats (Score: ${Math.round(maxBlockScore)}/100)!`);
+    } else {
+      alert(`Could not find ${pSize} contiguous available seats in a single row. Try a smaller group size.`);
+    }
+  }
 </script>
 {% endblock %}

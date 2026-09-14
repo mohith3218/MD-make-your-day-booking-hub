@@ -22,10 +22,12 @@
           {% set c = {'PAID':'emerald','PENDING':'amber','FAILED':'rose','CANCELLED':'slate','EXPIRED':'slate'}.get(b.status,'slate') %}
           <tr>
             <td class="p-3 font-mono text-white whitespace-nowrap">{{ b.reference }}</td>
-            <td class="p-3">{{ b.user.username }}</td>
-            <td class="p-3 font-semibold text-white">{{ b.showtime.movie.title }}</td>
-            <td class="p-3">{{ b.showtime.theater }}</td>
-            <td class="p-3 whitespace-nowrap">{{ b.showtime.show_date.strftime('%d %b') }} · {{ b.showtime.show_time }}</td>
+            <td class="p-3">{{ b.user.username if b.user else '—' }}</td>
+            <td class="p-3 font-semibold text-white">{{ b.showtime.movie.title if b.showtime and b.showtime.movie else '⚠ Deleted' }}</td>
+            <td class="p-3">{{ b.showtime.theater if b.showtime else '—' }}</td>
+            <td class="p-3 whitespace-nowrap">
+              {% if b.showtime %}{{ b.showtime.show_date.strftime('%d %b') }} · {{ b.showtime.show_time }}{% else %}—{% endif %}
+            </td>
             <td class="p-3">{{ b.seats }}</td>
             <td class="p-3 font-bold text-[#FF2E63] whitespace-nowrap">₹{{ '%.0f'|format(b.total_amount) }}</td>
             <td class="p-3">{{ b.payment.method if b.payment else '—' }}</td>

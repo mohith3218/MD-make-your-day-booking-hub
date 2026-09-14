@@ -109,6 +109,38 @@ class Movie(db.Model):
     is_upcoming = db.Column(db.Boolean, default=False)
     is_rerelease = db.Column(db.Boolean, default=False)
     release_date = db.Column(db.Date, nullable=True)
+    moods_json = db.Column(db.Text, default='[]')
+
+    @property
+    def moods(self):
+        """Returns list of mood codes for this movie, falling back to smart keyword tagger."""
+        try:
+            custom = json.loads(self.moods_json or '[]')
+            if custom:
+                return custom
+        except Exception:
+            pass
+
+        text_content = f"{self.title} {self.description}".lower()
+        tags = set()
+
+        if any(k in text_content for k in ['comedy', 'fun', 'laugh', 'hilarious', 'hero', 'entertainer', 'game', 'party', 'mass']):
+            tags.add('FUN')
+        if any(k in text_content for k in ['action', 'thriller', 'chase', 'war', 'police', 'fight', 'crime', 'hunt', 'stunt', 'blast', 'shadow', 'spy']):
+            tags.add('THRILL')
+        if any(k in text_content for k in ['drama', 'family', 'emotion', 'life', 'story', 'journey', 'struggle', 'father', 'mother', 'brother', 'truth']):
+            tags.add('EMOTIONAL')
+        if any(k in text_content for k in ['sci-fi', 'future', 'mystery', 'time', 'space', 'universe', 'secret', 'mind', 'alien', 'dimensions', 'kalki', 'devara', 'game changer']):
+            tags.add('MIND_BENDING')
+        if any(k in text_content for k in ['love', 'romance', 'heart', 'wedding', 'pair', 'romantic', 'song', 'sweet']):
+            tags.add('ROMANCE')
+
+        if not tags:
+            tags.add('FUN')
+            tags.add('THRILL')
+
+        return list(tags)
+
 
 
 class Theater(db.Model):
@@ -206,8 +238,39 @@ class Showtime(db.Model):
         return max(0, sl.count_seats(self.layout) - len(taken))
 
     @property
+    def show_datetime(self):
+        """Parse show_date + show_time into a datetime object. Supports HH:MM and H:MM AM/PM formats."""
+        for fmt in ('%H:%M', '%I:%M %p', '%I:%M%p'):
+            try:
+                t = datetime.strptime(self.show_time.strip(), fmt).time()
+                return datetime.combine(self.show_date, t)
+            except ValueError:
+                continue
+        return None
+
+    @property
     def is_past(self):
+        dt = self.show_datetime
+        if dt:
+            # consider past only after movie ends (show_datetime + duration)
+            end_dt = dt + timedelta(minutes=(self.movie.duration if self.movie else 0))
+            return datetime.now() > end_dt
         return self.show_date < date.today()
+
+    @property
+    def status(self):
+        """Returns 'upcoming', 'live', or 'ended' based on current time."""
+        dt = self.show_datetime
+        if not dt:
+            return 'upcoming'
+        now = datetime.now()
+        duration = self.movie.duration if self.movie else 0
+        end_dt = dt + timedelta(minutes=duration)
+        if now < dt:
+            return 'upcoming'
+        elif now <= end_dt:
+            return 'live'
+        return 'ended'
 
     @property
     def dynamic_pricing_info(self):
@@ -389,6 +452,31 @@ class RechargeRequest(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', backref=db.backref('recharge_requests', lazy=True))
+
+
+class PartySession(db.Model):
+    """Watch Together party session for real-time squad seat syncing."""
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(10), unique=True, nullable=False, default=lambda: secrets.token_hex(3).upper())
+    showtime_id = db.Column(db.Integer, db.ForeignKey('showtime.id'), nullable=False)
+    host_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='ACTIVE')
+
+    showtime = db.relationship('Showtime', backref=db.backref('parties', lazy=True))
+
+
+class PartyMember(db.Model):
+    """Individual participant in a Watch Together party."""
+    id = db.Column(db.Integer, primary_key=True)
+    party_id = db.Column(db.Integer, db.ForeignKey('party_session.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    user_name = db.Column(db.String(80), nullable=False)
+    avatar_color = db.Column(db.String(20), default='#FF2E63')
+    selected_seats = db.Column(db.String(200), default='')
+    last_ping = db.Column(db.DateTime, default=datetime.utcnow)
+
+    party = db.relationship('PartySession', backref=db.backref('members', lazy=True, cascade='all, delete-orphan'))
 
 
 @login_manager.user_loader
@@ -625,8 +713,11 @@ def logout():
 def movie_detail(movie_id):
     purge_expired_holds()
     movie = Movie.query.get_or_404(movie_id)
-    shows = (Showtime.query.filter_by(movie_id=movie_id)
-             .order_by(Showtime.show_date, Showtime.id).all())
+    all_shows = (Showtime.query.filter_by(movie_id=movie_id)
+                 .order_by(Showtime.show_date, Showtime.id).all())
+
+    # Only keep shows that have NOT ended yet (upcoming + live)
+    shows = [s for s in all_shows if s.status != 'ended']
 
     # group by date -> theatre so it reads like a real booking page
     grouped = {}
@@ -648,6 +739,10 @@ def book(showtime_id):
 
     if not showtime.screen:
         flash("This showtime has no screen assigned. Ask an admin to fix it.")
+        return redirect(url_for('movie_detail', movie_id=movie.id))
+
+    if showtime.status == 'ended':
+        flash("⛔ This show has already ended. Please choose another showtime.")
         return redirect(url_for('movie_detail', movie_id=movie.id))
 
     layout = showtime.layout
@@ -701,11 +796,119 @@ def book(showtime_id):
 
     grid = sl.build_layout(layout, booked=booked, held=held,
                            price_overrides=effective_overrides)
+    party_code = request.args.get('party', '').strip().upper()
     return render_template('book.html', movie=movie, showtime=showtime,
                            screen=showtime.screen, grid=grid,
                            max_seats=sl.MAX_SEATS_PER_BOOKING,
                            stats=sl.availability(layout, booked | held),
-                           dynamic_info=dyn)
+                           dynamic_info=dyn, party_code=party_code)
+
+
+@app.route('/api/movies/by-mood/<mood_code>')
+def movies_by_mood(mood_code):
+    """Returns list of movies matching a specified mood code."""
+    all_movies = Movie.query.all()
+    if mood_code.upper() == 'ALL':
+        matched = all_movies
+    else:
+        matched = [m for m in all_movies if mood_code.upper() in m.moods]
+    return jsonify({
+        'count': len(matched),
+        'movies': [{
+            'id': m.id,
+            'title': m.title,
+            'poster': m.poster,
+            'duration': m.duration,
+            'language': m.language,
+            'certificate': m.certificate,
+            'is_upcoming': m.is_upcoming,
+            'release_date': m.release_date.strftime('%d %b %Y') if m.release_date else None,
+            'moods': m.moods
+        } for m in matched]
+    })
+
+
+@app.route('/api/party/create/<int:showtime_id>', methods=['POST'])
+@login_required
+def party_create(showtime_id):
+    """Create a Watch Together party room for a showtime."""
+    showtime = Showtime.query.get_or_404(showtime_id)
+    party = PartySession(showtime_id=showtime.id, host_id=current_user.id)
+    db.session.add(party)
+    db.session.commit()
+
+    # Host joins automatically
+    member = PartyMember(party_id=party.id, user_id=current_user.id,
+                         user_name=current_user.username, avatar_color='#FF2E63')
+    db.session.add(member)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'party_code': party.code,
+        'party_id': party.id,
+        'join_url': url_for('book', showtime_id=showtime.id, party=party.code, _external=True)
+    })
+
+
+@app.route('/api/party/<party_code>/sync', methods=['POST'])
+def party_sync(party_code):
+    """Real-time sync endpoint: updates current user seats and returns all squad members' picks."""
+    party = PartySession.query.filter_by(code=party_code.upper()).first_or_404()
+    data = request.get_json() or {}
+
+    user_name = data.get('user_name', 'Guest')
+    selected = data.get('selected_seats', '')
+    avatar_color = data.get('avatar_color', '#3B82F6')
+
+    uid = current_user.id if current_user.is_authenticated else None
+
+    # Find or create member
+    member = None
+    if uid:
+        member = PartyMember.query.filter_by(party_id=party.id, user_id=uid).first()
+    if not member and user_name:
+        member = PartyMember.query.filter_by(party_id=party.id, user_name=user_name).first()
+
+    if not member:
+        member = PartyMember(party_id=party.id, user_id=uid, user_name=user_name,
+                             avatar_color=avatar_color, selected_seats=selected,
+                             last_ping=datetime.utcnow())
+        db.session.add(member)
+    else:
+        member.user_name = user_name
+        member.selected_seats = selected
+        member.avatar_color = avatar_color
+        member.last_ping = datetime.utcnow()
+
+    db.session.commit()
+
+    # Fetch all active members in last 60 seconds
+    cutoff = datetime.utcnow() - timedelta(seconds=60)
+    active_members = PartyMember.query.filter(PartyMember.party_id == party.id,
+                                             PartyMember.last_ping >= cutoff).all()
+
+    members_out = []
+    squad_seats = {}
+    for m in active_members:
+        seats = [s.strip() for s in (m.selected_seats or '').split(',') if s.strip()]
+        is_me = (m.user_id == uid) if uid else (m.user_name == user_name)
+        members_out.append({
+            'user_name': m.user_name,
+            'color': m.avatar_color,
+            'seats': seats,
+            'is_me': is_me
+        })
+        for st in seats:
+            if not is_me:
+                squad_seats[st] = {'user_name': m.user_name, 'color': m.avatar_color}
+
+    return jsonify({
+        'party_code': party.code,
+        'members': members_out,
+        'squad_seats': squad_seats
+    })
+
 
 
 @app.route('/api/showtime/<int:showtime_id>/availability')
@@ -716,6 +919,21 @@ def seat_availability(showtime_id):
     showtime = Showtime.query.get_or_404(showtime_id)
     return jsonify({'booked': sorted(showtime.booked_seat_ids()),
                     'held': sorted(showtime.held_seat_ids())})
+
+
+@app.route('/api/showtime/<int:showtime_id>/live-info')
+def showtime_live_info(showtime_id):
+    """Public endpoint: returns real-time seats left, show status, and countdown seconds."""
+    purge_expired_holds()
+    showtime = Showtime.query.get_or_404(showtime_id)
+    dt = showtime.show_datetime
+    seconds_to_start = int((dt - datetime.now()).total_seconds()) if dt else 0
+    return jsonify({
+        'seats_left': showtime.seats_left,
+        'total_seats': sl.count_seats(showtime.layout),
+        'status': showtime.status,
+        'seconds_to_start': max(0, seconds_to_start),
+    })
 
 
 # ====================== CHECKOUT & PAYMENT ======================
@@ -1215,6 +1433,26 @@ def toggle_rerelease(movie_id):
     return redirect(url_for('admin'))
 
 
+
+@app.route('/admin/delete_movie/<int:movie_id>', methods=['POST'])
+@login_required
+def delete_movie(movie_id):
+    guard = admin_required()
+    if guard:
+        return guard
+    movie = Movie.query.get_or_404(movie_id)
+    title = movie.title
+    # Cascade: delete bookings (and payments) tied to this movie's showtimes
+    showtime_ids = [s.id for s in Showtime.query.filter_by(movie_id=movie_id).all()]
+    if showtime_ids:
+        Booking.query.filter(Booking.showtime_id.in_(showtime_ids)).delete(synchronize_session=False)
+    Showtime.query.filter_by(movie_id=movie_id).delete()
+    db.session.delete(movie)
+    db.session.commit()
+    flash(f"Movie '{title}' has been deleted.")
+    return redirect(url_for('admin'))
+
+
 @app.route('/admin/add_theater', methods=['GET', 'POST'])
 @login_required
 def add_theater():
@@ -1432,7 +1670,7 @@ def auto_migrate():
         'user': [('phone', 'VARCHAR(15)'), ('points', 'INTEGER DEFAULT 100')],
         'movie': [('language', "VARCHAR(50)"), ('certificate', "VARCHAR(10)"),
                   ('is_upcoming', 'BOOLEAN DEFAULT 0'), ('release_date', 'DATE'),
-                  ('is_rerelease', 'BOOLEAN DEFAULT 0')],
+                  ('is_rerelease', 'BOOLEAN DEFAULT 0'), ('moods_json', "TEXT DEFAULT '[]'")],
         'theater': [('city', "VARCHAR(80)"), ('address', "VARCHAR(400)")],
         'showtime': [('screen_id', 'INTEGER'), ('price_overrides_json', 'TEXT')],
         'booking': [('reference', 'VARCHAR(20)'), ('seat_meta_json', 'TEXT'),

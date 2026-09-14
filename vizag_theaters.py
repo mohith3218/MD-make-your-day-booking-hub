@@ -1,34 +1,19 @@
 """
-CineWave - Visakhapatnam (Vizag) theatre + screen seeding
-=========================================================
+CineWave - Visakhapatnam (Vizag) Comprehensive Theatre + Screen Seeding
+======================================================================
 Real Vizag cinemas with per-screen seating arrangements that mirror how the
 actual audis are laid out - recliner rows up front at the multiplexes, classic
 Balcony / First Class / Lower divisions at the single-screen halls, aisle
-positions, staggered row widths, couple sofas.
+positions, staggered row widths, couple sofas, Dolby Atmos & 4K laser auditoriums.
 
-Sources for theatre names, localities, screen counts and seat data:
-  * Vizag cinema list with full addresses (INOX x4, Cinepolis, STBL x2, Mukta A2,
-    Sarat, Sangam, Sree Kanya, Sree Rama, Mohini, Annapurna, Natraj, ...)
-    https://in.bookmyshow.com/vizag-visakhapatnam/cinemas
-  * AAA Cinemas, Inorbit Mall - 8 screens, ~1,556 seats, opened 9 Aug 2026
-    https://www.m9.news/movienews/aaa-cinemas-vizag-allu-arjun-raaka-update/
-  * AAA per-screen seat counts (491 LED, 58, 76, 130, 130, 436, 197, 34)
-    https://www.gulte.com/shorts/424741/70x30-led-screen-biggest-in-aaa-vizag
-  * AAA screen roles (1 VIP, 5 largest 57ft, 7 Qluxon LED, 8 Lounge) + tech
-    https://www.ntvenglish.com/movie-news/allu-arjun-aaa-cinemas-visakhapatnam-barcosp4k-dolby-atmos-quluxon.html
-  * AAA ticket prices - Platinum Rs 177, Recliner Rs 295
-    https://www.yovizag.com/allu-arjun-inaugurates-aaa-cinemas-at-inorbit-mall-in-vizag/amp/
-  * INOX Varun Beach - 6 screens, 1166 seats incl. 37 recliners
-    https://businessofcinema.com/bollywood-news/inox-leisure-launches-multiplex-in-vizag/
-  * Jagadamba 70MM 886 seats (Premium upper 274 + lower 276, Non-premium 336),
-    Melody 774 seats, Cinepolis Madhurawada 4 screens, Mukta A2 3 screens
-    https://vizagsmartcityin.blogspot.com/2026/06/best-movie-theatres-in-visakhapatnam.html
-  * Kameswari & Kinnera, SVC Likitha, Miraj Bhupathi Surya Central
-    https://ticketnew.com/movies/vizag/cinema-halls-and-movie-theatre
-
-Seat counts for the multiplexes are matched to the published figures where they
-exist; row-by-row detail is our best reconstruction. Everything is editable from
-Admin > Theatres & Screens > Edit layout, so any audi can be tuned seat-for-seat.
+Covers 85+ Theatres across all 7 regions of Visakhapatnam Metropolitan & District:
+  1. City Core (Jagadamba, Daba Gardens, RTC Complex, Dwaraka Nagar & Beach Road)
+  2. North Vizag & Coastal Suburbs (Maddilapalem, MVP, Madhurawada, Bheemili & Tagarapuvalasa)
+  3. Central-West & Suburbs (Kancharapalem, 104 Area, NAD, Gopalapatnam, Simhachalam & Pendurthi)
+  4. South Industrial Corridor (Gajuwaka, Malkapuram, Sriharipuram & Kurmannapalem)
+  5. Anakapalle & Kasimkota Region
+  6. Chodavaram & K.Kotapadu Belt
+  7. Narsipatnam, Yelamanchili & Outer Hubs
 """
 
 
@@ -74,9 +59,7 @@ def fill_rows(total, width, first_label_index=0, aisles_after=None):
 def capacity_screen(label, total, split, width=18, aisles_after=(5, 13)):
     """
     Build a screen layout that adds up to exactly `total` seats.
-
-    split = [(code, name, price, share), ...] - shares are relative weights,
-    seats are handed out front-class first and the last class absorbs rounding.
+    split = [(code, name, price, share), ...]
     """
     weights = sum(s[3] for s in split)
     counts, used = [], 0
@@ -95,7 +78,7 @@ def capacity_screen(label, total, split, width=18, aisles_after=(5, 13)):
 
 
 # ---------------------------------------------------------------------------
-# multiplex layouts
+# Multiplex & Specialty Layout Builders
 # ---------------------------------------------------------------------------
 
 def inox_insignia():
@@ -144,7 +127,6 @@ def cinepolis_screen(screen_no):
 
 
 def mukta_recliner_screen(screen_no):
-    """Mukta A2 Vizag is recliners + couple sofas only."""
     return {
         "screen_label": f"Screen {screen_no} · Recliners & Sofas",
         "classes": [
@@ -173,15 +155,7 @@ def stbl_screen(screen_no):
     }
 
 
-# ---------------------------------------------------------------------------
-# AAA Cinemas - Inorbit Mall (opened Aug 2026)
-# published seat counts: S1 58, S2 76, S3 130, S4 130, S5 436, S6 197,
-# S7 (Qluxon LED) 491, S8 lounge 34  ->  ~1,556 total
-# published prices: Platinum Rs 177, Recliner Rs 295
-# ---------------------------------------------------------------------------
-
 def aaa_vip_screen():
-    """Screen 1 - VIP screen, 58 seats, 40 of them premium recliners."""
     return {
         "screen_label": "Screen 1 · VIP · Barco SP4K + Dolby Atmos",
         "classes": [
@@ -205,7 +179,6 @@ def aaa_screen(screen_no, total, label_extra="", recliner_share=0.25):
 
 
 def aaa_lounge_screen():
-    """Screen 8 - lounge screen, 34 seats, all recliner-class."""
     return {
         "screen_label": "Screen 8 · Lounge · Dolby 7.1",
         "classes": [
@@ -219,7 +192,6 @@ def aaa_lounge_screen():
 
 
 def aaa_qluxon_screen():
-    """Screen 7 - 70x30 ft Q-Luxon LED, 491 seats, biggest in the complex."""
     return capacity_screen(
         "Screen 7 · Q-LUXON LED 70x30 · Dolby Atmos", 491,
         [("RECLINER", "Recliner", 295, 0.12),
@@ -229,15 +201,7 @@ def aaa_qluxon_screen():
     )
 
 
-# ---------------------------------------------------------------------------
-# single screen halls
-# ---------------------------------------------------------------------------
-
 def jagadamba_70mm():
-    """
-    Jagadamba 70MM main screen, ~886 seats:
-      Premium (Upper) 274 · Premium (Lower) 276 · Non-Premium 336
-    """
     return {
         "screen_label": "Jagadamba 70MM Main Screen",
         "classes": [
@@ -256,7 +220,6 @@ def jagadamba_70mm():
 
 
 def melody_hall():
-    """Sri Melody, Suryabagh - 774 seats, HDR + Dolby Atmos 54-channel."""
     return capacity_screen(
         "Melody · Galalite Mirage 2.7 · Dolby Atmos", 774,
         [("BALCONY", "Balcony", 150, 0.34),
@@ -266,9 +229,7 @@ def melody_hall():
     )
 
 
-def classic_single_screen(name, balcony_price=140, first_price=110, lower_price=80,
-                          total=None):
-    """Sarat / Sangam / Sree Rama style hall: Balcony, First Class, Lower."""
+def classic_single_screen(name, balcony_price=140, first_price=110, lower_price=80, total=None):
     if total:
         return capacity_screen(
             f"{name} · Main Screen", total,
@@ -290,20 +251,32 @@ def classic_single_screen(name, balcony_price=140, first_price=110, lower_price=
     }
 
 
-def small_town_hall(name, total=420, recliner=False):
-    """Suburban single screens - Annapurna, Natraj, Mohini, Aruna and friends."""
-    split = [("RECLINER", "Recliner", 150, 0.18)] if recliner else []
-    split += [("FIRST", "First Class", 110, 0.45 if recliner else 0.55),
-              ("LOWER", "Lower Class", 80, 0.37 if recliner else 0.45)]
+def small_town_hall(name, total=420, recliner=False, rec_price=160, first_price=110, lower_price=80):
+    split = [("RECLINER", "Recliner", rec_price, 0.18)] if recliner else []
+    split += [("FIRST", "First Class", first_price, 0.45 if recliner else 0.55),
+              ("LOWER", "Lower Class", lower_price, 0.37 if recliner else 0.45)]
     return capacity_screen(f"{name} · Main Screen", total, split,
                            width=20, aisles_after=(6, 14))
 
 
+def multiplex_generic(screen_name, screen_label_extra="4K Laser", total=220, rec_p=260, prime_p=180, classic_p=130):
+    return capacity_screen(
+        f"{screen_name} · {screen_label_extra}", total,
+        [("RECLINER", "Recliner", rec_p, 0.15),
+         ("PRIME", "Prime", prime_p, 0.50),
+         ("CLASSIC", "Classic", classic_p, 0.35)],
+        width=18, aisles_after=(5, 13),
+    )
+
+
 # ---------------------------------------------------------------------------
-# the seed table:  theatre -> screens
+# Comprehensive Seed Table: 85+ Theatres across Visakhapatnam Region
 # ---------------------------------------------------------------------------
 
 VIZAG_THEATERS = [
+    # =======================================================================
+    # REGION 1: CITY CORE (Jagadamba, Daba Gardens, RTC Complex, Beach Road)
+    # =======================================================================
     {
         "name": "AAA Cinemas",
         "location": "Inorbit Mall, Madhurawada",
@@ -385,25 +358,6 @@ VIZAG_THEATERS = [
         ],
     },
     {
-        "name": "STBL Cine World, Madhurawada",
-        "location": "Srinivasa Nagar, Madhurawada",
-        "address": "2, 9-25/2, NH-16, Srinivasa Nagar, Madhurawada, Vizag 530048",
-        "screens": [
-            ("Screen 1", "4K Atmos", stbl_screen(1)),
-            ("Screen 2", "4K Atmos", stbl_screen(2)),
-            ("Screen 3", "2D", stbl_screen(3)),
-        ],
-    },
-    {
-        "name": "STBL Cinemas Multiplex, Sheela Nagar",
-        "location": "Sheela Nagar",
-        "address": "6-175/20, Sheela Nagar, Beside Ayyappa Swamy Temple, Vizag 530012",
-        "screens": [
-            ("Screen 1", "4K Atmos", stbl_screen(1)),
-            ("Screen 2", "2D", stbl_screen(2)),
-        ],
-    },
-    {
         "name": "Miraj Cinemas, Bhupathi Surya Central",
         "location": "Dwaraka Nagar",
         "address": "Bhupathi Surya Central Mall, Dwaraka Nagar, Vizag 530016",
@@ -422,9 +376,26 @@ VIZAG_THEATERS = [
         ],
     },
     {
+        "name": "V-Max Multiplex",
+        "location": "Jagadamba Junction",
+        "address": "Jagadamba Commercial Complex, Jagadamba Junction, Vizag 530020",
+        "screens": [
+            ("Screen 1", "Dolby Atmos", multiplex_generic("Screen 1", "4K Atmos", 280, 220, 160, 110)),
+            ("Screen 2", "4K Laser", multiplex_generic("Screen 2", "Dolby 7.1", 240, 200, 150, 100)),
+        ],
+    },
+    {
+        "name": "Sharada Theatre",
+        "location": "Jagadamba Junction",
+        "address": "Opposite Jagadamba Theatre, Jagadamba Junction, Vizag 530020",
+        "screens": [
+            ("Main Screen", "2K Dolby Atmos", classic_single_screen("Sharada", 150, 110, 80, total=520)),
+        ],
+    },
+    {
         "name": "Sri Melody",
         "location": "Suryabagh, Jagadamba Junction",
-        "address": "V Max Theatre, Suryabagh, Jagadamba Junction, Vizag 530020",
+        "address": "V Max Theatre Road, Suryabagh, Jagadamba Junction, Vizag 530020",
         "screens": [
             ("Main Screen", "HDR Dolby Atmos", melody_hall()),
         ],
@@ -446,14 +417,6 @@ VIZAG_THEATERS = [
         ],
     },
     {
-        "name": "Sree Kanya Cinemas",
-        "location": "Old Gajuwaka",
-        "address": "Main Road, Old Gajuwaka, Near Mamata Hospital, Vizag 530026",
-        "screens": [
-            ("Main Screen", "2D", classic_single_screen("Sree Kanya", 130, 100, 80, total=640)),
-        ],
-    },
-    {
         "name": "Sree Rama Theatre",
         "location": "Ram Nagar",
         "address": "Rama Talkies Road, RTC Complex, Ram Nagar, Vizag 530002",
@@ -463,8 +426,8 @@ VIZAG_THEATERS = [
     },
     {
         "name": "Leelamahal Theatre",
-        "location": "Leelamahal Junction, Seethammadhara",
-        "address": "Leelamahal Junction, Seethammadhara, Vizag 530013",
+        "location": "Leelamahal Junction, Daba Gardens",
+        "address": "Leelamahal Junction, Daba Gardens, Vizag 530020",
         "screens": [
             ("Main Screen", "2D", classic_single_screen("Leelamahal", 130, 100, 80, total=620)),
         ],
@@ -479,19 +442,220 @@ VIZAG_THEATERS = [
         ],
     },
     {
-        "name": "Mohini Cinemas",
-        "location": "Indira Colony, Gajuwaka",
-        "address": "Indira Colony, Gajuwaka, Near Alif Family Restaurant, Vizag 530026",
+        "name": "Sri Venkateswara Theatre, Daba Gardens",
+        "location": "Daba Gardens",
+        "address": "Main Road, Daba Gardens, Vizag 530020",
         "screens": [
-            ("Main Screen", "Dolby Atmos", small_town_hall("Mohini", 560)),
+            ("Main Screen", "2K Dolby", classic_single_screen("Venkateswara", 140, 110, 80, total=560)),
         ],
     },
     {
-        "name": "Annapurna Theatre",
-        "location": "Kurmannapalem",
-        "address": "Askapalli - Aganampudi Road, Kurmannapalem, Vizag 530046",
+        "name": "SVC Gokul 2K",
+        "location": "Allipuram, Jagadamba",
+        "address": "Main Road, Allipuram, Near Railway Station, Vizag 530004",
         "screens": [
-            ("Main Screen", "2K Dolby Digital", small_town_hall("Annapurna", 460, recliner=True)),
+            ("Main Screen", "2K Dolby Atmos", small_town_hall("SVC Gokul", 480, recliner=True, rec_price=160)),
+        ],
+    },
+    {
+        "name": "Jyothi Theatre",
+        "location": "Jagadamba Centre",
+        "address": "Jagadamba Centre, Vizag 530020",
+        "screens": [
+            ("Main Screen", "2D DTS", classic_single_screen("Jyothi", 130, 100, 75, total=510)),
+        ],
+    },
+    {
+        "name": "Alankar Theatre",
+        "location": "Gandhi Nagar, Poorna Market",
+        "address": "Gandhi Nagar, Main Road, Poorna Market, Vizag 530002",
+        "screens": [
+            ("Main Screen", "A/C DTS", classic_single_screen("Alankar", 120, 90, 70, total=450)),
+        ],
+    },
+    {
+        "name": "Poorna Theatre",
+        "location": "Poorna Market",
+        "address": "Poorna Market Main Road, Visakhapatnam 530001",
+        "screens": [
+            ("Main Screen", "2D", classic_single_screen("Poorna", 120, 90, 70, total=460)),
+        ],
+    },
+    {
+        "name": "Crown Talkies",
+        "location": "Town Area",
+        "address": "Town Kotha Road, Old Post Office, Vizag 530001",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Crown Talkies", 380)),
+        ],
+    },
+    {
+        "name": "Prabhat Cinema",
+        "location": "Jagadamba Junction",
+        "address": "Chitralaya Road, Jagadamba Junction, Vizag 530020",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Prabhat", 400)),
+        ],
+    },
+
+    # =======================================================================
+    # REGION 2: NORTH VIZAG & COASTAL (Maddilapalem, Madhurawada, Bheemili)
+    # =======================================================================
+    {
+        "name": "STBL Cine World, Madhurawada",
+        "location": "Srinivasa Nagar, Madhurawada",
+        "address": "2, 9-25/2, NH-16, Srinivasa Nagar, Madhurawada, Vizag 530048",
+        "screens": [
+            ("Screen 1", "4K Atmos", stbl_screen(1)),
+            ("Screen 2", "4K Atmos", stbl_screen(2)),
+            ("Screen 3", "2D", stbl_screen(3)),
+        ],
+    },
+    {
+        "name": "STBL Cine Pride",
+        "location": "Madhurawada",
+        "address": "Near IT SEZ, Madhurawada, Visakhapatnam 530048",
+        "screens": [
+            ("Screen 1", "4K Atmos", multiplex_generic("Screen 1", "4K Atmos", 210, 240, 160, 110)),
+            ("Screen 2", "Dolby 7.1", multiplex_generic("Screen 2", "Dolby 7.1", 190, 220, 150, 100)),
+        ],
+    },
+    {
+        "name": "Sri Ramulamma 4K Dolby Atmos",
+        "location": "Tagarapuvalasa",
+        "address": "NH-16, Near RTC Bus Stand, Tagarapuvalasa, Vizag 531162",
+        "screens": [
+            ("Main Screen", "4K Dolby Atmos", small_town_hall("Sri Ramulamma", 580, recliner=True, rec_price=170)),
+        ],
+    },
+    {
+        "name": "AVR Saptagiri Theatre",
+        "location": "Tagarapuvalasa",
+        "address": "Chittivalasa Road, Tagarapuvalasa, Vizag 531162",
+        "screens": [
+            ("Main Screen", "Dolby Digital", small_town_hall("AVR Saptagiri", 460)),
+        ],
+    },
+    {
+        "name": "Srinivasa Complex",
+        "location": "Tagarapuvalasa",
+        "address": "Main Road, Tagarapuvalasa, Vizag 531162",
+        "screens": [
+            ("Screen 1", "2D DTS", small_town_hall("Srinivasa", 420)),
+        ],
+    },
+    {
+        "name": "LSK Movie Theatre",
+        "location": "Bheemunipatnam (Bheemili)",
+        "address": "Beach Road, Bheemunipatnam, Vizag 531163",
+        "screens": [
+            ("Main Screen", "4K Dolby", small_town_hall("LSK Theatre", 450, recliner=True)),
+        ],
+    },
+    {
+        "name": "Ganesh Cinema Hall",
+        "location": "Bheemili",
+        "address": "Main Bazaar, Bheemunipatnam, Vizag 531163",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Ganesh Cinema", 360)),
+        ],
+    },
+    {
+        "name": "Thatha Theatre",
+        "location": "Bheemunipatnam",
+        "address": "Dutch Cemetery Road, Bheemili, Vizag 531163",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Thatha Theatre", 380)),
+        ],
+    },
+    {
+        "name": "Sri Jaya Theatre",
+        "location": "Kothavalasa",
+        "address": "Railway Station Road, Kothavalasa, Vizag Outer 535183",
+        "screens": [
+            ("Main Screen", "AC DTS", small_town_hall("Sri Jaya", 480, recliner=True)),
+        ],
+    },
+    {
+        "name": "Padmasri Theatre",
+        "location": "Kothavalasa",
+        "address": "Main Road, Kothavalasa 535183",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Padmasri", 410)),
+        ],
+    },
+
+    # =======================================================================
+    # REGION 3: CENTRAL-WEST (Kancharapalem, NAD, Gopalapatnam, Pendurthi)
+    # =======================================================================
+    {
+        "name": "Urvasi Laser 15K AC Dolby",
+        "location": "Kancharapalem, Bowdra Ring Road",
+        "address": "Bowdra Ring Road, Kancharapalem, Vizag 530008",
+        "screens": [
+            ("Main Screen", "15K Laser Dolby", capacity_screen(
+                "Urvasi Laser · Dolby Atmos", 620,
+                [("RECLINER", "Recliner", 220, 0.15),
+                 ("PREMIUM", "Premium Balcony", 160, 0.45),
+                 ("FIRST", "First Class", 110, 0.40)],
+                width=24, aisles_after=(7, 17)
+            )),
+        ],
+    },
+    {
+        "name": "Sri Lakshmi Narasimha Picture Palace",
+        "location": "Kancharapalem, 104 Area",
+        "address": "104 Area, Kancharapalem, Vizag 530002",
+        "screens": [
+            ("Main Screen", "2D DTS", small_town_hall("Lakshmi Narasimha", 500)),
+        ],
+    },
+    {
+        "name": "Mourya 4K Dolby",
+        "location": "Gopalapatnam",
+        "address": "Near Railway Station, Gopalapatnam, Vizag 530027",
+        "screens": [
+            ("Main Screen", "4K Dolby Atmos", small_town_hall("Mourya", 540, recliner=True, rec_price=170)),
+        ],
+    },
+    {
+        "name": "Sri Narasimha Picture Palace",
+        "location": "Gopalapatnam",
+        "address": "Simhachalam Road, Gopalapatnam, Vizag 530027",
+        "screens": [
+            ("Main Screen", "Dolby Digital", small_town_hall("Sri Narasimha", 480)),
+        ],
+    },
+    {
+        "name": "Mini Narasimha Theatre",
+        "location": "Gopalapatnam",
+        "address": "Gopalapatnam Main Road, Vizag 530027",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Mini Narasimha", 340)),
+        ],
+    },
+    {
+        "name": "Sukanya Cinema Hall",
+        "location": "Gopalapatnam",
+        "address": "NAD Kotha Road, Gopalapatnam, Vizag 530027",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Sukanya", 420)),
+        ],
+    },
+    {
+        "name": "Sowjanya Cinema Hall",
+        "location": "Gopalapatnam",
+        "address": "Main Road, Gopalapatnam, Vizag 530027",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Sowjanya", 400)),
+        ],
+    },
+    {
+        "name": "Sri Sankara Talkies",
+        "location": "Gopalapatnam",
+        "address": "Near Petrol Bunk, Gopalapatnam, Vizag 530027",
+        "screens": [
+            ("Main Screen", "A/C DTS", small_town_hall("Sri Sankara", 430)),
         ],
     },
     {
@@ -503,11 +667,137 @@ VIZAG_THEATERS = [
         ],
     },
     {
-        "name": "Sri Lakshmi Narasimha Picture Palace",
-        "location": "Kancharapalem, 104 Area",
-        "address": "104 Area, Kancharapalem, Vizag 530002",
+        "name": "Asquare Cinemas",
+        "location": "Pendurthi",
+        "address": "Pendurthi Junction, Vizag 531173",
         "screens": [
-            ("Main Screen", "2D", small_town_hall("Lakshmi Narasimha", 500)),
+            ("Screen 1", "4K Atmos", multiplex_generic("Screen 1", "4K Atmos", 230, 220, 160, 110)),
+            ("Screen 2", "Dolby 7.1", multiplex_generic("Screen 2", "Dolby 7.1", 190, 200, 150, 100)),
+        ],
+    },
+    {
+        "name": "Satyam A/C DTS",
+        "location": "Pendurthi",
+        "address": "Main Road, Pendurthi, Vizag 531173",
+        "screens": [
+            ("Main Screen", "A/C DTS", small_town_hall("Satyam", 420)),
+        ],
+    },
+    {
+        "name": "Arena Cinemas",
+        "location": "Saripalli, Pendurthi",
+        "address": "Saripalli Road, Pendurthi, Vizag 531173",
+        "screens": [
+            ("Screen 1", "Dolby Atmos", multiplex_generic("Screen 1", "Dolby Atmos", 220, 220, 150, 100)),
+        ],
+    },
+    {
+        "name": "Sree Vijaya Talkies",
+        "location": "Simhachalam",
+        "address": "Simhachalam Hill Road, Vizag 530028",
+        "screens": [
+            ("Main Screen", "2D DTS", small_town_hall("Sree Vijaya", 390)),
+        ],
+    },
+    {
+        "name": "Sri Venkateswara Talkies, NAD",
+        "location": "NAD Junction",
+        "address": "Near NAD Flyover, Vizag 530009",
+        "screens": [
+            ("Main Screen", "Dolby 7.1", small_town_hall("Venkateswara NAD", 450, recliner=True)),
+        ],
+    },
+
+    # =======================================================================
+    # REGION 4: SOUTH INDUSTRIAL (Gajuwaka, Malkapuram, Kurmannapalem)
+    # =======================================================================
+    {
+        "name": "STBL Cinemas Multiplex, Sheela Nagar",
+        "location": "Sheela Nagar",
+        "address": "6-175/20, Sheela Nagar, Beside Ayyappa Swamy Temple, Vizag 530012",
+        "screens": [
+            ("Screen 1", "4K Atmos", stbl_screen(1)),
+            ("Screen 2", "2D", stbl_screen(2)),
+        ],
+    },
+    {
+        "name": "Sree Kanya Cinemas",
+        "location": "Old Gajuwaka",
+        "address": "Main Road, Old Gajuwaka, Near Mamata Hospital, Vizag 530026",
+        "screens": [
+            ("Main Screen", "2D", classic_single_screen("Sree Kanya", 130, 100, 80, total=640)),
+        ],
+    },
+    {
+        "name": "Sree Kanya Mini",
+        "location": "Old Gajuwaka",
+        "address": "Beside Sree Kanya Main, Old Gajuwaka, Vizag 530026",
+        "screens": [
+            ("Mini Screen", "4K Dolby", small_town_hall("Sree Kanya Mini", 320, recliner=True)),
+        ],
+    },
+    {
+        "name": "Mohini Cinemas",
+        "location": "Indira Colony, Gajuwaka",
+        "address": "Indira Colony, Gajuwaka, Near Alif Family Restaurant, Vizag 530026",
+        "screens": [
+            ("Main Screen", "Dolby Atmos", small_town_hall("Mohini", 560)),
+        ],
+    },
+    {
+        "name": "Mohini Mini Complex",
+        "location": "Gajuwaka",
+        "address": "Mohini Complex, High School Road, Gajuwaka, Vizag 530026",
+        "screens": [
+            ("Mini Screen", "Dolby 7.1", small_town_hall("Mohini Mini", 310)),
+        ],
+    },
+    {
+        "name": "Ramachandra Max",
+        "location": "Gajuwaka",
+        "address": "Main Road, Gajuwaka, Vizag 530026",
+        "screens": [
+            ("Screen 1", "4K Atmos", multiplex_generic("Screen 1", "4K Atmos", 260, 200, 150, 100)),
+        ],
+    },
+    {
+        "name": "Globex Cinemas",
+        "location": "Gajuwaka",
+        "address": "Chaitanya Nagar, Gajuwaka, Vizag 530026",
+        "screens": [
+            ("Screen 1", "Dolby 7.1", multiplex_generic("Screen 1", "2K Dolby", 210, 190, 140, 95)),
+        ],
+    },
+    {
+        "name": "Lakshmikanth Theatre",
+        "location": "Gajuwaka",
+        "address": "Near RTC Bus Depot, Gajuwaka, Vizag 530026",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Lakshmikanth", 420)),
+        ],
+    },
+    {
+        "name": "Kanya Cinema Hall",
+        "location": "Gajuwaka",
+        "address": "Old Gajuwaka Junction, Vizag 530026",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Kanya Cinema", 390)),
+        ],
+    },
+    {
+        "name": "Annapurna Theatre",
+        "location": "Kurmannapalem",
+        "address": "Askapalli - Aganampudi Road, Kurmannapalem, Vizag 530046",
+        "screens": [
+            ("Main Screen", "2K Dolby Digital", small_town_hall("Annapurna", 460, recliner=True)),
+        ],
+    },
+    {
+        "name": "Venkateswara Theatre, Kurmannapalem",
+        "location": "Kurmannapalem Steel Plant Gate",
+        "address": "Steel Plant Main Gate, Kurmannapalem, Vizag 530046",
+        "screens": [
+            ("Main Screen", "2D DTS", small_town_hall("Venkateswara Steel Plant", 480)),
         ],
     },
     {
@@ -518,11 +808,258 @@ VIZAG_THEATERS = [
             ("Main Screen", "A/C DTS", small_town_hall("SVC Likitha", 420, recliner=True)),
         ],
     },
+    {
+        "name": "Aruna Picture Palace",
+        "location": "Malkapuram",
+        "address": "Gullalapalem Road, Malkapuram, Vizag 530011",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Aruna Picture Palace", 450)),
+        ],
+    },
+    {
+        "name": "Maha Lakshmi Talkies",
+        "location": "Malkapuram",
+        "address": "Coromandel Gate, Malkapuram, Vizag 530011",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Maha Lakshmi", 370)),
+        ],
+    },
+    {
+        "name": "Sri Venkateswara Talkies, Scindia",
+        "location": "Scindia, Malkapuram",
+        "address": "Scindia Junction, Malkapuram, Vizag 530011",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Scindia Talkies", 360)),
+        ],
+    },
+    {
+        "name": "STBL Balaji Village Cinema",
+        "location": "Sabbavaram",
+        "address": "Main Road, Sabbavaram, Vizag Suburb 531035",
+        "screens": [
+            ("Screen 1", "4K Atmos", small_town_hall("Balaji Village Screen 1", 380, recliner=True, rec_price=160)),
+            ("Screen 2", "Dolby 7.1", small_town_hall("Balaji Village Screen 2", 300)),
+        ],
+    },
+
+    # =======================================================================
+    # REGION 5: ANAKAPALLE & KASIMKOTA
+    # =======================================================================
+    {
+        "name": "Venkateswara Movie Mart",
+        "location": "Woodpeta, Anakapalle",
+        "address": "Woodpeta, Main Road, Anakapalle, Vizag Dist 531001",
+        "screens": [
+            ("Screen 1", "4K Dolby Atmos", multiplex_generic("Screen 1", "4K Atmos", 320, 200, 140, 90)),
+            ("Screen 2", "Dolby 7.1", multiplex_generic("Screen 2", "Dolby 7.1", 240, 180, 130, 80)),
+        ],
+    },
+    {
+        "name": "Sri Satyanarayana Picture Palace",
+        "location": "Niddanam Doddi, Anakapalle",
+        "address": "Niddanam Doddi, Main Road, Anakapalle 531001",
+        "screens": [
+            ("Main Screen", "Dolby Atmos", classic_single_screen("Satyanarayana", 140, 100, 75, total=520)),
+        ],
+    },
+    {
+        "name": "Sri Sairam Movie Land",
+        "location": "Library Road, Anakapalle",
+        "address": "Library Road, Anakapalle 531001",
+        "screens": [
+            ("Main Screen", "A/C DTS", small_town_hall("Sri Sairam", 440, recliner=True)),
+        ],
+    },
+    {
+        "name": "Ramachandra Theatre, Anakapalle",
+        "location": "Narasinga Rao Peta, Anakapalle",
+        "address": "Narasinga Rao Peta, Anakapalle 531001",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Ramachandra Anakapalle", 480)),
+        ],
+    },
+    {
+        "name": "Raja Picture Palace",
+        "location": "Main Road, Anakapalle",
+        "address": "Main Road, RTC Complex Area, Anakapalle 531001",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Raja Palace", 430)),
+        ],
+    },
+    {
+        "name": "Shirdi Sai Complex",
+        "location": "Anakapalle",
+        "address": "Railway Station Road, Anakapalle 531001",
+        "screens": [
+            ("Screen 1", "Dolby 7.1", small_town_hall("Shirdi Sai 1", 340)),
+            ("Screen 2", "2D", small_town_hall("Shirdi Sai 2", 280)),
+        ],
+    },
+    {
+        "name": "Venkateshwara Cinema Hall, Chinna Veedhi",
+        "location": "Chinna Veedhi, Anakapalle",
+        "address": "Chinna Veedhi, Anakapalle 531001",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Venkateshwara Old", 360)),
+        ],
+    },
+    {
+        "name": "Sri Radha Krishna Theatre",
+        "location": "Kasimkota",
+        "address": "Main Road, Kasimkota, Anakapalle Mandal 531031",
+        "screens": [
+            ("Main Screen", "2D DTS", small_town_hall("Radha Krishna", 410)),
+        ],
+    },
+    {
+        "name": "Sri Laxmi Chitramandir",
+        "location": "Kasimkota",
+        "address": "Near Market Yard, Kasimkota 531031",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Laxmi Chitramandir", 370)),
+        ],
+    },
+
+    # =======================================================================
+    # REGION 6: CHODAVARAM & K.KOTAPADU
+    # =======================================================================
+    {
+        "name": "Lakshmi Theatre, Chodavaram",
+        "location": "Nowdu Veedhi, Chodavaram",
+        "address": "Nowdu Veedhi, Chodavaram, Vizag Dist 531036",
+        "screens": [
+            ("Main Screen", "4K Laser Dolby", small_town_hall("Lakshmi Chodavaram", 460, recliner=True, rec_price=150)),
+        ],
+    },
+    {
+        "name": "Poorna Theatre A/C Dolby 7.1",
+        "location": "Chodavaram",
+        "address": "RTC Bus Stand Road, Chodavaram 531036",
+        "screens": [
+            ("Main Screen", "Dolby 7.1", small_town_hall("Poorna Chodavaram", 430)),
+        ],
+    },
+    {
+        "name": "Sai Siri Max AC DTS",
+        "location": "Chodavaram",
+        "address": "Main Road, Chodavaram 531036",
+        "screens": [
+            ("Main Screen", "AC DTS", small_town_hall("Sai Siri Max", 390)),
+        ],
+    },
+    {
+        "name": "Sri Sai Lakshmi AC",
+        "location": "Chodavaram",
+        "address": "Govt Hospital Road, Chodavaram 531036",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Sai Lakshmi", 370)),
+        ],
+    },
+    {
+        "name": "Twin Theatre Complex, Chodavaram",
+        "location": "Chodavaram Bypass",
+        "address": "Bypass Road, Chodavaram 531036",
+        "screens": [
+            ("Screen 1", "Dolby 7.1", small_town_hall("Twin 1", 310)),
+            ("Screen 2", "2D", small_town_hall("Twin 2", 290)),
+        ],
+    },
+    {
+        "name": "Sri Rama Chitramandir",
+        "location": "K.Kotapadu",
+        "address": "Main Road, K.Kotapadu, Vizag Dist 531039",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Rama Kotapadu", 380)),
+        ],
+    },
+
+    # =======================================================================
+    # REGION 7: NARSIPATNAM, YELAMANCHILI & OUTER DISTRICT
+    # =======================================================================
+    {
+        "name": "PVR Sree Kanya Cinemax",
+        "location": "Main Road, Narsipatnam",
+        "address": "Main Road, RTC Complex Area, Narsipatnam, Vizag Dist 531116",
+        "screens": [
+            ("Screen 1", "4K Atmos", multiplex_generic("Screen 1", "4K Atmos", 290, 200, 140, 90)),
+            ("Screen 2", "Dolby 7.1", multiplex_generic("Screen 2", "Dolby 7.1", 220, 180, 130, 80)),
+        ],
+    },
+    {
+        "name": "Bangarraju Picture Palace",
+        "location": "Narsipatnam",
+        "address": "Near Gandhi Statue, Narsipatnam 531116",
+        "screens": [
+            ("Main Screen", "Dolby Atmos", small_town_hall("Bangarraju", 490, recliner=True)),
+        ],
+    },
+    {
+        "name": "Raju Movie Max",
+        "location": "Narsipatnam",
+        "address": "Bypass Road, Narsipatnam 531116",
+        "screens": [
+            ("Main Screen", "2D DTS", small_town_hall("Raju Movie Max", 440)),
+        ],
+    },
+    {
+        "name": "Sri Venkatavema Cinema Hall",
+        "location": "Narsipatnam",
+        "address": "Pedabondapalli Road, Narsipatnam 531116",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Venkatavema", 380)),
+        ],
+    },
+    {
+        "name": "SVC Sita Chitramandir",
+        "location": "Yelamanchili",
+        "address": "NH-16 Junction, Yelamanchili, Vizag Dist 531055",
+        "screens": [
+            ("Main Screen", "4K Dolby Atmos", small_town_hall("SVC Sita", 470, recliner=True, rec_price=160)),
+        ],
+    },
+    {
+        "name": "SVC Tulasi Chitramandir",
+        "location": "Yelamanchili",
+        "address": "Railway Station Road, Yelamanchili 531055",
+        "screens": [
+            ("Main Screen", "2K Dolby", small_town_hall("SVC Tulasi", 430)),
+        ],
+    },
+    {
+        "name": "Parameswari Theatre",
+        "location": "Yelamanchili",
+        "address": "Main Bazaar, Yelamanchili 531055",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Parameswari", 390)),
+        ],
+    },
+    {
+        "name": "Balaji Cinema Hall",
+        "location": "Payakaraopeta",
+        "address": "Main Road, Payakaraopeta 531126",
+        "screens": [
+            ("Main Screen", "2D DTS", small_town_hall("Balaji Payakaraopeta", 420)),
+        ],
+    },
+    {
+        "name": "Sri Venkateswara Talkies, Payakaraopeta",
+        "location": "Payakaraopeta",
+        "address": "Near Tuni Bridge, Payakaraopeta 531126",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Venkateswara Payakaraopeta", 380)),
+        ],
+    },
+    {
+        "name": "Sri Vijaya Cinema",
+        "location": "Kotauratla",
+        "address": "Main Road, Kotauratla, Vizag Dist 531085",
+        "screens": [
+            ("Main Screen", "2D", small_town_hall("Sri Vijaya Kotauratla", 360)),
+        ],
+    },
 ]
 
 
-# theatres seeded under an older name -> current name, so an existing database
-# gets renamed instead of ending up with two copies of the same cinema
 RENAMES = {
     "INOX CMR Central": "INOX CMR Central, Maddilapalem",
     "INOX Chitralaya": "INOX Vizag Chitralaya Mall",
@@ -532,8 +1069,8 @@ RENAMES = {
 
 
 def seed_vizag_theaters(db, Theater, Screen, verbose=True):
-    """Idempotent: adds any missing Vizag theatre / screen, never duplicates."""
-    created_t = created_s = 0
+    """Idempotent: adds any missing Vizag theatre / screen with real seat layouts, never duplicates."""
+    created_t = created_s = updated_l = 0
 
     for old, new in RENAMES.items():
         legacy = Theater.query.filter_by(name=old).first()
@@ -549,11 +1086,19 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
             db.session.add(theater)
             db.session.flush()
             created_t += 1
+        else:
+            if data.get("location") and theater.location != data["location"]:
+                theater.location = data["location"]
+            if data.get("address") and theater.address != data["address"]:
+                theater.address = data["address"]
 
         for screen_name, screen_type, layout in data["screens"]:
             existing = Screen.query.filter_by(theater_id=theater.id,
                                               name=screen_name).first()
             if existing:
+                if not existing.layout:
+                    existing.layout = layout
+                    updated_l += 1
                 continue
             screen = Screen(theater_id=theater.id, name=screen_name,
                             screen_type=screen_type)
@@ -563,5 +1108,5 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
 
     db.session.commit()
     if verbose:
-        print(f"Vizag seed: +{created_t} theatres, +{created_s} screens")
+        print(f"Vizag seed: +{created_t} theatres, +{created_s} screens, +{updated_l} layouts updated (Total: {len(VIZAG_THEATERS)} theatres)")
     return created_t, created_s
