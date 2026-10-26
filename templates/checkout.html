@@ -39,7 +39,7 @@
       <div class="flex justify-between text-slate-400"><span>Convenience fee</span><span>₹{{ '%.2f'|format(booking.convenience_fee) }}</span></div>
       <div class="flex justify-between text-slate-400"><span>GST (18% on fee)</span><span>₹{{ '%.2f'|format(booking.gst) }}</span></div>
       <div class="flex justify-between pt-2 border-t border-slate-800 text-sm font-bold text-white">
-        <span>Amount payable</span><span class="text-[#FF2E63]">₹{{ '%.2f'|format(booking.total_amount) }}</span>
+        <span>Amount payable</span><span class="text-[#C9A84C]">₹{{ '%.2f'|format(booking.total_amount) }}</span>
       </div>
     </div>
 
@@ -139,7 +139,7 @@
     <!-- gateway -->
     <div class="glass-card rounded-2xl p-5 space-y-4">
       <div class="flex items-center justify-between gap-3">
-        <p class="text-sm font-bold text-white"><i class="fa-solid fa-credit-card text-[#FF2E63] mr-2"></i>UPI / Card / Netbanking</p>
+        <p class="text-sm font-bold text-white"><i class="fa-solid fa-credit-card text-[#C9A84C] mr-2"></i>UPI / Card / Netbanking</p>
         <span class="text-[10px] px-2 py-1 rounded-full {% if gateway == 'razorpay' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% else %}bg-amber-500/10 text-amber-500 border border-amber-500/20{% endif %} whitespace-nowrap">
           {% if gateway == 'razorpay' %}Razorpay live{% else %}Sandbox mode{% endif %}
         </span>
@@ -149,8 +149,8 @@
         {% for m, icon, label in [('upi','fa-mobile-screen','UPI / GPay / PhonePe'), ('card','fa-credit-card','Credit / Debit card'), ('netbanking','fa-building-columns','Netbanking')] %}
           <form method="POST" action="{{ url_for('pay_gateway', reference=booking.reference) }}">
             <input type="hidden" name="method" value="{{ m }}">
-            <button type="submit" class="w-full h-full px-4 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-[#FF2E63] rounded-xl transition text-left">
-              <i class="fa-solid {{ icon }} text-[#FF2E63]"></i>
+            <button type="submit" class="w-full h-full px-4 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-[#C9A84C] rounded-xl transition text-left">
+              <i class="fa-solid {{ icon }} text-[#C9A84C]"></i>
               <p class="text-xs font-semibold text-white mt-2 leading-snug">{{ label }}</p>
             </button>
           </form>
@@ -167,7 +167,7 @@
     </div>
 
     <form method="POST" action="{{ url_for('cancel_booking', reference=booking.reference) }}">
-      <button type="submit" class="text-[11px] text-slate-500 hover:text-[#FF2E63] transition">Cancel and release seats</button>
+      <button type="submit" class="text-[11px] text-slate-500 hover:text-[#C9A84C] transition">Cancel and release seats</button>
     </form>
   </section>
 </div>

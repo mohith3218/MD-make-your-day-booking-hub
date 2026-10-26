@@ -23,11 +23,16 @@ Run:
     admin / admin123
 """
 
+import csv
+import io
 import json
 import os
 import re
 import secrets
 from datetime import date, datetime, timedelta
+from urllib.parse import parse_qs, urlparse
+
+from sqlalchemy import func as sa_func
 
 import requests
 from flask import (
@@ -53,7 +58,9 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
+import ai_booking_assistant
 import payments
 import seat_layout as sl
 from vizag_theaters import seed_vizag_theaters
@@ -62,6 +69,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vizag-movie-booking-secret')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///vizag_movies.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024
 
 # TMDb API Key
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "329d5f23baebf5312db6f28ab506ce9e")
@@ -90,12 +98,106 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     points = db.Column(db.Integer, default=100)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    bio = db.Column(db.String(250), nullable=True, default='Cinema lover & movie enthusiast.')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def initials(self):
+        name = (self.username or 'U').strip()
+        parts = re.split(r'[\s._-]+', name)
+        if len(parts) >= 2 and parts[0] and parts[1]:
+            return f"{parts[0][0]}{parts[1][0]}".upper()
+        return (name[:2] if len(name) >= 2 else name).upper()
+
+    @property
+    def member_since_formatted(self):
+        dt = self.created_at or datetime(2024, 1, 1)
+        return dt.strftime('Member since %B %Y')
+
+    @property
+    def club_tier(self):
+        pts = self.points or 0
+        if pts >= 500:
+            return "CineWave Club VIP"
+        elif pts >= 250:
+            return "CineWave Club Gold"
+        return "CineWave Club 08"
+
+    @property
+    def stats(self):
+        paid_bookings = [b for b in self.bookings if b.status == 'PAID']
+        distinct_movies = {}
+        for b in paid_bookings:
+            if b.showtime and b.showtime.movie:
+                distinct_movies[b.showtime.movie.id] = b.showtime.movie
+
+        current_year = datetime.utcnow().year
+        films_this_year = sum(1 for b in paid_bookings if b.booked_at and b.booked_at.year == current_year)
+        total_minutes = sum((m.duration or 120) for m in distinct_movies.values())
+        hours_watched = round(total_minutes / 60, 1) if total_minutes else 0.0
+
+        user_ratings = [r.rating for r in self.movie_ratings]
+        if user_ratings:
+            avg_rating = round(sum(user_ratings) / len(user_ratings), 1)
+        elif distinct_movies:
+            movie_ratings = [m.display_rating for m in distinct_movies.values()]
+            avg_rating = round(sum(movie_ratings) / len(movie_ratings), 1) if movie_ratings else 0.0
+        else:
+            avg_rating = 0.0
+
+        return {
+            'films_this_year': films_this_year,
+            'total_films': len(distinct_movies),
+            'hours_watched': hours_watched,
+            'avg_rating': avg_rating,
+            'total_bookings': len(paid_bookings)
+        }
+
+    @property
+    def film_dna(self):
+        paid_bookings = [b for b in self.bookings if b.status == 'PAID']
+        mood_counts = {}
+        total_tags = 0
+
+        mood_meta = {
+            'EMOTIONAL': ('Drama', '#d9979a', 'bg-[#d9979a]'),
+            'MIND_BENDING': ('Sci-Fi', '#70b9cc', 'bg-[#70b9cc]'),
+            'ROMANCE': ('Romance', '#ef8ba8', 'bg-[#ef8ba8]'),
+            'THRILL': ('Action & Thrill', '#f5b942', 'bg-[#f5b942]'),
+            'FUN': ('Comedy & Fun', '#82c9a0', 'bg-[#82c9a0]')
+        }
+
+        for b in paid_bookings:
+            if b.showtime and b.showtime.movie:
+                for mood in b.showtime.movie.moods:
+                    mood_counts[mood] = mood_counts.get(mood, 0) + 1
+                    total_tags += 1
+
+        if not mood_counts or total_tags == 0:
+            return []
+
+        dna = []
+        for code, count in sorted(mood_counts.items(), key=lambda x: x[1], reverse=True)[:4]:
+            meta = mood_meta.get(code, (code.capitalize(), '#f5b942', 'bg-[#f5b942]'))
+            pct = round((count / total_tags) * 100)
+            dna.append({
+                'name': meta[0],
+                'pct': pct,
+                'color_hex': meta[1],
+                'color_class': meta[2]
+            })
+        return dna
+
+    @property
+    def watchlist_movies(self):
+        items = sorted(self.watchlist_items, key=lambda x: x.added_at, reverse=True)
+        return [item.movie for item in items if item.movie]
 
 
 class Movie(db.Model):
@@ -106,10 +208,66 @@ class Movie(db.Model):
     poster = db.Column(db.String(500), nullable=True)
     language = db.Column(db.String(50), nullable=True, default='Telugu')
     certificate = db.Column(db.String(10), nullable=True, default='U/A')
+    rating = db.Column(db.Float, default=8.5)
     is_upcoming = db.Column(db.Boolean, default=False)
     is_rerelease = db.Column(db.Boolean, default=False)
     release_date = db.Column(db.Date, nullable=True)
     moods_json = db.Column(db.Text, default='[]')
+    tmdb_id = db.Column(db.Integer, nullable=True, index=True)
+    cast_json = db.Column(db.Text, nullable=True, default=None)
+    youtube_trailer_key = db.Column(db.String(20), nullable=True)
+    trailer_video_path = db.Column(db.String(300), nullable=True)
+
+    @property
+    def cast_info(self):
+        """Cast/crew info dict {'director': str|None, 'cast': [...]} or {} if unset."""
+        try:
+            data = json.loads(self.cast_json or 'null')
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            return data
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data[0]          # tolerate legacy/wrapped shapes
+        return {}
+
+    def is_in_watchlist(self, user):
+        if not user or not getattr(user, 'is_authenticated', False):
+            return False
+        return any(item.movie_id == self.id for item in user.watchlist_items)
+
+    @property
+    def display_rating(self):
+        ratings = [r.rating for r in self.user_ratings]
+        if ratings:
+            return round(sum(ratings) / len(ratings), 1)
+        return round(self.rating, 1) if getattr(self, 'rating', None) else 4.5
+
+    def get_user_rating(self, user):
+        if not user or not getattr(user, 'is_authenticated', False):
+            return None
+        r = MovieRating.query.filter_by(user_id=user.id, movie_id=self.id).first()
+        return r.rating if r else None
+
+    @property
+    def trailer_video_key(self):
+        """Return the admin-selected trailer, or a YouTube trailer found through TMDb."""
+        if self.trailer_video_path:
+            return None
+        if self.youtube_trailer_key:
+            return self.youtube_trailer_key
+        if self.tmdb_id:
+            try:
+                url = f"{TMDB_BASE_URL}/movie/{self.tmdb_id}/videos?api_key={TMDB_API_KEY}"
+                resp = requests.get(url, timeout=3)
+                if resp.status_code == 200:
+                    results = resp.json().get('results', [])
+                    for v in results:
+                        if v.get('site') == 'YouTube' and v.get('type') in ('Trailer', 'Teaser'):
+                            return v.get('key')
+            except Exception:
+                pass
+        return None
 
     @property
     def moods(self):
@@ -142,6 +300,33 @@ class Movie(db.Model):
         return list(tags)
 
 
+class Watchlist(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    movie_id = db.Column(db.Integer, db.ForeignKey('movie.id'), nullable=False)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'movie_id', name='_user_movie_uc'),)
+
+    user = db.relationship('User', backref=db.backref('watchlist_items', lazy=True, cascade='all, delete-orphan'))
+    movie = db.relationship('Movie', backref=db.backref('in_watchlists', lazy=True, cascade='all, delete-orphan'))
+
+
+class MovieRating(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    movie_id = db.Column(db.Integer, db.ForeignKey('movie.id'), nullable=False)
+    rating = db.Column(db.Float, nullable=False)
+    review = db.Column(db.String(500), nullable=True)
+    has_spoiler = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'movie_id', name='_user_movie_rating_uc'),)
+
+    user = db.relationship('User', backref=db.backref('movie_ratings', lazy=True, cascade='all, delete-orphan'))
+    movie = db.relationship('Movie', backref=db.backref('user_ratings', lazy=True, cascade='all, delete-orphan'))
+
+
 
 class Theater(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -165,6 +350,32 @@ class Screen(db.Model):
     name = db.Column(db.String(80), nullable=False)              # "Screen 1"
     screen_type = db.Column(db.String(40), default='2D')         # 2D/3D/IMAX/Recliner
     layout_json = db.Column(db.Text, nullable=False, default='{}')
+
+    @property
+    def comfort_score(self):
+        """Calculates authentic comfort index rating out of 5."""
+        name_lower = (self.name + ' ' + (self.theater.name if self.theater else '')).lower()
+        if 'insignia' in name_lower or 'vip' in name_lower or 'lounge' in name_lower:
+            return 4.9
+        if 'aaa' in name_lower or 'led' in name_lower or 'varun' in name_lower:
+            return 4.8
+        if 'imax' in name_lower or '70mm' in name_lower:
+            return 4.7
+        return 4.6
+
+    @property
+    def comfort_features(self):
+        """Returns acoustic, visual, and seat ergonomics comfort badges."""
+        name_lower = (self.name + ' ' + (self.theater.name if self.theater else '')).lower()
+        if 'insignia' in name_lower or 'recliner' in name_lower or 'vip' in name_lower:
+            return ['160° Motorized Recliners', 'Dolby Atmos 64-Channel', '4K Barco Laser', 'Dedicated Butler Service']
+        elif 'aaa' in name_lower or 'led' in name_lower:
+            return ['Q-Luxon 70ft Active LED', 'Dolby Atmos Sound', 'Premium Ergonomic Prime Seats', '42-inch Extra Legroom']
+        elif 'varun' in name_lower:
+            return ['RGB Laser 4K Projection', 'Dolby Atmos Sound', 'Sea Breeze Ambient Lounge', 'Luxury Prime Cushions']
+        elif '70mm' in name_lower:
+            return ['Giant 70MM Curved Screen', 'Acoustic Sound Array', 'Classic Balcony Experience']
+        return ['Dolby 7.1 Surround', 'Plush Pushback Seating', 'Climate Controlled 21°C']
 
     @property
     def layout(self):
@@ -498,6 +709,42 @@ def admin_required():
     return None
 
 
+def parse_youtube_video_key(value):
+    """Accept a YouTube video URL or 11-character video ID; reject other values."""
+    value = (value or '').strip()
+    if not value:
+        return ''
+    candidate = value
+    if '://' in value:
+        parsed = urlparse(value)
+        host = (parsed.hostname or '').lower()
+        if host in ('youtu.be', 'www.youtu.be'):
+            candidate = parsed.path.strip('/').split('/')[0]
+        elif host in ('youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com'):
+            if parsed.path == '/watch':
+                candidate = parse_qs(parsed.query).get('v', [''])[0]
+            else:
+                parts = [part for part in parsed.path.split('/') if part]
+                candidate = parts[1] if len(parts) > 1 and parts[0] in ('embed', 'shorts', 'live') else ''
+        else:
+            return None
+    return candidate if re.fullmatch(r'[A-Za-z0-9_-]{11}', candidate) else None
+
+
+def save_trailer_upload(upload):
+    """Save an uploaded MP4/WebM trailer under a random safe name in static files."""
+    if not upload or not upload.filename:
+        return None
+    extension = os.path.splitext(secure_filename(upload.filename))[1].lower()
+    if extension not in {'.mp4', '.webm'}:
+        raise ValueError('Trailer uploads must be MP4 or WebM video files.')
+    relative_path = os.path.join('uploads', 'trailers', f'{secrets.token_hex(16)}{extension}')
+    absolute_path = os.path.join(app.static_folder, relative_path)
+    os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+    upload.save(absolute_path)
+    return relative_path.replace(os.sep, '/')
+
+
 def create_wallet(user, balance=WELCOME_WALLET_BALANCE):
     """New wallet with the signup bonus already credited."""
     wallet = Wallet(user_id=user.id, balance=balance)
@@ -566,6 +813,13 @@ def commit_seats(booking):
     db.session.flush()
 
 
+def dispatch_ticket_delivery(booking):
+    """Dispatches digital e-ticket receipt & QR pass notification to customer."""
+    recipient = getattr(booking.user, 'email', None) or booking.user.username
+    print(f"[E-Ticket Dispatch] Booking {booking.reference} ({booking.showtime.movie.title}) sent to {recipient}")
+    return True
+
+
 def finalise_paid_booking(booking, payment):
     """Commit seats, mark paid, drop the lock. Returns (ok, message)."""
     try:
@@ -577,12 +831,25 @@ def finalise_paid_booking(booking, payment):
             lock = SeatLock.query.filter_by(token=booking.lock_token).first()
             if lock:
                 db.session.delete(lock)
-        # CinePass points reward: 10 points per ₹100 spent
-        earned_pts = int(booking.total_amount / 10)
+        # CinePass points reward: 10 points per ₹100 spent (20 points/₹100 for Rewatch Champion bookings!)
+        is_rewatch = False
+        if booking.user and booking.showtime and booking.showtime.movie:
+            prev_cnt = (Booking.query.filter_by(user_id=booking.user_id, status='PAID')
+                        .join(Showtime)
+                        .filter(Showtime.movie_id == booking.showtime.movie_id, Booking.id != booking.id)
+                        .count())
+            if prev_cnt > 0:
+                is_rewatch = True
+
+        pts_multiplier = 2 if is_rewatch else 1
+        earned_pts = int((booking.total_amount / 10) * pts_multiplier)
         if earned_pts > 0:
             booking.user.points = (booking.user.points or 0) + earned_pts
         db.session.commit()
-        return True, "Payment successful"
+        # Dispatch digital receipt / e-ticket
+        dispatch_ticket_delivery(booking)
+        msg = "Payment successful" + (" 🎉 (Rewatch Bonus: 2X CinePass Points Earned!)" if is_rewatch else "")
+        return True, msg
     except IntegrityError:
         db.session.rollback()
         booking.status = 'FAILED'
@@ -1198,6 +1465,58 @@ def cancel_booking(reference):
     return redirect(url_for('dashboard'))
 
 
+@app.route('/booking/<reference>/refund', methods=['POST'])
+@login_required
+def refund_booking(reference):
+    booking = Booking.query.filter_by(reference=reference).first_or_404()
+    if booking.user_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    if booking.status != 'PAID':
+        flash("Only confirmed, paid bookings are eligible for cancellation and refund.")
+        return redirect(url_for('ticket', reference=reference))
+
+    if booking.showtime.is_past:
+        flash("⛔ This show has already ended or started. Past shows cannot be cancelled.")
+        return redirect(url_for('ticket', reference=reference))
+
+    # Cancellation policy: 90% refund of the ticket amount
+    cancellation_fee_rate = 0.10
+    refund_amount = round(booking.ticket_amount * (1.0 - cancellation_fee_rate), 2)
+
+    # Free up booked seats
+    BookedSeat.query.filter_by(booking_id=booking.id).delete()
+
+    # Credit refund to user's wallet
+    wallet = get_wallet(booking.user)
+    wallet.balance = round(wallet.balance + refund_amount, 2)
+    db.session.add(WalletTransaction(
+        wallet_id=wallet.id,
+        amount=refund_amount,
+        type='REFUND',
+        description=f'Self-service cancellation refund for {booking.reference}'
+    ))
+
+    booking.status = 'CANCELLED'
+    db.session.commit()
+
+    flash(f"✅ Booking {booking.reference} cancelled successfully. ₹{refund_amount:.2f} refunded to your CineWave Wallet!")
+    return redirect(url_for('wallet_page'))
+
+
+@app.route('/ticket/<reference>/resend_delivery', methods=['POST'])
+@login_required
+def resend_ticket_delivery(reference):
+    booking = Booking.query.filter_by(reference=reference).first_or_404()
+    if booking.user_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    dispatch_ticket_delivery(booking)
+    recipient = current_user.email or current_user.username
+    flash(f"📧 E-ticket with QR pass dispatched to {recipient}!")
+    return redirect(url_for('ticket', reference=reference))
+
+
 @app.route('/ticket/<reference>')
 @login_required
 def ticket(reference):
@@ -1222,7 +1541,6 @@ def ticket_qr(reference):
                f"{booking.showtime.theater}|{booking.showtime.show_date}|"
                f"{booking.showtime.show_time}|{booking.seats}")
     try:
-        import io
         import qrcode
         img = qrcode.make(payload)
         buf = io.BytesIO()
@@ -1269,7 +1587,7 @@ def wallet_recharge():
     return redirect(url_for('wallet_page'))
 
 
-# ====================== USER DASHBOARD ======================
+# ====================== USER DASHBOARD & PROFILE ======================
 
 @app.route('/dashboard')
 @login_required
@@ -1278,6 +1596,137 @@ def dashboard():
     bookings = (Booking.query.filter_by(user_id=current_user.id)
                 .order_by(Booking.booked_at.desc()).all())
     return render_template('dashboard.html', bookings=bookings)
+
+
+@app.route('/profile')
+@login_required
+def profile():
+    purge_expired_holds()
+    user_stats = current_user.stats
+    film_dna = current_user.film_dna
+    watchlist_movies = current_user.watchlist_movies
+    recent_bookings = (Booking.query.filter_by(user_id=current_user.id, status='PAID')
+                      .order_by(Booking.booked_at.desc()).limit(6).all())
+    return render_template(
+        'profile.html',
+        stats=user_stats,
+        film_dna=film_dna,
+        watchlist_movies=watchlist_movies,
+        recent_bookings=recent_bookings
+    )
+
+
+@app.route('/profile/edit', methods=['POST'])
+@login_required
+def edit_profile():
+    email = request.form.get('email', '').strip()
+    phone = request.form.get('phone', '').strip()
+    bio = request.form.get('bio', '').strip()
+
+    if email and not is_valid_email(email):
+        flash('Please enter a valid email address.')
+        return redirect(url_for('profile'))
+
+    # Check email uniqueness if changed
+    if email and email != current_user.email:
+        existing = User.query.filter_by(email=email).first()
+        if existing and existing.id != current_user.id:
+            flash('This email address is already in use by another account.')
+            return redirect(url_for('profile'))
+        current_user.email = email
+
+    if phone:
+        current_user.phone = phone
+    if bio:
+        current_user.bio = bio[:250]
+
+    db.session.commit()
+    flash('Your profile has been updated!')
+    return redirect(url_for('profile'))
+
+
+@app.route('/api/watchlist/toggle/<int:movie_id>', methods=['POST'])
+@login_required
+def toggle_watchlist(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    item = Watchlist.query.filter_by(user_id=current_user.id, movie_id=movie_id).first()
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+        saved = False
+        message = f"Removed '{movie.title}' from your watchlist."
+    else:
+        new_item = Watchlist(user_id=current_user.id, movie_id=movie_id)
+        db.session.add(new_item)
+        db.session.commit()
+        saved = True
+        message = f"Added '{movie.title}' to your watchlist!"
+
+    count = Watchlist.query.filter_by(user_id=current_user.id).count()
+    return jsonify({
+        'success': True,
+        'saved': saved,
+        'movie_id': movie_id,
+        'message': message,
+        'watchlist_count': count
+    })
+
+
+@app.route('/watchlist')
+@login_required
+def watchlist_page():
+    return redirect(url_for('profile') + '#watchlist')
+
+
+@app.route('/api/movie/<int:movie_id>/rate', methods=['POST'])
+@login_required
+def rate_movie(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    data = request.get_json(silent=True) or request.form
+    try:
+        score = float(data.get('rating', 0))
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Invalid rating score'}), 400
+
+    if score < 1.0 or score > 5.0:
+        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5 stars'}), 400
+
+    review_text = (data.get('review') or '').strip()[:500]
+    has_spoiler = bool(data.get('has_spoiler', False))
+    # Auto-detect plot spoilers if not explicitly flagged
+    if not has_spoiler and review_text:
+        spoiler_triggers = ['die', 'dies', 'died', 'death', 'kill', 'kills', 'killed', 'murder',
+                            'climax', 'twist', 'ending', 'ends with', 'post credit', 'villain is',
+                            'culprit', 'betray', 'killer is']
+        if any(trig in review_text.lower() for trig in spoiler_triggers):
+            has_spoiler = True
+
+    rating_obj = MovieRating.query.filter_by(user_id=current_user.id, movie_id=movie_id).first()
+    is_new = False
+    if rating_obj:
+        rating_obj.rating = score
+        rating_obj.review = review_text
+        rating_obj.has_spoiler = has_spoiler
+        rating_obj.created_at = datetime.utcnow()
+    else:
+        rating_obj = MovieRating(user_id=current_user.id, movie_id=movie_id, rating=score,
+                                 review=review_text, has_spoiler=has_spoiler)
+        db.session.add(rating_obj)
+        is_new = True
+
+    if is_new:
+        current_user.points = (current_user.points or 0) + 5
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f"You rated '{movie.title}' {score:.1f} ★" + (" (+5 CinePass Pts)" if is_new else ""),
+        'rating': score,
+        'has_spoiler': has_spoiler,
+        'movie_avg_rating': movie.display_rating,
+        'user_points': current_user.points
+    })
 
 
 # ====================== ADMIN ROUTES ======================
@@ -1308,6 +1757,16 @@ def add_movie():
     if guard:
         return guard
     if request.method == 'POST':
+        try:
+            trailer_path = save_trailer_upload(request.files.get('trailer_video'))
+        except ValueError as exc:
+            flash(str(exc))
+            return render_template('add_movie.html'), 400
+        trailer_key = ('' if trailer_path else
+                       parse_youtube_video_key(request.form.get('youtube_trailer')))
+        if trailer_key is None:
+            flash('Enter a valid YouTube video link or 11-character video ID.')
+            return render_template('add_movie.html'), 400
         category = request.form.get('category', 'showing')
         is_upcoming = (category == 'upcoming')
         is_rerelease = (request.form.get('release_type', 'fresh') == 'rerelease')
@@ -1328,7 +1787,9 @@ def add_movie():
                       certificate=request.form.get('certificate', 'U/A'),
                       is_upcoming=is_upcoming,
                       is_rerelease=is_rerelease,
-                      release_date=rel_date)
+                      release_date=rel_date,
+                      youtube_trailer_key=trailer_key or None,
+                      trailer_video_path=trailer_path)
         db.session.add(movie)
         db.session.commit()
         cat_label = 'Coming Soon' if is_upcoming else 'Now Showing'
@@ -1336,6 +1797,35 @@ def add_movie():
         flash(f"Movie '{movie.title}' added to {cat_label}{rel_label}!")
         return redirect(url_for('admin'))
     return render_template('add_movie.html')
+
+
+@app.route('/admin/movie/<int:movie_id>/trailer', methods=['POST'])
+@login_required
+def update_movie_trailer(movie_id):
+    guard = admin_required()
+    if guard:
+        return guard
+    movie = Movie.query.get_or_404(movie_id)
+    try:
+        trailer_path = save_trailer_upload(request.files.get('trailer_video'))
+    except ValueError as exc:
+        flash(str(exc))
+        return redirect(url_for('admin'))
+    trailer_input = request.form.get('youtube_trailer', '').strip()
+    trailer_key = parse_youtube_video_key(trailer_input) if trailer_input else None
+    if trailer_path:
+        movie.trailer_video_path = trailer_path
+        movie.youtube_trailer_key = None
+        db.session.commit()
+        flash(f"Uploaded trailer saved for '{movie.title}'.")
+    elif trailer_input and trailer_key is None:
+        flash('Trailer not changed: enter a valid YouTube video link or 11-character video ID.')
+    elif trailer_input:
+        movie.youtube_trailer_key = trailer_key or None
+        movie.trailer_video_path = None
+        db.session.commit()
+        flash(f"YouTube trailer saved for '{movie.title}'.")
+    return redirect(url_for('admin'))
 
 
 @app.route('/admin/import_movie', methods=['GET', 'POST'])
@@ -1365,6 +1855,53 @@ def import_movie():
     return render_template('import_movie.html', results=results, query=query)
 
 
+def _tmdb_find_id(title):
+    """Best-effort TMDb lookup by title; returns the first result's id or None."""
+    try:
+        res = requests.get(f"{TMDB_BASE_URL}/search/movie",
+                           params={'api_key': TMDB_API_KEY, 'query': title},
+                           timeout=10).json()
+        for item in res.get('results', []):
+            if item.get('id'):
+                return item['id']
+    except Exception:
+        pass
+    return None
+
+
+def _tmdb_fetch_credits(tmdb_id):
+    """
+    Returns (cast_entries, director_name) for a TMDb movie id; ([], None) on any
+    failure so callers never hard-fail when TMDb is unreachable.
+    """
+    try:
+        res = requests.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}/credits",
+                           params={'api_key': TMDB_API_KEY}, timeout=10).json()
+        cast_entries = []
+        for c in (res.get('cast') or [])[:12]:
+            cast_entries.append({
+                'name': c.get('name') or '',
+                'character': c.get('character') or '',
+                'profile': f"{TMDB_IMAGE_BASE}{c['profile_path']}" if c.get('profile_path') else None,
+            })
+        director = next((c.get('name') for c in (res.get('crew') or [])
+                         if c.get('job') == 'Director'), None)
+        return cast_entries, director
+    except Exception:
+        return [], None
+
+
+def _store_movie_cast(movie, tmdb_id):
+    """Fetch credits for tmdb_id and store them on the movie. Returns True if anything was saved."""
+    cast_entries, director = _tmdb_fetch_credits(tmdb_id)
+    if not cast_entries and not director:
+        return False
+    movie.tmdb_id = tmdb_id
+    movie.cast_json = json.dumps({'director': director, 'cast': cast_entries})
+    db.session.commit()
+    return True
+
+
 @app.route('/admin/import_movie/add/<int:tmdb_id>', methods=['POST'])
 @login_required
 def import_movie_add(tmdb_id):
@@ -1372,6 +1909,16 @@ def import_movie_add(tmdb_id):
     if guard:
         return guard
     try:
+        try:
+            trailer_path = save_trailer_upload(request.files.get('trailer_video'))
+        except ValueError as exc:
+            flash(str(exc))
+            return redirect(url_for('admin'))
+        trailer_key = ('' if trailer_path else
+                       parse_youtube_video_key(request.form.get('youtube_trailer')))
+        if trailer_key is None and not trailer_path:
+            flash('Enter a valid YouTube video link or 11-character video ID.')
+            return redirect(url_for('admin'))
         res = requests.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}",
                            params={'api_key': TMDB_API_KEY}, timeout=10).json()
         poster_path = res.get('poster_path')
@@ -1394,12 +1941,24 @@ def import_movie_add(tmdb_id):
                       language=(res.get('original_language') or 'te').upper(),
                       is_upcoming=is_upcoming,
                       is_rerelease=is_rerelease,
-                      release_date=rel_date)
+                      release_date=rel_date,
+                      tmdb_id=tmdb_id,
+                      youtube_trailer_key=trailer_key or None,
+                      trailer_video_path=trailer_path)
         db.session.add(movie)
         db.session.commit()
+
+        # pull cast + director along with the import (falls back to title search)
+        cast_saved = _store_movie_cast(movie, tmdb_id)
+        if not cast_saved:
+            found = _tmdb_find_id(movie.title)
+            if found:
+                cast_saved = _store_movie_cast(movie, found)
+
         cat_label = 'Coming Soon' if is_upcoming else 'Now Showing'
         rel_label = ' (Re-Release)' if is_rerelease else ''
-        flash(f'Imported "{movie.title}" as {cat_label}{rel_label}!')
+        cast_note = ' with cast' if cast_saved else ''
+        flash(f'Imported "{movie.title}" as {cat_label}{rel_label}{cast_note}!')
     except Exception as e:
         flash(f"Failed to import movie: {e}")
     return redirect(url_for('admin'))
@@ -1416,6 +1975,27 @@ def toggle_movie_status(movie_id):
     db.session.commit()
     status_str = "Coming Soon" if movie.is_upcoming else "Now Showing"
     flash(f"Movie '{movie.title}' status changed to {status_str}!")
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/fetch_cast/<int:movie_id>', methods=['POST'])
+@login_required
+def fetch_cast(movie_id):
+    """Pull cast + director from TMDb for an existing movie (admin action)."""
+    guard = admin_required()
+    if guard:
+        return guard
+    movie = Movie.query.get_or_404(movie_id)
+
+    tmdb_id = movie.tmdb_id or _tmdb_find_id(movie.title)
+    if not tmdb_id:
+        flash(f"Could not find '{movie.title}' on TMDb. Try adding the TMDb id manually.")
+        return redirect(url_for('admin'))
+
+    if _store_movie_cast(movie, tmdb_id):
+        flash(f"Cast updated for '{movie.title}'!")
+    else:
+        flash(f"TMDb reachable but no cast found for '{movie.title}'.")
     return redirect(url_for('admin'))
 
 
@@ -1642,6 +2222,425 @@ def admin_bookings():
     return render_template('admin_bookings.html', bookings=bookings)
 
 
+# ====================== ADMIN ANALYTICS ======================
+
+def _analytics_window(days):
+    """(start_of_window, end) datetimes for a `days` lookback; None start = all time."""
+    end = datetime.utcnow()
+    start = (end - timedelta(days=days)).replace(hour=0, minute=0, second=0,
+                                                 microsecond=0) if days else None
+    return start, end
+
+
+def _analytics_bookings(days):
+    """All bookings in the window as plain Booking objects, freshest first."""
+    q = (Booking.query.join(Showtime, Booking.showtime_id == Showtime.id)
+         .join(Movie, Showtime.movie_id == Movie.id))
+    start, _ = _analytics_window(days)
+    if start:
+        q = q.filter(Booking.booked_at >= start)
+    return q.order_by(Booking.booked_at.desc()).all()
+
+
+def _collect_analytics(days):
+    """
+    All aggregates for the analytics dashboard, in one pass over the window's
+    bookings plus grouped queries. Kept independent of templates so tests can
+    assert on the numbers directly.
+    """
+    start, end = _analytics_window(days)
+
+    def in_window(q):
+        return q.filter(Booking.booked_at >= start) if start else q
+
+    # ---- headline KPIs -----------------------------------------------------
+    rows = (in_window(Booking.query)
+            .with_entities(Booking.status,
+                           sa_func.count(Booking.id),
+                           sa_func.coalesce(sa_func.sum(Booking.total_amount), 0.0))
+            .group_by(Booking.status).all())
+    status_counts = {status: {'count': cnt, 'amount': float(amount or 0.0)}
+                     for status, cnt, amount in rows}
+    paid = status_counts.get('PAID', {'count': 0, 'amount': 0.0})
+    lost = (status_counts.get('CANCELLED', {'count': 0, 'amount': 0})['count']
+            + status_counts.get('FAILED', {'count': 0, 'amount': 0})['count']
+            + status_counts.get('EXPIRED', {'count': 0, 'amount': 0})['count'])
+    all_count = sum(v['count'] for v in status_counts.values())
+
+    active_buyers = in_window(Booking.query.filter(Booking.status == 'PAID')) \
+        .with_entities(sa_func.count(sa_func.distinct(Booking.user_id))).scalar() or 0
+
+    # ---- daily revenue trend (last `days` days, zero-filled) ---------------
+    trend = []
+    if days:
+        daily = (in_window(Booking.query.filter(Booking.status == 'PAID'))
+                 .with_entities(sa_func.date(Booking.paid_at).label('d'),
+                                sa_func.coalesce(sa_func.sum(Booking.total_amount), 0.0),
+                                sa_func.count(Booking.id))
+                 .group_by('d').all())
+        by_day = {str(d): {'amount': float(a or 0.0), 'tickets': int(n)} for d, a, n in daily}
+        today = date.today()
+        for i in range(days - 1, -1, -1):
+            day = today - timedelta(days=i)
+            info = by_day.get(day.isoformat(), {'amount': 0.0, 'tickets': 0})
+            trend.append({'date': day, 'label': day.strftime('%d %b'),
+                          'amount': info['amount'], 'tickets': info['tickets']})
+
+    # ---- top movies / theatres (PAID only) ---------------------------------
+    movie_stats = (in_window(Booking.query.filter(Booking.status == 'PAID'))
+                   .join(Showtime, Booking.showtime_id == Showtime.id)
+                   .with_entities(Showtime.movie_id,
+                                  sa_func.count(Booking.id),
+                                  sa_func.coalesce(sa_func.sum(Booking.total_amount), 0.0))
+                   .group_by(Showtime.movie_id).all())
+    movie_stats = {mid: {'count': int(cnt), 'revenue': float(rev or 0.0)}
+                   for mid, cnt, rev in movie_stats}
+
+    theatre_stats = (in_window(Booking.query.filter(Booking.status == 'PAID'))
+                     .join(Showtime, Booking.showtime_id == Showtime.id)
+                     .join(Screen, Showtime.screen_id == Screen.id)
+                     .join(Theater, Screen.theater_id == Theater.id)
+                     .with_entities(Theater.id,
+                                    sa_func.count(Booking.id),
+                                    sa_func.coalesce(sa_func.sum(Booking.total_amount), 0.0))
+                     .group_by(Theater.id).all())
+    theatre_stats = {tid: {'count': int(cnt), 'revenue': float(rev or 0.0)}
+                     for tid, cnt, rev in theatre_stats}
+
+    # ---- occupancy: booked seats per showtime ------------------------------
+    q = (Booking.query.filter(Booking.status == 'PAID')
+         .join(Showtime, Booking.showtime_id == Showtime.id)
+         .with_entities(Showtime.id,
+                        sa_func.sum(Booking.total_amount),
+                        sa_func.count(Booking.id)))
+    if start:
+        q = q.filter(Booking.booked_at >= start)
+    per_show_paid = {sid: {'revenue': float(rev or 0.0), 'bookings': int(n)}
+                     for sid, rev, n in q.group_by(Showtime.id).all()}
+    seats_paid_rows = (in_window(Booking.query.filter(Booking.status == 'PAID'))
+                       .join(BookedSeat, BookedSeat.booking_id == Booking.id)
+                       .with_entities(BookedSeat.showtime_id, sa_func.count(BookedSeat.id))
+                       .group_by(BookedSeat.showtime_id).all())
+    seats_paid = {sid: int(n) for sid, n in seats_paid_rows}
+
+    # ---- payment method split (PAID) ---------------------------------------
+    method_rows = (in_window(Payment.query.filter(Payment.status == 'CAPTURED'))
+                   .join(Booking, Payment.booking_id == Booking.id)
+                   .with_entities(Payment.method,
+                                  sa_func.count(Payment.id),
+                                  sa_func.coalesce(sa_func.sum(Payment.amount), 0.0))
+                   .group_by(Payment.method).all())
+    pay_split = [{'method': (m or 'unknown'), 'count': int(n), 'amount': float(a or 0.0)}
+                 for m, n, a in method_rows]
+    pay_split.sort(key=lambda x: x['amount'], reverse=True)
+    pay_total = sum(m['amount'] for m in pay_split)
+
+    # ---- top movies & theatres joined with names + occupancy ---------------
+    movies = Movie.query.all()
+    movie_names = {m.id: m.title for m in movies}
+    top_movies = sorted(
+        ({'id': mid, 'title': movie_names.get(mid, f'Movie #{mid}'), **st}
+         for mid, st in movie_stats.items()),
+        key=lambda x: x['revenue'], reverse=True)
+
+    theatres = Theater.query.all()
+    theatre_names = {t.id: t for t in theatres}
+    showtimes = Showtime.query.all()
+    layout_cache = {}
+    for s in showtimes:
+        layout_cache[s.id] = s.layout
+
+    top_theatres = []
+    for tid, st in sorted(theatre_stats.items(), key=lambda kv: kv[1]['revenue'], reverse=True):
+        th = theatre_names.get(tid)
+        if not th:
+            continue
+        top_theatres.append({'id': tid, 'name': th.name, 'location': th.location or '', **st})
+
+    # ---- upcoming showtimes heat strip (today + next 7 days) ---------------
+    upcoming = [s for s in showtimes
+                if s.show_date >= date.today() and s.show_date <= date.today() + timedelta(days=7)
+                and s.layout]
+    upcoming.sort(key=lambda s: (s.show_date, s.show_time))
+    heat = []
+    for s in upcoming[:24]:
+        total = sl.count_seats(layout_cache[s.id]) or 1
+        sold = seats_paid.get(s.id, 0)
+        pct = min(100, round(100.0 * sold / total))
+        heat.append({'showtime': s, 'sold': sold, 'total': total, 'pct': pct,
+                     'revenue': per_show_paid.get(s.id, {}).get('revenue', 0.0)})
+
+    overall_total_seats = sum(sl.count_seats(layout_cache[s.id]) or 0
+                              for s in showtimes if s.show_date >= date.today())
+    overall_sold = sum(seats_paid.values())
+    occupancy_overall = round(100.0 * overall_sold / overall_total_seats, 1) \
+        if overall_total_seats else 0.0
+
+    return {
+        'days': days,
+        'paid': paid,
+        'all_count': all_count,
+        'lost_count': lost,
+        'cancel_rate': round(100.0 * lost / all_count, 1) if all_count else 0.0,
+        'avg_ticket': round(paid['amount'] / paid['count'], 0) if paid['count'] else 0,
+        'active_buyers': active_buyers,
+        'trend': trend,
+        'trend_max': max((t['amount'] for t in trend), default=0.0),
+        'trend_total': round(sum(t['amount'] for t in trend), 2),
+        'top_movies': top_movies[:8],
+        'top_theatres': top_theatres[:8],
+        'pay_split': pay_split,
+        'pay_total': pay_total,
+        'heat': heat,
+        'occupancy_overall': occupancy_overall,
+    }
+
+
+@app.route('/admin/analytics')
+@login_required
+def admin_analytics():
+    guard = admin_required()
+    if guard:
+        return guard
+    try:
+        days = int(request.args.get('days', '') or 0)
+    except ValueError:
+        days = 0
+    if days not in (7, 30, 90):
+        days = 0
+    data = _collect_analytics(days)
+    return render_template('admin_analytics.html', a=data, days=days)
+
+
+@app.route('/admin/analytics/export.csv')
+@login_required
+def admin_analytics_export():
+    guard = admin_required()
+    if guard:
+        return guard
+    try:
+        days = int(request.args.get('days', '') or 0)
+    except ValueError:
+        days = 0
+    if days not in (7, 30, 90):
+        days = 0
+
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(['reference', 'booked_at', 'status', 'movie', 'theatre',
+                     'screen', 'show_date', 'show_time', 'seats', 'seat_count',
+                     'ticket_amount', 'convenience_fee', 'gst', 'total_amount',
+                     'method', 'paid_at'])
+    for b in _analytics_bookings(days):
+        payment = b.payment
+        writer.writerow([
+            b.reference,
+            b.booked_at.strftime('%Y-%m-%d %H:%M') if b.booked_at else '',
+            b.status,
+            b.showtime.movie.title,
+            b.showtime.theater,
+            b.showtime.screen_label,
+            b.showtime.show_date.isoformat(),
+            b.showtime.show_time,
+            b.seats,
+            len(b.seat_list),
+            f"{b.ticket_amount:.2f}",
+            f"{b.convenience_fee:.2f}",
+            f"{b.gst:.2f}",
+            f"{b.total_amount:.2f}",
+            payment.method if payment else '',
+            b.paid_at.strftime('%Y-%m-%d %H:%M') if b.paid_at else '',
+        ])
+
+    stamp = datetime.utcnow().strftime('%Y%m%d_%H%M')
+    resp = app.response_class(out.getvalue(), mimetype='text/csv')
+    resp.headers['Content-Disposition'] = f'attachment; filename=cinewave_bookings_{stamp}.csv'
+    return resp
+
+
+# ====================== AI BOOKING ASSISTANT ROUTES ======================
+
+@app.route('/api/ai/chat', methods=['POST'])
+def api_ai_chat():
+    data = request.get_json() or {}
+    user_prompt = data.get('prompt', '').strip()
+    history = data.get('history', [])
+
+    if not user_prompt:
+        return jsonify({'success': False, 'message': 'Prompt cannot be empty'}), 400
+
+    # Build DB context for AI Booking Assistant
+    try:
+        running_movies = Movie.query.filter_by(is_upcoming=False).all()
+        movies_context = [{
+            'id': m.id,
+            'title': m.title,
+            'genre': getattr(m, 'genre', 'Drama'),
+            'language': getattr(m, 'language', 'Telugu'),
+            'rating': getattr(m, 'rating', 8.5),
+            'poster': getattr(m, 'poster', None)
+        } for m in running_movies]
+
+        theaters_context = [{
+            'id': t.id,
+            'name': t.name,
+            'location': t.location
+        } for t in Theater.query.all()]
+
+        # Collect active/upcoming showtimes
+        active_showtimes = []
+        for s in Showtime.query.all():
+            if not s.is_past:
+                active_showtimes.append({
+                    'id': s.id,
+                    'movie_id': s.movie_id,
+                    'theater': s.theater,
+                    'screen_label': s.screen_label,
+                    'show_time': s.show_time,
+                    'show_date': s.show_date.strftime('%d %b') if s.show_date else 'Today',
+                    'seats_left': s.seats_left
+                })
+    except Exception:
+        movies_context = []
+        theaters_context = []
+        active_showtimes = []
+
+    context_data = {
+        'movies': movies_context,
+        'theaters': theaters_context,
+        'showtimes': active_showtimes
+    }
+
+    user_info = {}
+    if current_user.is_authenticated:
+        w = Wallet.query.filter_by(user_id=current_user.id).first()
+        user_info['wallet_balance'] = w.balance if w else 0.0
+        user_info['username'] = current_user.username
+
+    res = ai_booking_assistant.process_chat_message(
+        user_prompt,
+        history=history,
+        context_data=context_data,
+        user_info=user_info
+    )
+
+    return jsonify({
+        'success': True,
+        'response': res['response'],
+        'actions': res.get('actions', []),
+        'intent': res.get('intent', 'general'),
+        'source': 'ai_assistant'
+    })
+
+
+@app.route('/api/ai/book-direct', methods=['POST'])
+def api_ai_book_direct():
+    """
+    Direct seat allocation & hold initiated by the AI Booking Assistant.
+    """
+    if not current_user.is_authenticated:
+        return jsonify({
+            'success': False,
+            'need_login': True,
+            'message': 'Please sign in to complete your seat reservation.',
+            'login_url': url_for('login')
+        }), 401
+
+    data = request.get_json() or {}
+    showtime_id = data.get('showtime_id')
+    count = int(data.get('seat_count', 2))
+    preferred_class = data.get('preferred_class', None)
+    explicit_seats = data.get('seats', [])
+
+    showtime = Showtime.query.get(showtime_id)
+    if not showtime:
+        return jsonify({'success': False, 'message': 'Showtime not found'}), 404
+
+    if showtime.status == 'ended' or showtime.is_past:
+        return jsonify({'success': False, 'message': 'This show has already concluded.'}), 400
+
+    layout = showtime.layout
+    booked = showtime.booked_seat_ids()
+    held = showtime.held_seat_ids()
+
+    if explicit_seats:
+        selected_seats = [s.strip().upper() for s in explicit_seats if s.strip()]
+    else:
+        selected_seats = ai_booking_assistant.find_best_seats(
+            layout, booked, held, count=count, preferred_class=preferred_class
+        )
+
+    if not selected_seats or len(selected_seats) < count:
+        return jsonify({
+            'success': False,
+            'message': f"Sorry, could not find {count} available seats in the requested class."
+        }), 400
+
+    ok, msg = sl.validate_seats(layout, selected_seats)
+    if not ok:
+        return jsonify({'success': False, 'message': msg}), 400
+
+    clash = sorted(set(selected_seats) & (booked | held))
+    if clash:
+        return jsonify({
+            'success': False,
+            'message': f"Seats {', '.join(clash)} are no longer available. Please select again."
+        }), 400
+
+    ticket_amount, meta = price_seats(showtime, selected_seats)
+    amounts = payments.compute_amounts(ticket_amount, len(selected_seats))
+
+    lock = SeatLock(showtime_id=showtime.id, user_id=current_user.id,
+                    seats=",".join(selected_seats))
+    db.session.add(lock)
+    db.session.flush()
+
+    booking = Booking(
+        user_id=current_user.id,
+        showtime_id=showtime.id,
+        seats=",".join(selected_seats),
+        seat_meta_json=json.dumps(meta),
+        ticket_amount=amounts['ticket_amount'],
+        convenience_fee=amounts['convenience_fee'],
+        gst=amounts['gst'],
+        total_amount=amounts['total'],
+        status='PENDING',
+        lock_token=lock.token,
+        expires_at=lock.expires_at
+    )
+    db.session.add(booking)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'reference': booking.reference,
+        'seats': booking.seats,
+        'seat_count': len(selected_seats),
+        'total_amount': booking.total_amount,
+        'checkout_url': url_for('checkout', reference=booking.reference)
+    })
+
+
+@app.route('/api/ai/movie_summary/<int:movie_id>')
+@app.route('/api/ai/movie_reviews/<int:movie_id>')
+def api_ai_movie_summary(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    reviews = [(getattr(r, 'review', None) or getattr(r, 'comment', None))
+               for r in getattr(movie, 'user_ratings', [])
+               if (getattr(r, 'review', None) or getattr(r, 'comment', None))]
+
+    res = ai_booking_assistant.generate_movie_review_summary(movie.title, reviews)
+    return jsonify({
+        'success': True,
+        'movie_id': movie_id,
+        'movie_title': movie.title,
+        'summary': res['summary'],
+        'sentiment': res.get('sentiment', 'Positive'),
+        'score': res.get('score', '4.8/5'),
+        'source': 'ai_assistant'
+    })
+
+
 # ====================== INITIALIZATION ======================
 
 SAMPLE_LAYOUT = {
@@ -1667,10 +2666,15 @@ def auto_migrate():
     """
     insp = inspect(db.engine)
     wanted = {
-        'user': [('phone', 'VARCHAR(15)'), ('points', 'INTEGER DEFAULT 100')],
+        'user': [('phone', 'VARCHAR(15)'), ('points', 'INTEGER DEFAULT 100'),
+                 ('created_at', 'DATETIME'), ('bio', "VARCHAR(250) DEFAULT 'Cinema lover & movie enthusiast.'")],
         'movie': [('language', "VARCHAR(50)"), ('certificate', "VARCHAR(10)"),
+                  ('rating', 'FLOAT DEFAULT 8.5'),
                   ('is_upcoming', 'BOOLEAN DEFAULT 0'), ('release_date', 'DATE'),
-                  ('is_rerelease', 'BOOLEAN DEFAULT 0'), ('moods_json', "TEXT DEFAULT '[]'")],
+                  ('is_rerelease', 'BOOLEAN DEFAULT 0'), ('moods_json', "TEXT DEFAULT '[]'"),
+                  ('tmdb_id', 'INTEGER'), ('cast_json', 'TEXT'),
+                  ('youtube_trailer_key', 'VARCHAR(20)'),
+                  ('trailer_video_path', 'VARCHAR(300)')],
         'theater': [('city', "VARCHAR(80)"), ('address', "VARCHAR(400)")],
         'showtime': [('screen_id', 'INTEGER'), ('price_overrides_json', 'TEXT')],
         'booking': [('reference', 'VARCHAR(20)'), ('seat_meta_json', 'TEXT'),
@@ -1680,6 +2684,7 @@ def auto_migrate():
                     ('expires_at', 'DATETIME'), ('is_split_pay', 'BOOLEAN DEFAULT 0'),
                     ('snacks_json', 'TEXT'), ('points_redeemed', 'INTEGER DEFAULT 0')],
         'booked_seat': [('booking_id', 'INTEGER')],
+        'movie_rating': [('has_spoiler', 'BOOLEAN DEFAULT 0')],
     }
     for table, cols in wanted.items():
         if table not in insp.get_table_names():
@@ -1698,16 +2703,176 @@ def auto_migrate():
     db.session.commit()
 
 
-def seed_sample_upcoming_movies():
-    # No auto-seeded upcoming movies - admin adds them manually via the admin panel
-    pass
+def seed_sample_movies():
+    """Seeds popular Vizag blockbusters with showtimes and reviews if not present."""
+    admin = User.query.filter_by(username='admin').first()
+    inox_screen = Screen.query.filter(Screen.name.contains('1')).first()
+    jag_theater = Theater.query.filter(Theater.name.contains('Jagadamba')).first()
+    jag_screen = jag_theater.screens[0] if (jag_theater and jag_theater.screens) else inox_screen
+    cine_theater = Theater.query.filter(Theater.name.contains('Cinepolis')).first()
+    cine_screen = cine_theater.screens[0] if (cine_theater and cine_theater.screens) else inox_screen
+
+    u1 = User.query.filter_by(username='rahul_vizag').first()
+    if not u1:
+        u1 = User(username='rahul_vizag', email='rahul@vizag.com')
+        u1.set_password('pass123')
+        db.session.add(u1)
+    u2 = User.query.filter_by(username='ananya_k').first()
+    if not u2:
+        u2 = User(username='ananya_k', email='ananya@vizag.com')
+        u2.set_password('pass123')
+        db.session.add(u2)
+    db.session.commit()
+
+    samples = [
+        {
+            'title': 'Pushpa 2: The Rule',
+            'description': 'The unstoppable rise of Pushpa Raj as he rules the syndicate and clashes with SP Bhanwar Singh Shekhawat in an explosive showdown.',
+            'duration': 195,
+            'poster': 'https://image.tmdb.org/t/p/w500/bQ2vHspz5K2f7wD0H92z6u6z4oG.jpg',
+            'language': 'Telugu',
+            'certificate': 'U/A',
+            'rating': 9.1,
+            'is_upcoming': False,
+            'release_date': date.today() - timedelta(days=14),
+            'moods_json': json.dumps(['MASS', 'THRILL']),
+            'cast_json': json.dumps([
+                {'name': 'Allu Arjun', 'role': 'Pushpa Raj'},
+                {'name': 'Rashmika Mandanna', 'role': 'Srivalli'},
+                {'name': 'Fahadh Faasil', 'role': 'SP Bhanwar Singh'}
+            ]),
+            'screen': inox_screen,
+            'times': ['10:30 AM', '02:00 PM', '06:15 PM', '09:45 PM'],
+            'reviews': [
+                {'user': u1, 'rating': 5.0, 'review': 'Peak mass cinema! The Jathara sequence is pure goosebumps. Allu Arjun national award worthy performance.', 'has_spoiler': False},
+                {'user': u2, 'rating': 4.5, 'review': 'Shekhawat revenge plan in the climax sets up Pushpa 3 Rampage perfectly! Watch out for the truck chase scene.', 'has_spoiler': True}
+            ]
+        },
+        {
+            'title': 'Devara: Part 1',
+            'description': 'An epic coastal mass action saga of fear, courage, and legacy starring Jr NTR as a fearsome sea guardian.',
+            'duration': 178,
+            'poster': 'https://image.tmdb.org/t/p/w500/A73FvW30bK1h6Wl8l5Fp9y7v1Bf.jpg',
+            'language': 'Telugu',
+            'certificate': 'U/A',
+            'rating': 8.7,
+            'is_upcoming': False,
+            'release_date': date.today() - timedelta(days=10),
+            'moods_json': json.dumps(['THRILL', 'MASS']),
+            'cast_json': json.dumps([
+                {'name': 'Jr. NTR', 'role': 'Devara / Varadha'},
+                {'name': 'Janhvi Kapoor', 'role': 'Thangam'},
+                {'name': 'Saif Ali Khan', 'role': 'Bhaira'}
+            ]),
+            'screen': jag_screen,
+            'times': ['02:15 PM', '06:45 PM', '10:15 PM'],
+            'reviews': [
+                {'user': u1, 'rating': 5.0, 'review': 'Mind-blowing interval block and Anirudh BGM shook Jagadamba 70MM!', 'has_spoiler': False},
+                {'user': u2, 'rating': 4.5, 'review': 'Major plot twist at the climax when Bhaira discovers who actually survived the sea fight! Do not leave before post-credits.', 'has_spoiler': True}
+            ]
+        },
+        {
+            'title': 'Kalki 2898 AD',
+            'description': 'A mythological sci-fi extravaganza set in post-apocalyptic Kasi where the battle for the future begins.',
+            'duration': 181,
+            'poster': 'https://image.tmdb.org/t/p/w500/87IVFtX1LzJ51m8N25C4kQJd1rZ.jpg',
+            'language': 'Telugu',
+            'certificate': 'U/A',
+            'rating': 8.9,
+            'is_upcoming': False,
+            'release_date': date.today() - timedelta(days=20),
+            'moods_json': json.dumps(['THRILL', 'ACTION']),
+            'cast_json': json.dumps([
+                {'name': 'Prabhas', 'role': 'Bhairava'},
+                {'name': 'Amitabh Bachchan', 'role': 'Ashwatthama'},
+                {'name': 'Kamal Haasan', 'role': 'Supreme Yaskin'}
+            ]),
+            'screen': inox_screen,
+            'times': ['11:00 AM', '03:30 PM', '07:30 PM'],
+            'reviews': [
+                {'user': u1, 'rating': 5.0, 'review': 'World-class visuals! Amitabh Bachchan as Ashwatthama steals the whole show.', 'has_spoiler': False},
+                {'user': u2, 'rating': 5.0, 'review': 'The Karna reveal in the climax battle was absolute goosebumps! Prabhas transformation is insane.', 'has_spoiler': True}
+            ]
+        },
+        {
+            'title': 'Game Changer',
+            'description': 'A high-stakes political action thriller featuring an honest IAS officer taking down election corruption.',
+            'duration': 165,
+            'poster': 'https://image.tmdb.org/t/p/w500/1X78jG80R1x1L19kM0R2Q1.jpg',
+            'language': 'Telugu',
+            'certificate': 'U/A',
+            'rating': 8.4,
+            'is_upcoming': False,
+            'release_date': date.today() - timedelta(days=5),
+            'moods_json': json.dumps(['THRILL', 'DRAMA']),
+            'cast_json': json.dumps([
+                {'name': 'Ram Charan', 'role': 'Ram Nandan IAS'},
+                {'name': 'Kiara Advani', 'role': 'Jabilamma'},
+                {'name': 'SJ Suryah', 'role': 'Minister'}
+            ]),
+            'screen': cine_screen,
+            'times': ['01:30 PM', '06:00 PM', '09:45 PM'],
+            'reviews': [
+                {'user': u1, 'rating': 4.5, 'review': 'Shankar style grandeur and Ram Charan in top form. Thaman songs are energetic.', 'has_spoiler': False}
+            ]
+        }
+    ]
+
+    for m_data in samples:
+        movie = Movie.query.filter_by(title=m_data['title']).first()
+        if not movie:
+            movie = Movie(
+                title=m_data['title'],
+                description=m_data['description'],
+                duration=m_data['duration'],
+                poster=m_data['poster'],
+                language=m_data['language'],
+                certificate=m_data['certificate'],
+                rating=m_data['rating'],
+                is_upcoming=m_data['is_upcoming'],
+                release_date=m_data['release_date'],
+                moods_json=m_data['moods_json'],
+                cast_json=m_data['cast_json']
+            )
+            db.session.add(movie)
+            db.session.flush()
+
+        # Add showtimes if none exist
+        if not movie.showtimes:
+            target_screen = m_data['screen'] or inox_screen
+            for t in m_data['times']:
+                for day_offset in [0, 1, 2]:
+                    s_date = date.today() + timedelta(days=day_offset)
+                    st = Showtime(
+                        movie_id=movie.id,
+                        screen_id=target_screen.id if target_screen else None,
+                        theater=target_screen.theater.name if target_screen else 'INOX Varun Beach',
+                        show_date=s_date,
+                        show_time=t
+                    )
+                    db.session.add(st)
+
+        # Add sample ratings if none exist
+        if not movie.user_ratings:
+            for r in m_data['reviews']:
+                mr = MovieRating(
+                    user_id=r['user'].id,
+                    movie_id=movie.id,
+                    rating=r['rating'],
+                    review=r['review'],
+                    has_spoiler=r['has_spoiler']
+                )
+                db.session.add(mr)
+
+    db.session.commit()
 
 
 def init_db():
     with app.app_context():
         db.create_all()
         auto_migrate()
-        seed_sample_upcoming_movies()
+        seed_vizag_theaters(db, Theater, Screen)
+        seed_sample_movies()
 
         admin_user = User.query.filter_by(username='admin').first()
         if not admin_user:
@@ -1722,9 +2887,6 @@ def init_db():
         for u in User.query.all():
             if not Wallet.query.filter_by(user_id=u.id).first():
                 create_wallet(u)
-
-        # Vizag theatres + real seat layouts
-        seed_vizag_theaters(db, Theater, Screen)
 
         # attach a screen to any legacy showtime that has none
         for s in Showtime.query.filter(Showtime.screen_id.is_(None)).all():

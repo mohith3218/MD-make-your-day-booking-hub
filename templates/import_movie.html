@@ -18,7 +18,7 @@
 
     {% with messages = get_flashed_messages() %}
       {% if messages %}
-        <div class="p-3 rounded-xl bg-[#FF2E63]/10 border border-[#FF2E63]/30 text-[#FF2E63] text-xs">
+        <div class="p-3 rounded-xl bg-[#C9A84C]/10 border border-[#C9A84C]/30 text-[#C9A84C] text-xs">
           {{ messages[0] }}
         </div>
       {% endif %}
@@ -26,8 +26,8 @@
 
     <div class="glass-card rounded-2xl p-4">
       <form method="POST" class="flex gap-3">
-        <input type="text" name="query" placeholder="Search movie title..." value="{{ query }}" required class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
-        <button type="submit" class="px-6 py-2.5 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition">
+        <input type="text" name="query" placeholder="Search movie title..." value="{{ query }}" required class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
+        <button type="submit" class="px-6 py-2.5 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition">
           Search
         </button>
       </form>
@@ -47,7 +47,7 @@
             <p class="text-xs text-slate-400 line-clamp-2">{{ r.overview }}</p>
           </div>
 
-          <form method="POST" action="{{ url_for('import_movie_add', tmdb_id=r.tmdb_id) }}" class="flex flex-col sm:flex-row items-center gap-2">
+          <form method="POST" enctype="multipart/form-data" action="{{ url_for('import_movie_add', tmdb_id=r.tmdb_id) }}" class="flex flex-col sm:flex-row items-center gap-2">
             <select name="category" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
               <option value="showing">🎬 Now Showing</option>
               <option value="upcoming">🗓️ Coming Soon</option>
@@ -57,6 +57,8 @@
               <option value="rerelease">🔁 Re-Release</option>
             </select>
             <input type="date" name="release_date" value="{{ r.release_date }}" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white">
+            <input type="text" name="youtube_trailer" placeholder="YouTube trailer link or ID (optional)" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white w-56">
+            <input type="file" name="trailer_video" accept="video/mp4,video/webm,.mp4,.webm" aria-label="Upload trailer video" class="bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-[10px] text-white w-56">
             <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition whitespace-nowrap">
               + Add Movie
             </button>

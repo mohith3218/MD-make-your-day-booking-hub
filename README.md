@@ -17,7 +17,7 @@ If you'd rather start clean, delete `instance/vizag_movies.db` and run again.
 Verify everything at once:
 
 ```bash
-python test_flow.py     # 13 checks: seat map, locks, wallet, gateway, refunds, expiry
+python test_flow.py     # 15 checks: seat map, locks, wallet, gateway, refunds, expiry, analytics, cast
 ```
 
 ## 2. Files
@@ -173,12 +173,16 @@ Three payment methods:
 | `GET /ticket/<reference>` + `/qr.png` | E-ticket and QR |
 | `GET /wallet`, `POST /wallet/recharge` | Wallet + recharge request |
 | `/admin/screens`, `/admin/add_screen`, `/admin/screen/<id>/layout` | Seating admin |
+| `/admin/analytics` | Analytics dashboard: KPIs, revenue trend, top movies/theatres, payment split, occupancy heat strip (`?days=7/30/90`, omit for all-time) |
+| `/admin/analytics/export.csv` | CSV download of every booking in the same window |
+| `POST /admin/fetch_cast/<movie_id>` | Pull cast + director from TMDb onto a movie (auto-done on TMDb import) |
 | `/admin/recharges`, `/admin/bookings`, `POST /admin/seed_vizag` | Admin tools |
 
 ## 6. Nice-to-haves if you want to keep going
 
 - Email/SMS the ticket after payment (Flask-Mail or Twilio)
+- Movie pages show cast & crew, fetched from TMDb on import (or via **Admin → Fetch cast**)
 - Cancellation with partial refund to wallet, before showtime
 - Food & beverage add-ons at checkout
 - Coupon codes applied before GST
-- Occupancy report per screen for the admin dashboard
+- Occupancy report per screen for the admin dashboard — **done, see `/admin/analytics`**

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What is OpenLLM? — Plain-English Explanation</title>
+<style>
+  :root{
+    --bg:#f6f7f9;
+    --surface:#ffffff;
+    --ink:#1b1f24;
+    --muted:#5b6470;
+    --line:#e3e6ea;
+    --accent:#1d6f9c;
+    --accent-soft:#e7f1f7;
+    --warn-bg:#fff7e6;
+    --warn-border:#f0c674;
+    --warn-ink:#7a5100;
+    --good:#1f7a45;
+    --shadow:0 1px 2px rgba(20,30,40,.06), 0 6px 18px rgba(20,30,40,.05);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:48px 28px 80px}
+  header{margin-bottom:34px}
+  h1{font-size:34px;line-height:1.15;margin:0 0 10px;letter-spacing:-.4px;font-weight:700}
+  .lede{font-size:18px;color:var(--muted);max-width:700px;margin:0 0 6px}
+  .hint{font-size:14px;color:var(--muted);border-left:3px solid var(--accent-soft);padding:6px 0 6px 14px;background:var(--accent-soft);border-radius:0 8px 8px 0;margin-top:14px}
+
+  section{margin-top:42px}
+  h2{font-size:22px;margin:0 0 6px;letter-spacing:-.3px;font-weight:650}
+  h2 .num{color:var(--accent);font-weight:600;margin-right:8px}
+  .sec-sub{color:var(--muted);font-size:15px;margin:0 0 18px}
+
+  /* Analogy card */
+  .analogy{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:22px 22px 20px;
+    margin-top:18px;
+  }
+  .analogy .plug-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:14px 0 6px}
+  .plug{width:64px;height:64px;flex:0 0 auto;border-radius:14px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:600;font-size:12px;color:#fff;line-height:1.25}
+  .plug.plug-a{background:linear-gradient(160deg,#1d6f9c,#165a82)}
+  .plug.plug-b{background:linear-gradient(160deg,#5b6b3a,#3d4a26)}
+  .plug.plug-c{background:linear-gradient(160deg,#7a5100,#5a3c00)}
+  .plug-arrow{color:var(--accent);font-size:20px;margin:0 2px}
+  .analogy .explain{font-size:15px;color:var(--ink);max-width:760px}
+  .analogy .explain b{color:var(--accent)}
+
+  /* flow */
+  .flow{
+    display:flex;
+    align-items:stretch;
+    gap:0;
+    margin-top:18px;
+    flex-wrap:wrap;
+  }
+  .flow .step{
+    flex:1 1 0;
+    min-width:120px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px 12px;
+    text-align:center;
+    box-shadow:var(--shadow);
+    position:relative;
+  }
+  .flow .step .ic{
+    width:42px;height:42px;margin:0 auto 8px;
+    border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;line-height:1;
+    color:#fff;
+  }
+  .flow .step .title{font-weight:650;font-size:14px;margin:0 0 3px}
+  .flow .step .desc{font-size:12.5px;color:var(--muted);margin:0;line-height:1.4}
+  .flow .arrow{
+    flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--accent);font-size:18px;padding:0 4px;
+    align-self:center;
+  }
+
+  /* two-column compare */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+  @media (max-width:680px){.cols{grid-template-columns:1fr}}
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:20px 20px 16px;
+  }
+  .card .tag{
+    display:inline-block;font-size:12px;font-weight:600;letter-spacing:.4px;
+    text-transform:uppercase;color:var(--accent);
+    background:var(--accent-soft);
+    padding:3px 10px;border-radius:999px;margin-bottom:10px;
+  }
+  .card h3{margin:0 0 6px;font-size:18px}
+  .card ul{margin:8px 0 0;padding:0;list-style:none}
+  .card li{padding:7px 0 7px 22px;border-bottom:1px dashed var(--line);position:relative;font-size:14px;line-height:1.45}
+  .card li:last-child{border-bottom:none}
+  .card li:before{
+    content:"";
+    position:absolute;left:0;top:11px;width:8px;height:8px;border-radius:2px;background:var(--accent);
+  }
+
+  /* uses list */
+  .uses{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:6px 6px 6px 22px;
+    margin-top:18px;
+    list-style:none;
+  }
+  .uses li{
+    padding:11px 6px;border-bottom:1px dashed var(--line);
+    font-size:15px;line-height:1.45;position:relative;
+  }
+  .uses li:last-child{border-bottom:none}
+  .uses li .title{display:block;font-weight:650;margin-bottom:2px}
+  .uses li .ex{color:var(--muted)}
+  @media (max-width:680px){.uses{padding-left:16px}}
+
+  /* glossary */
+  .gloss{
+    margin-top:30px;
+    border-top:1px solid var(--line);
+    padding-top:18px;
+  }
+  .gloss h3{font-size:15px;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .gloss dl{margin:0;columns:2;column-gap:28px}
+  @media (max-width:680px){.gloss dl{columns:1}}
+  .gloss dt{font-weight:650;font-size:14px;margin-top:10px;color:var(--ink)}
+  .gloss dd{margin:0 0 4px;font-size:13.5px;color:var(--muted);line-height:1.45}
+
+  .note{
+    margin-top:22px;
+    background:var(--warn-bg);
+    border:1px solid var(--warn-border);
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:13.5px;
+    color:var(--warn-ink);
+    line-height:1.5;
+  }
+  .note b{color:var(--warn-ink)}
+  footer{margin-top:38px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>What is OpenLLM, and what's it used for?</h1>
+    <p class="lede">A plain-English guide for someone who has never heard of an "LLM," an "API," or a "cloud endpoint" — built from how this project actually uses the term.</p>
+    <p class="hint">Short version: OpenLLM is two things at once — a way to run your own smart text engine behind the scenes, and a reusable name for the kind of plug this app uses to talk to one.</p>
+  </header>
+
+  <section>
+    <h2><span class="num">1.</span>The one-sentence idea, with an everyday picture</h2>
+    <p class="sec-sub">Think of it like a <b>universal plug adapter for smart text engines</b>.</p>
+
+    <div class="analogy">
+      <div class="plug-row">
+        <div class="plug plug-a" title="One brand of smart text engine">Engine A</div>
+        <div class="plug-arrow">➜</div>
+        <div class="plug plug-b" title="OpenLLM-style adapter layer">Adapter</div>
+        <div class="plug-arrow">➜</div>
+        <div class="plug plug-c" title="This app">This app</div>
+      </div>
+      <p class="explain">
+        Normally, if you built an app that talks to one brand of smart text engine, you'd have to rewrite the app to work with another brand — like needing a different power plug for each country.
+        <b>OpenLLM is the adapter in the middle.</b> It gives every engine the same "outlet shape," so the app only ever has to know one way to plug in.
+        In practice, "the same shape" means one standard set of requests for "here's a question, give me a reply," just like many different phone chargers can all use the same USB cable.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">2.</span>What "OpenLLM" means inside this app</h2>
+    <p class="sec-sub">Here, the word doesn't mean one specific product. It's a <b>label for any smart-text service</b> that speaks the same standard language.</p>
+
+    <div class="flow">
+      <div class="step">
+        <div class="ic" style="background:linear-gradient(160deg,#1d6f9c,#165a82)">🔑</div>
+        <h3 class="title">Find the key</h3>
+        <p class="desc">Reads a secret key from a config file (openllm.txt), or from the computer's environment.</p>
+      </div>
+      <div class="arrow">➜</div>
+      <div class="step">
+        <div class="ic" style="background:linear-gradient(160deg,#5b6b3a,#3d4a26)">🌎</div>
+        <h3 class="title">Pick the address</h3>
+        <p class="desc">Uses a base URL so the same code can reach different services — OpenAI, Groq, Together AI, Ollama, LM Studio, vLLM, etc.</p>
+      </div>
+      <div class="arrow">➜</div>
+      <div class="step">
+        <div class="ic" style="background:linear-gradient(160deg,#7a5100,#5a3c00)">🧠</div>
+        <h3 class="title">Choose the model</h3>
+        <p class="desc">Tells the service which "mind" to use (a model name), also configurable.</p>
+      </div>
+      <div class="arrow">➜</div>
+      <div class="step">
+        <div class="ic" style="background:linear-gradient(160deg,#1f7a45,#155c32)">💬</div>
+        <h3 class="title">Get a reply</h3>
+        <p class="desc">Sends a question and gets back a response; if the service is down, a built-in rule engine gives a fallback answer.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:18px;font-size:14.5px;color:var(--ink)">
+      This app uses that connection for <b>two jobs</b>:
+    </p>
+    <ul class="uses">
+      <li>
+        <span class="title">CineBot, the movie-chat helper</span>
+        <span class="ex">A friendly assistant that answers questions about movies playing in Vizag, theaters, tickets, and recommendations. It keeps a short conversation history and knows the current movies and theaters.</span>
+      </li>
+      <li>
+        <span class="title">Review summarizer</span>
+        <span class="ex">Takes a handful of audience reviews for a movie and writes a short "what people are saying" summary, plus a feel-good / mixed / negative read on the mood.</span>
+      </li>
+    </ul>
+
+    <div class="note">
+      <b>Smart fallback.</b> If the smart-text service is unreachable, this app doesn't just crash. It has a built-in rule-based "good enough" answer engine that matches the user's question to movie and theater info and replies with sensible canned answers. That way the assistant still feels alive even when the smart engine is offline.
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">3.</span>What OpenLLM means outside this app</h2>
+    <p class="sec-sub">Beyond this codebase, OpenLLM is also the name of a <b>real product from BentoML</b> — a toolkit for running your own open-source smart text engines.</p>
+
+    <div class="cols">
+      <div class="card">
+        <span class="tag">The adapter idea (used by this app)</span>
+        <h3>A common plug shape</h3>
+        <ul>
+          <li>It's a <b>style of connection</b>, not one single engine.</li>
+          <li>Any service that speaks the same standard language can be swapped in.</li>
+          <li>The app only learns one way to send a question and read a reply.</li>
+          <li>Point it elsewhere by changing a config file or a setting — no rewrite.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="tag">The BentoML product</span>
+        <h3>A machine that runs open-source engines</h3>
+        <ul>
+          <li>One command starts a smart-text server from an open model.</li>
+          <li>It offers the same standard "ask and answer" interface this app expects.</li>
+          <li>Many open models are available to choose from.</li>
+          <li>It ships with tooling to package and deploy the engine like any regular web service.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p style="margin-top:14px;font-size:14.5px;color:var(--ink)">
+      Put simply: the BentoML product <b>is one thing that can sit behind the adapter</b>. This app's code doesn't care which one it is — it just talks to the standard plug. In this repo, <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:#f0f3f6;border:1px solid var(--line);padding:1px 4px;border-radius:4px">openllm.txt</span> currently holds a key that looks like it belongs to a BentoML-hosted service, so this app is likely talking to that family of engines right now.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">4.</span>Common things people use it for</h2>
+    <p class="sec-sub">Because the plug is standard and the engines are swappable, the same setup shows up in a lot of everyday software.</p>
+
+    <ul class="uses">
+      <li>
+        <span class="title">Chatbots and assistants</span>
+        <span class="ex">Customer support helpers, guided tour bots, and in-app assistants that answer questions in plain language — like CineBot here.</span>
+      </li>
+      <li>
+        <span class="title">Summarizing and rewriting</span>
+        <span class="ex">Turning a pile of reviews, feedback, or notes into a short summary, a cleaner rewrite, or a quick "the gist" version.</span>
+      </li>
+      <li>
+        <span class="title">Answering from private data</span>
+        <span class="ex">Letting a team ask questions about their own documents or records without sending everything to a public service — the engine runs where they control it.</span>
+      </li>
+      <li>
+        <span class="title">Cheap, private, on-your-own-terms AI</span>
+        <span class="ex">Running an engine yourself to keep costs predictable and keep data inside your own systems, instead of depending on a third-party "ask and get an answer" service.</span>
+      </li>
+      <li>
+        <span class="title">Experimenting with different engines</span>
+        <span class="ex">Trying a few different underlying models by changing one setting, without rewriting the app each time — exactly the flexibility this project's code was built for.</span>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">5.</span>A tiny map of the talk this app makes</h2>
+    <p class="sec-sub">How a user question becomes a reply in this app, when the smart-text service is reachable.</p>
+
+    <div class="analogy" style="padding:18px 20px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <span style="font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)">User</span>
+        <span style="color:var(--accent)">➜</span>
+        <span style="font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)">This app (CineWave)</span>
+        <span style="color:var(--accent)">➜</span>
+        <span style="font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)">Smart-text service (any OpenAI-style endpoint)</span>
+        <span style="color:var(--accent)">➜</span>
+        <span style="font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)">Back to the app</span>
+        <span style="color:var(--accent)">➜</span>
+        <span style="font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)">Back to the user</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13.5px;align-items:start">
+        <span style="font-weight:650;color:var(--ink);white-space:nowrap">1.</span><div>User asks CineBot something, e.g. "What's playing this week?"</div>
+        <span style="font-weight:650;color:var(--ink);white-space:nowrap">2.</span><div>The app builds a short conversation, adds current movies/theaters, and sends it to the configured smart-text service.</div>
+        <span style="font-weight:650;color:var(--ink);white-space:nowrap">3.</span><div>The service replies with a friendly answer.</div>
+        <span style="font-weight:650;color:var(--ink);white-space:nowrap">4.</span><div>The app shows the answer to the user. If the service was unreachable, the built-in rule engine answers instead.</div>
+      </div>
+
+      <div class="note" style="margin-top:14px">
+        <b>For review summaries</b>, step 1 is "here are some reviews for this movie," step 3 is "a two-sentence read on what viewers think and whether the mood is positive, mixed, or negative," and the fallback is a generic-but-friendly summary when the service is down.
+      </div>
+    </div>
+  </section>
+
+  <section class="gloss">
+    <h3>Words used here, in plain terms</h3>
+    <dl>
+      <dt>Smart-text engine (this guide's word for "LLM")</dt>
+      <dd>A computer system that reads text you give it and writes back text that sounds like it understood you — for example, answering a question or summarizing a list of reviews.</dd>
+
+      <dt>Service / endpoint</dt>
+      <dd>The place your app talks to when it wants the engine to do something. Think of it as the engine's phone number and mailbox combined.</dd>
+
+      <dt>OpenAI-style / OpenAI-compatible</dt>
+      <dd>A common "ask and get a reply" format. Lots of different engines speak it, so an app written for one can often talk to another with little or no change.</dd>
+
+      <dt>Model</dt>
+      <dd>One particular version of a smart-text engine, like choosing between a general-purpose one and one tuned for a specific kind of task.</dd>
+
+      <dt>Fallback</dt>
+      <dd>A simpler backup plan that runs when the smart engine isn't reachable, so the app still gives a reasonable answer instead of failing.</dd>
+
+      <dt>Config file / environment variable</dt>
+      <dd>Two common places to store settings like keys and addresses, so you can change where the app points without editing the app's code.</dd>
+    </dl>
+  </section>
+
+  <footer>
+    <span>Built from this project's <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">openllm_service.py</span>, <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">openllm.txt</span>, and <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">app.py</span>.</span>
+    <span>Source file: <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">.freebuff/explain-openllm.html</span></span>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -19,7 +19,7 @@
           <tr>
             <td class="p-3">{{ r.id }}</td>
             <td class="p-3 font-semibold text-white">{{ r.user.username }}</td>
-            <td class="p-3 font-bold text-[#FF2E63]">₹{{ '%.0f'|format(r.amount) }}</td>
+            <td class="p-3 font-bold text-[#C9A84C]">₹{{ '%.0f'|format(r.amount) }}</td>
             <td class="p-3 whitespace-nowrap">{{ r.created_at.strftime('%d %b %Y, %I:%M %p') }}</td>
             <td class="p-3"><span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ c }}-500/10 text-{{ c }}-400 border border-{{ c }}-500/20">{{ r.status }}</span></td>
             <td class="p-3 text-right">

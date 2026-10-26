@@ -8,7 +8,7 @@
   <p class="text-xs text-slate-400 break-words">{{ movie.title }} · {{ showtime.theater }} · {{ booking.seats }}</p>
 
   <p class="text-xs text-slate-400">The payment window should open automatically.</p>
-  <button id="pay-btn" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+  <button id="pay-btn" class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">
     Open payment window
   </button>
 
@@ -43,7 +43,7 @@
       contact: "{{ user.phone or '' }}"
     },
     notes: { reference: "{{ booking.reference }}" },
-    theme: { color: "#FF2E63" },
+    theme: { color: "#C9A84C" },
     handler: function (response) {
       document.getElementById('f_order').value = response.razorpay_order_id;
       document.getElementById('f_payment').value = response.razorpay_payment_id;

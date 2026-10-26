@@ -11,21 +11,21 @@
   {% if not screens %}
     <div class="text-center space-y-3 py-4">
       <p class="text-xs text-amber-400">You need at least one theatre screen before scheduling shows.</p>
-      <a href="{{ url_for('screens') }}" class="inline-block px-4 py-2 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">Set up screens</a>
+      <a href="{{ url_for('screens') }}" class="inline-block px-4 py-2 bg-[#C9A84C] text-white text-xs font-semibold rounded-xl">Set up screens</a>
     </div>
   {% elif not movies %}
     <div class="text-center space-y-3 py-4">
       <p class="text-xs text-amber-400">Add a movie first.</p>
-      <a href="{{ url_for('add_movie') }}" class="inline-block px-4 py-2 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">+ Add Movie</a>
+      <a href="{{ url_for('add_movie') }}" class="inline-block px-4 py-2 bg-[#C9A84C] text-white text-xs font-semibold rounded-xl">+ Add Movie</a>
     </div>
   {% else %}
     <form method="POST" class="space-y-4">
-      <select name="movie_id" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      <select name="movie_id" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
         <option value="" disabled selected>Select movie</option>
         {% for m in movies %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}
       </select>
 
-      <select name="screen_id" id="screen-select" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      <select name="screen_id" id="screen-select" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
         <option value="" disabled selected>Select theatre &amp; screen</option>
         {% for t in theaters %}
           {% if t.screens %}
@@ -40,9 +40,9 @@
 
       <div class="flex gap-3">
         <input type="date" name="show_date" required value="{{ today }}"
-               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
         <input type="time" name="show_time" required
-               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]
+               class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]
                       [color-scheme:dark]">
       </div>
 
@@ -51,7 +51,7 @@
         <div id="price-fields" class="space-y-2"></div>
       </div>
 
-      <button type="submit" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+      <button type="submit" class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">
         Add Showtime
       </button>
     </form>
@@ -74,7 +74,7 @@
           <div class="flex items-center gap-3">
             <span class="flex-1 text-xs text-slate-300">${c.name}</span>
             <input type="number" name="price_${c.code}" min="0" step="1" placeholder="${c.price}"
-                   class="w-28 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+                   class="w-28 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-[#C9A84C]">
           </div>`);
       });
       box.classList.toggle('hidden', data.classes.length === 0);

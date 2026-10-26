@@ -1,0 +1,277 @@
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+127.0.0.1 - - [22/Sep/2026 16:26:41] "GET / HTTP/1.1" 200 -
+C:\Code\MD-booking-hub\app.py:642: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  return User.query.get(int(user_id))
+127.0.0.1 - - [22/Sep/2026 16:26:41] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:26:42] "GET /favicon.ico HTTP/1.1" 404 -
+C:\Code\MD-booking-hub\app.py:681: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+C:\Code\MD-booking-hub\app.py:383: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:26:56] "GET /movie/1 HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:27:17] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:27:37] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:27:57] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:28:17] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:29:19] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:29:34] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:29:37] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:29:40] "GET /movie/1 HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:29:57] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:30:01] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:30:17] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:30:21] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:30:41] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:31:01] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:31:21] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:31:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:31:41] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:32:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:32:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:33:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:33:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:34:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:34:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:35:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:35:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:36:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:36:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:37:01] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:37:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:37:20] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [22/Sep/2026 16:37:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:37:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:37:56] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:38:16] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [22/Sep/2026 16:38:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:38:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:38:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:38:57] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:39:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:39:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:39:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:39:56] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+ * Detected change in 'C:\\Code\\MD-booking-hub\\app.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+C:\Code\MD-booking-hub\app.py:682: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+C:\Code\MD-booking-hub\app.py:384: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:40:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+ * Detected change in 'C:\\Code\\MD-booking-hub\\app.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+C:\Code\MD-booking-hub\app.py:682: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+C:\Code\MD-booking-hub\app.py:384: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:40:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:40:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:40:56] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:41:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:41:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:41:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:41:56] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:42:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:42:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:42:37] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:42:56] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:43:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:43:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:43:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+ * Detected change in 'C:\\Code\\MD-booking-hub\\test_flow.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+C:\Code\MD-booking-hub\app.py:682: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+C:\Code\MD-booking-hub\app.py:384: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:43:56] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:44:17] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:44:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:44:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:44:56] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+ * Detected change in 'C:\\Code\\MD-booking-hub\\test_flow.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+C:\Code\MD-booking-hub\app.py:682: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+C:\Code\MD-booking-hub\app.py:384: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:45:16] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:45:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+ * Detected change in 'C:\\Code\\MD-booking-hub\\test_flow.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+C:\Code\MD-booking-hub\app.py:682: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+C:\Code\MD-booking-hub\app.py:384: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:45:38] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:45:57] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+ * Detected change in 'C:\\Code\\MD-booking-hub\\test_flow.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+C:\Code\MD-booking-hub\app.py:682: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:46:17] "GET /api/showtime/1/live-info HTTP/1.1" 404 -
+C:\Code\MD-booking-hub\app.py:384: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:46:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:46:37] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+ * Detected change in 'C:\\Code\\MD-booking-hub\\app.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 541-564-648
+C:\Code\MD-booking-hub\app.py:682: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+C:\Code\MD-booking-hub\app.py:384: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  now = datetime.utcnow()
+127.0.0.1 - - [22/Sep/2026 16:47:24] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:47:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:47:37] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:47:57] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:48:17] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:48:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:48:43] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+C:\Code\MD-booking-hub\app.py:643: LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get() (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+  return User.query.get(int(user_id))
+127.0.0.1 - - [22/Sep/2026 16:48:45] "GET /movie/1 HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:48:45] "GET /api/ai/movie_summary/1 HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:48:46] "GET /movie/1 HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:48:46] "GET /api/ai/movie_summary/1 HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:48:48] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:49:11] "POST /api/ai/chat HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:49:18] "POST /api/ai/chat HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:49:36] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:50:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:51:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:52:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:53:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:54:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:55:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:56:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:57:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:58:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 16:59:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:00:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:01:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:02:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:03:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:04:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:05:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:06:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:07:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:08:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:09:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:10:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:11:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:12:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:13:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:14:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:15:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:16:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:17:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:18:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:19:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:20:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:21:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:22:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:23:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:24:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:25:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:26:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:27:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:28:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:29:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:30:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:31:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:32:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:33:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:34:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:35:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:36:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:37:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:38:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:39:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:40:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:41:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:42:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:43:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:44:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:45:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:46:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:47:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:48:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:49:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:50:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:51:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:52:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:53:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:54:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:55:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:56:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:57:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:58:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 17:59:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:00:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:01:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:02:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:03:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:04:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:05:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:06:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:07:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:08:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:09:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:10:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:11:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:12:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:13:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:14:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:15:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:16:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:17:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:18:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:19:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:20:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:21:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:22:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:23:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:24:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:25:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:26:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:27:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:28:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:29:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:30:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:31:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:32:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:33:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:34:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:35:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:36:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:37:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:38:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:39:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:40:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:41:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:42:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:43:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:44:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:45:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:46:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:47:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -
+127.0.0.1 - - [22/Sep/2026 18:48:35] "GET /api/showtime/1/live-info HTTP/1.1" 200 -

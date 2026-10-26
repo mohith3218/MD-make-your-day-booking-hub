@@ -36,6 +36,8 @@ seat_span     : 2 = couple / sofa seat (rendered double width)
 
 from __future__ import annotations
 
+import math
+
 # how many seats one user may book in a single transaction (BookMyShow uses 10)
 MAX_SEATS_PER_BOOKING = 10
 
@@ -94,11 +96,15 @@ def compute_seat_pov(cell_id: str, row_label: str, seat_num: int, row_index: int
     front_pct = row_index / max(1, total_rows - 1)
     col_pct = cell_index / max(1, total_cells_in_row - 1)
 
-    # Front row (bottom): ~52° neck tilt, 15% screen distance
-    # Back row (top): ~26° eye-level angle, 90% screen distance
-    view_angle = int(26 + (front_pct * 26))
+    # Approximate the upward viewing angle from a 3.4m screen-centre rise and
+    # the seat's estimated distance. This keeps the displayed angle physically
+    # plausible instead of assigning every row an arbitrary 26°–52° tilt.
     screen_dist_pct = int(90 - (front_pct * 75))
+    seat_distance_m = 6.5 + ((screen_dist_pct - 15) / 75) * 11.5
+    view_angle = int(round(math.degrees(math.atan2(3.4, seat_distance_m))))
+    rows_ahead = max(0, total_rows - row_index - 1)
     off_center_deg = int(abs(col_pct - 0.5) * 50)
+    side_angle_deg = int(round((col_pct - 0.5) * 50))
 
     # Sound Experience Calculations:
     # Cinema acoustic sweetspot is typically middle-center of the auditorium (front_pct ~0.40 to 0.60, col_pct ~0.40 to 0.60)
@@ -134,12 +140,12 @@ def compute_seat_pov(cell_id: str, row_label: str, seat_num: int, row_index: int
     if front_pct > 0.80:
         zone = "FRONT"
         zone_name = "Front Row Immersive Screen Zone"
-        comfort_badge = f"⚠️ {view_angle}° High Upward Neck Tilt"
+        comfort_badge = f"⚠️ {view_angle}° Upward View"
         zone_color = "amber"
     elif 0.25 <= front_pct <= 0.65 and 0.25 <= col_pct <= 0.75:
         zone = "GOLD"
         zone_name = "VIP Gold Center Zone"
-        comfort_badge = f"🌟 Optimal {view_angle}° FOV · Atmos Sweetspot"
+        comfort_badge = f"🌟 {view_angle}° Upward View · Atmos Sweetspot"
         zone_color = "emerald"
     elif col_pct < 0.15 or col_pct > 0.85:
         zone = "SIDE"
@@ -156,8 +162,17 @@ def compute_seat_pov(cell_id: str, row_label: str, seat_num: int, row_index: int
     # 1. Couples Corner (span == 2 or corner recliners/back row pairs)
     # 2. Quiet Zone (back rows, high privacy)
     # 3. Fun & Social Zone (center middle crowd rows)
-    # 4. Family & Easy-Exit Zone (aisle-adjacent or front-mid rows)
-    if front_pct < 0.25 and (col_pct < 0.2 or col_pct > 0.8):
+    # Front seats are the rows closest to the screen (at the bottom of the map).
+    # Reserve this front quarter for fans who want an immersive, energetic view.
+    # 1. Fans Front Zone  2. Couples Corner  3. Quiet Zone  4. Fun & Social  5. Family & Easy-Exit
+    if front_pct >= 0.75:
+        vibe_code = "FANS"
+        vibe_name = "Fans Front Zone"
+        vibe_icon = "📣"
+        vibe_badge = "📣 Front Row Fan Zone"
+        vibe_desc = "Front rows closest to the screen for fans who want a larger, more immersive view."
+        vibe_color = "amber"
+    elif front_pct < 0.25 and (col_pct < 0.2 or col_pct > 0.8):
         vibe_code = "COUPLES"
         vibe_name = "Couples Corner"
         vibe_icon = "💑"
@@ -196,7 +211,10 @@ def compute_seat_pov(cell_id: str, row_label: str, seat_num: int, row_index: int
         "zone_color": zone_color,
         "view_angle": view_angle,
         "screen_dist_pct": screen_dist_pct,
+        "rows_ahead": rows_ahead,
+        "row_index": row_index,
         "off_center_deg": off_center_deg,
+        "side_angle_deg": side_angle_deg,
         "sound_score": sound_score_raw,
         "sound_exp": sound_exp,
         "sound_badge": sound_badge,
@@ -284,7 +302,8 @@ def build_layout(layout: dict,
 
         out.append(block)
 
-    # classes are drawn screen-first (closest to screen at the top)
+    # Preserve layout row order; the booking template places the screen marker after the rows,
+    # so the last rows are the front rows nearest the screen at the bottom of the map.
     return out
 
 

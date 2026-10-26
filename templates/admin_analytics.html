@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Analytics · MD CineWave{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-2xl font-black text-white flex items-center gap-2">
+    <i class="fa-solid fa-chart-line text-[#C9A84C]"></i> Analytics
+  </h1>
+  <div class="flex items-center gap-2 text-xs">
+    {% for d, label in [(7, '7 days'), (30, '30 days'), (90, '90 days'), (0, 'All time')] %}
+      <a href="{{ url_for('admin_analytics', days=d) if d else url_for('admin_analytics') }}"
+         class="px-3 py-1.5 rounded-xl font-semibold transition {% if days == d %}bg-[#C9A84C] text-white{% else %}bg-slate-800 hover:bg-slate-700 text-slate-200{% endif %}">
+        {{ label }}
+      </a>
+    {% endfor %}
+    <a href="{{ url_for('admin_analytics_export', days=days) if days else url_for('admin_analytics_export') }}"
+       class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition ml-1">
+      <i class="fa-solid fa-file-csv mr-1"></i>Export CSV
+    </a>
+  </div>
+</div>
+<p class="text-xs text-slate-500">
+  {% if days %}Window: last {{ days }} days{% else %}Window: all time{% endif %}
+  · paid_at decides the revenue window · occupancy counts confirmed seats on future shows
+</p>
+
+<!-- KPI cards -->
+<div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+  {% for label, value, icon, color in [
+      ('Revenue', '₹%.0f'|format(a.paid.amount), 'fa-indian-rupee-sign', 'text-emerald-400'),
+      ('Tickets sold', a.paid.count, 'fa-ticket', 'text-sky-400'),
+      ('Avg ticket', '₹%.0f'|format(a.avg_ticket), 'fa-chart-simple', 'text-violet-400'),
+      ('Active buyers', a.active_buyers, 'fa-users', 'text-amber-400'),
+      ('Loss rate', '%.1f%%'|format(a.cancel_rate), 'fa-ban', 'text-amber-400'),
+      ('Occupancy', '%.1f%%'|format(a.occupancy_overall), 'fa-chair', 'text-[#C9A84C]')] %}
+    <div class="glass-card rounded-2xl p-4">
+      <p class="text-[10px] uppercase tracking-wider text-slate-500">{{ label }}</p>
+      <p class="text-xl font-black text-white mt-1">{{ value }}</p>
+      <i class="fa-solid {{ icon }} {{ color }} text-xs mt-2"></i>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Revenue trend -->
+<section class="glass-card rounded-2xl p-6 space-y-4">
+  <div class="flex items-center justify-between">
+    <h2 class="text-lg font-bold text-white">Revenue trend</h2>
+    <span class="text-xs text-slate-400">₹{{ '%.2f'|format(a.trend_total) }} in window</span>
+  </div>
+  {% if a.trend %}
+    {% set max_val = a.trend_max if a.trend_max > 0 else 1 %}
+    <div class="flex items-end gap-1.5 h-40">
+      {% for t in a.trend %}
+        {% set h = ((t.amount / max_val) * 100) | round | int %}
+        <div class="flex-1 flex flex-col items-center justify-end gap-1 group min-w-0"
+             title="{{ t.label }} — ₹{{ '%.2f'|format(t.amount) }} · {{ t.tickets }} tickets">
+          <div class="w-full rounded-t-md bg-gradient-to-t from-[#C9A84C]/40 to-[#C9A84C] {% if t.amount == 0 %}bg-slate-800 from-slate-800 to-slate-800{% endif %}"
+               style="height: {{ [h, 2] | max }}px;"></div>
+          <span class="text-[8px] text-slate-500 truncate w-full text-center">{{ t.label }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-sm text-slate-500">Daily trend is available for the 7 / 30 / 90-day views.</p>
+  {% endif %}
+</section>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <!-- Top movies -->
+  <section class="glass-card rounded-2xl p-6 space-y-3">
+    <h2 class="text-lg font-bold text-white">Top movies</h2>
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">#</th><th class="p-3">Movie</th><th class="p-3">Bookings</th><th class="p-3">Revenue</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for m in a.top_movies %}
+          <tr>
+            <td class="p-3 {% if loop.index == 1 %}text-amber-400{% else %}text-slate-500{% endif %} font-bold">{{ loop.index }}</td>
+            <td class="p-3 font-semibold text-white">{{ m.title }}</td>
+            <td class="p-3">{{ m.count }}</td>
+            <td class="p-3 text-emerald-400 font-semibold">₹{{ '%.0f'|format(m.revenue) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="p-3 text-slate-500">No paid bookings in this window yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Top theatres -->
+  <section class="glass-card rounded-2xl p-6 space-y-3">
+    <h2 class="text-lg font-bold text-white">Top theatres</h2>
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">#</th><th class="p-3">Theatre</th><th class="p-3">Bookings</th><th class="p-3">Revenue</th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for t in a.top_theatres %}
+          <tr>
+            <td class="p-3 {% if loop.index == 1 %}text-amber-400{% else %}text-slate-500{% endif %} font-bold">{{ loop.index }}</td>
+            <td class="p-3">
+              <span class="font-semibold text-white">{{ t.name }}</span>
+              {% if t.location %}<span class="block text-[10px] text-slate-500">{{ t.location }}</span>{% endif %}
+            </td>
+            <td class="p-3">{{ t.count }}</td>
+            <td class="p-3 text-emerald-400 font-semibold">₹{{ '%.0f'|format(t.revenue) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="p-3 text-slate-500">No paid bookings in this window yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <!-- Payment split -->
+  <section class="glass-card rounded-2xl p-6 space-y-4">
+    <h2 class="text-lg font-bold text-white">Payment methods</h2>
+    {% for m in a.pay_split %}
+      {% set pct = (100 * m.amount / a.pay_total) | round | int if a.pay_total else 0 %}
+      <div>
+        <div class="flex justify-between text-xs mb-1">
+          <span class="font-semibold text-slate-200 capitalize">{{ m.method }}</span>
+          <span class="text-slate-400">₹{{ '%.0f'|format(m.amount) }} · {{ m.count }} txn · {{ pct }}%</span>
+        </div>
+        <div class="h-2.5 rounded-full bg-slate-800 overflow-hidden">
+          <div class="h-full rounded-full bg-gradient-to-r from-[#C9A84C] to-amber-400" style="width: {{ pct }}%;"></div>
+        </div>
+      </div>
+    {% else %}
+      <p class="text-sm text-slate-500">No captured payments in this window yet.</p>
+    {% endfor %}
+  </section>
+
+  <!-- Occupancy heat strip -->
+  <section class="glass-card rounded-2xl p-6 space-y-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-bold text-white">Fast-filling shows</h2>
+      <span class="text-xs text-slate-400">next 7 days</span>
+    </div>
+    {% if a.heat %}
+      <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+        {% for h in a.heat %}
+          {% if h.pct >= 70 %}{% set bar = 'bg-amber-500' %}
+          {% elif h.pct >= 40 %}{% set bar = 'bg-amber-400' %}
+          {% else %}{% set bar = 'bg-sky-500' %}{% endif %}
+          <div class="flex items-center gap-3 text-xs">
+            <div class="w-40 shrink-0 min-w-0">
+              <p class="font-semibold text-white truncate">{{ h.showtime.movie.title }}</p>
+              <p class="text-[10px] text-slate-500 truncate">{{ h.showtime.theater }} · {{ h.showtime.screen_label }} · {{ h.showtime.show_date.strftime('%d %b') }} {{ h.showtime.show_time }}</p>
+            </div>
+            <div class="flex-1 h-2.5 rounded-full bg-slate-800 overflow-hidden">
+              <div class="h-full rounded-full {{ bar }}" style="width: {{ h.pct }}%;"></div>
+            </div>
+            <span class="w-14 text-right text-slate-300">{{ h.pct }}%</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-sm text-slate-500">No shows scheduled in the next 7 days.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

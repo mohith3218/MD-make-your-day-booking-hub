@@ -7,7 +7,11 @@ Run:  python test_flow.py
 import json
 import os
 import re
+import sys
 from datetime import date, timedelta
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 os.environ.pop('RAZORPAY_KEY_ID', None)
 
@@ -15,9 +19,9 @@ import app as A
 
 
 def main():
-    if os.path.exists('instance/vizag_movies.db'):
-        os.remove('instance/vizag_movies.db')
     A.app.config['WTF_CSRF_ENABLED'] = False
+    with A.app.app_context():
+        A.db.drop_all()
     A.init_db()
 
     with A.app.app_context():
@@ -218,9 +222,136 @@ def main():
         assert c1.get(path).status_code == 200, path
     print("12. all pages render (admin + user)")
 
+    # ---- 14. admin analytics page + CSV export ---------------------------
+    r = admin.get('/admin/analytics?days=30', follow_redirects=False)
+    assert r.status_code == 200, r.status_code
+    html = r.get_data(as_text=True)
+    assert 'Analytics' in html and 'Revenue trend' in html
+    with A.app.app_context():
+        a = A._collect_analytics(30)
+        assert a['paid']['count'] == 2, a['paid']            # ref1 + ref2 from this flow
+        assert abs(a['paid']['amount'] - 847.2 - b2.total_amount) < 0.01, a['paid']
+        assert a['active_buyers'] == 2, a['active_buyers']
+        assert a['pay_split'], 'payment split must not be empty'
+        assert a['pay_split'][0]['amount'] > 0
+        assert any(m['title'] == 'Pushpa 3 - The Rampage' for m in a['top_movies'])
+        assert a['occupancy_overall'] >= 0
+    print("14. analytics OK - KPIs computed: "
+          f"{a['paid']['count']} paid, ₹{a['paid']['amount']:.2f}, "
+          f"occ {a['occupancy_overall']}%")
+
+    r = admin.get('/admin/analytics/export.csv?days=30', follow_redirects=False)
+    assert r.status_code == 200 and 'text/csv' in r.headers['Content-Type']
+    assert 'attachment' in r.headers.get('Content-Disposition', '')
+    csv_body = r.get_data(as_text=True)
+    assert csv_body.startswith('reference,booked_at,status')
+    assert ref1 in csv_body and ref2 in csv_body
+    assert 'Pushpa 3 - The Rampage' in csv_body
+    print("14b. CSV export OK - header + both paid bookings present")
+
+    # non-admin is kept out of analytics, same as every other admin page
+    r = c1.get('/admin/analytics', follow_redirects=False)
+    assert r.status_code == 302, r.status_code
+    r = c1.get('/admin/analytics/export.csv?days=30', follow_redirects=False)
+    assert r.status_code == 302, r.status_code
+    print("14c. analytics guarded - non-admin redirected")
+
+    # ---- 15. movie cast section + fetch-cast admin action ----------------
+    with A.app.app_context():
+        m1 = A.Movie.query.filter_by(title='Pushpa 3 - The Rampage').one()
+        m_id = m1.id
+        m1.cast_json = A.json.dumps({
+            'director': 'Sukumar',
+            'cast': [{'name': 'Allu Arjun', 'character': 'Pushpa Raj', 'profile': None},
+                     {'name': 'Rashmika Mandanna', 'character': 'Srivalli', 'profile': None}]})
+        A.db.session.commit()
+
+    r = c1.get(f'/movie/{m_id}').get_data(as_text=True)
+    assert 'Cast &amp; Crew' in r
+    assert 'Sukumar' in r and 'Allu Arjun' in r and 'Pushpa Raj' in r
+    print("15. cast OK - director + actors render on the movie page")
+
+    # admin fetch-cast action answers gracefully with or without TMDb access
+    r = admin.post(f'/admin/fetch_cast/{m_id}', follow_redirects=True)
+    assert r.status_code == 200, r.status_code
+    r = c1.get('/admin/analytics', follow_redirects=False)  # sanity: nothing broke
+    assert r.status_code == 302
+    print("15b. fetch-cast route OK - admin action handled without error")
+
+    # ---- 16. AI Booking Assistant & Summary routes ----------------------
+    r = c1.post('/api/ai/chat', json={'prompt': 'What movies are playing?'})
+    assert r.status_code == 200, r.status_code
+    data = r.get_json()
+    assert data['success'] is True and 'response' in data and len(data['response']) > 0
+    assert 'actions' in data
+    print("16a. AI Booking Assistant Chat API OK - returned assistant response and action cards")
+
+    with A.app.app_context():
+        first_m_id = A.Movie.query.first().id
+    r = c1.get(f'/api/ai/movie_summary/{first_m_id}')
+    assert r.status_code == 200, r.status_code
+    data = r.get_json()
+    assert data['success'] is True and 'summary' in data and 'sentiment' in data
+    print("16b. AI Movie Review Summary API OK - returned heuristic review summary")
+
+    # ---- 17. AI Direct Seat Allocation & Booking Flow -------------------
+    r = c1.post('/api/ai/book-direct', json={
+        'showtime_id': show_id,
+        'seat_count': 2,
+        'preferred_class': 'RECLINER'
+    })
+    assert r.status_code == 200, r.status_code
+    direct_data = r.get_json()
+    assert direct_data['success'] is True and 'reference' in direct_data
+    assert direct_data['seat_count'] == 2 and direct_data['total_amount'] > 0
+    ai_ref = direct_data['reference']
+    print(f"17. AI Direct Booking OK - Auto-allocated seats {direct_data['seats']}, ref: {ai_ref}")
+
+    # Complete wallet payment for AI booking
+    r = c1.post(f'/pay/wallet/{ai_ref}', follow_redirects=False)
+    assert f'/ticket/{ai_ref}' in r.headers['Location']
+    print("17b. AI Booking Payment OK - paid with wallet")
+
+    # ---- 18. Self-Service Cancellation with Wallet Refund --------------
+    with A.app.app_context():
+        u = A.User.query.filter_by(username='mohith').one()
+        w_before = A.Wallet.query.filter_by(user_id=u.id).one().balance
+        b_ai = A.Booking.query.filter_by(reference=ai_ref).one()
+        expected_refund = round(b_ai.ticket_amount * 0.90, 2)
+    
+    r = c1.post(f'/booking/{ai_ref}/refund', follow_redirects=True)
+    assert r.status_code == 200, r.status_code
+    with A.app.app_context():
+        u = A.User.query.filter_by(username='mohith').one()
+        b_after = A.Booking.query.filter_by(reference=ai_ref).one()
+        w_after = A.Wallet.query.filter_by(user_id=u.id).one().balance
+        assert b_after.status == 'CANCELLED'
+        assert round(w_after, 2) == round(w_before + expected_refund, 2)
+        # Seats should be freed up
+        assert A.BookedSeat.query.filter_by(booking_id=b_after.id).count() == 0
+    print(f"18. Self-service Cancellation & Refund OK - ₹{expected_refund:.2f} credited to wallet, seats freed")
+
+    # ---- 19. Spoiler Shield & Keyword Auto-Detection ------------------
+    with A.app.app_context():
+        m_id = A.Movie.query.first().id
+    # Test review with explicit spoiler flag
+    r = c1.post(f'/api/movie/{m_id}/rate', json={'rating': 5, 'review': 'Awesome film!', 'has_spoiler': True})
+    assert r.status_code == 200 and r.get_json()['has_spoiler'] is True
+    # Test review with auto-detected spoiler keyword 'climax twist'
+    r = c1.post(f'/api/movie/{m_id}/rate', json={'rating': 4.5, 'review': 'The climax twist where the hero dies was shocking'})
+    assert r.status_code == 200 and r.get_json()['has_spoiler'] is True
+    print("19. Spoiler Shield OK - explicit and NLP keyword triggers detected")
+
+    # ---- 20. Theater & Screen Comfort Scores ---------------------------
+    with A.app.app_context():
+        sc = A.Screen.query.filter(A.Screen.name.like('%Screen 1%')).first()
+        assert sc.comfort_score >= 4.5
+        assert len(sc.comfort_features) >= 2
+    print(f"20. Comfort Score OK - {sc.full_name} scored {sc.comfort_score}/5.0 with {len(sc.comfort_features)} features")
+
     with A.app.app_context():
         rev = A.db.session.query(A.db.func.sum(A.Booking.total_amount)) \
-                          .filter(A.Booking.status == 'PAID').scalar()
+                          .filter(A.Booking.status == 'PAID').scalar() or 0.0
         seats = sum(s.total_seats for s in A.Screen.query.all())
         assert A.Theater.query.count() >= 23 and A.Screen.query.count() >= 40
         aaa = A.Theater.query.filter_by(name='AAA Cinemas').one()
@@ -228,8 +359,8 @@ def main():
             [34, 58, 76, 130, 130, 197, 436, 491], 'AAA seat counts drifted'
         print(f"\nSeeded {A.Theater.query.count()} Vizag theatres, "
               f"{A.Screen.query.count()} screens, {seats} total seats")
-        print(f"Revenue from paid bookings: ₹{rev:.2f}")
-    print("\nALL 13 CHECKS PASSED")
+        print(f"Revenue from active paid bookings: ₹{rev:.2f}")
+    print("\nALL 20 CHECKS PASSED")
 
 
 if __name__ == '__main__':

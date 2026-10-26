@@ -38,7 +38,7 @@
 
   <form method="POST" action="{{ url_for('simulate', reference=booking.reference) }}" class="space-y-3">
     <button type="submit" name="outcome" value="success"
-            class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+            class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">
       Pay ₹{{ '%.2f'|format(booking.total_amount) }}
     </button>
     <button type="submit" name="outcome" value="fail"

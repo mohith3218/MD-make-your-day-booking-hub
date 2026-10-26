@@ -13,14 +13,14 @@
     <form method="POST" action="{{ url_for('wallet_recharge') }}" class="space-y-3">
       <label class="block text-xs text-slate-400">Request a recharge</label>
       <input type="number" name="amount" min="1" max="10000" step="1" required placeholder="Amount in ₹"
-             class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+             class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
       <div class="flex gap-2">
         {% for amt in [200, 500, 1000] %}
           <button type="submit" name="amount" value="{{ amt }}"
                   class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">+₹{{ amt }}</button>
         {% endfor %}
       </div>
-      <button type="submit" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">
+      <button type="submit" class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">
         Submit request
       </button>
       <p class="text-[10px] text-slate-500 leading-relaxed">New accounts start with a ₹500 welcome bonus. An admin approves recharges, then the balance is credited instantly.</p>
@@ -50,7 +50,7 @@
             <p class="text-slate-200 font-medium break-words">{{ t.description or t.type }}</p>
             <p class="text-[10px] text-slate-500">{{ t.timestamp.strftime('%d %b %Y, %I:%M %p') }}</p>
           </div>
-          <span class="font-bold shrink-0 {% if t.type == 'PAYMENT' %}text-rose-400{% else %}text-emerald-400{% endif %}">
+          <span class="font-bold shrink-0 {% if t.type == 'PAYMENT' %}text-amber-400{% else %}text-emerald-400{% endif %}">
             {% if t.type == 'PAYMENT' %}−{% else %}+{% endif %}₹{{ '%.2f'|format(t.amount) }}
           </span>
         </div>

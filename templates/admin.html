@@ -2,9 +2,14 @@
 {% block title %}Admin Panel · MD CineWave{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-black text-white flex items-center gap-2">
-  <i class="fa-solid fa-user-shield text-amber-400"></i> Admin Panel
-</h1>
+<div class="flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-black text-white flex items-center gap-2">
+      <i class="fa-solid fa-user-shield text-amber-400"></i> Admin Panel
+    </h1>
+    <p class="text-xs text-slate-400 mt-1">Manage movies, trailers, theatres, and showtimes.</p>
+  </div>
+</div>
 
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
   {% for label, value, icon in [
@@ -15,17 +20,19 @@
     <div class="glass-card rounded-2xl p-4">
       <p class="text-[10px] uppercase tracking-wider text-slate-500">{{ label }}</p>
       <p class="text-2xl font-black text-white mt-1">{{ value }}</p>
-      <i class="fa-solid {{ icon }} text-[#FF2E63] text-xs mt-2"></i>
+      <i class="fa-solid {{ icon }} text-[#C9A84C] text-xs mt-2"></i>
     </div>
   {% endfor %}
 </div>
 
 <div class="flex flex-wrap gap-3">
-  <a href="{{ url_for('add_movie') }}" class="px-4 py-2 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">+ Add Movie</a>
+  <a href="{{ url_for('add_movie') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">+ Add Movie</a>
   <a href="{{ url_for('import_movie') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-magnifying-glass mr-1"></i>TMDb Import</a>
   <a href="{{ url_for('add_showtime') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Showtime</a>
+  <a href="{{ url_for('add_theater') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Theatre</a>
   <a href="{{ url_for('screens') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Theatres &amp; Screens</a>
   <a href="{{ url_for('admin_bookings') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Bookings</a>
+  <a href="{{ url_for('admin_analytics') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-chart-line mr-1"></i>Analytics</a>
   <a href="{{ url_for('admin_recharges') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">
     Recharges{% if pending_recharges %} <span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">{{ pending_recharges }}</span>{% endif %}
   </a>
@@ -33,17 +40,23 @@
 
 <section class="glass-card rounded-2xl p-6 space-y-4">
   <div class="flex items-center justify-between gap-3">
-    <h2 class="text-lg font-bold text-white">Theatres ({{ theaters|length }})</h2>
-    <a href="{{ url_for('screens') }}" class="text-xs text-[#FF2E63] hover:underline">Manage seating</a>
+    <div>
+      <h2 class="text-lg font-bold text-white">Theatres <span class="text-sm text-slate-500">({{ theaters|length }})</span></h2>
+      <p class="text-[11px] text-slate-500 mt-0.5">Browse locations and screen capacity.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <input type="search" data-table-filter="theaters-table" aria-label="Search theatres" placeholder="Search theatres" class="w-44 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400">
+      <a href="{{ url_for('screens') }}" class="text-xs text-[#C9A84C] hover:underline whitespace-nowrap">Manage seating</a>
+    </div>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-xs text-slate-300">
       <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
         <tr><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Location</th><th class="p-3">Screens</th><th class="p-3">Seats</th></tr>
       </thead>
-      <tbody class="divide-y divide-slate-800">
+      <tbody id="theaters-table" class="divide-y divide-slate-800">
         {% for t in theaters %}
-          <tr>
+          <tr data-admin-row>
             <td class="p-3">{{ t.id }}</td>
             <td class="p-3 font-semibold text-white">{{ t.name }}</td>
             <td class="p-3">{{ t.location or '—' }}</td>
@@ -53,47 +66,65 @@
         {% else %}
           <tr><td colspan="5" class="p-3 text-slate-500">No theatres registered yet.</td></tr>
         {% endfor %}
+        <tr data-filter-empty class="hidden"><td colspan="5" class="p-3 text-slate-500">No theatres match your search.</td></tr>
       </tbody>
     </table>
   </div>
 </section>
 
 <section class="glass-card rounded-2xl p-6 space-y-4">
-  <div class="flex items-center justify-between">
-    <h2 class="text-lg font-bold text-white">Movies ({{ movies|length }})</h2>
-    <div class="flex gap-2">
-      <a href="{{ url_for('add_movie') }}" class="px-3 py-1.5 bg-[#FF2E63] text-white text-xs font-semibold rounded-xl">+ Add Movie</a>
-      <a href="{{ url_for('import_movie') }}" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl">Import TMDb</a>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-bold text-white">Movies <span class="text-sm text-slate-500">({{ movies|length }})</span></h2>
+      <p class="text-[11px] text-slate-500 mt-0.5">Update listing status, cast, and trailer sources.</p>
     </div>
+    <input type="search" data-table-filter="movies-table" aria-label="Search movies" placeholder="Search movies" class="w-52 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400">
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-xs text-slate-300">
       <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
         <tr><th class="p-3">ID</th><th class="p-3">Title</th><th class="p-3">Lang</th><th class="p-3">Duration</th><th class="p-3">Category</th><th class="p-3">Release Type</th><th class="p-3">Actions</th></tr>
       </thead>
-      <tbody class="divide-y divide-slate-800">
+      <tbody id="movies-table" class="divide-y divide-slate-800">
         {% for m in movies %}
-          <tr>
+          <tr data-admin-row>
             <td class="p-3">{{ m.id }}</td>
             <td class="p-3 font-semibold text-white">{{ m.title }}</td>
             <td class="p-3">{{ m.language or '—' }}</td>
             <td class="p-3">{{ m.duration }} min</td>
             <td class="p-3">
               {% if m.is_upcoming %}
-                <span class="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">🗓️ Coming Soon</span>
+                <span class="inline-flex min-w-max items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">🗓️ Coming Soon</span>
               {% else %}
-                <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">🎬 Now Showing</span>
+                <span class="inline-flex min-w-max items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">🎬 Now Showing</span>
               {% endif %}
             </td>
             <td class="p-3">
               {% if m.is_rerelease %}
-                <span class="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[10px] font-bold">🔁 Re-Release</span>
+                <span class="inline-flex min-w-max items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[10px] font-bold">🔁 Re-Release</span>
               {% else %}
-                <span class="px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 text-[10px] font-bold">✨ Fresh Release</span>
+                <span class="inline-flex min-w-max items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 text-[10px] font-bold">✨ Fresh Release</span>
               {% endif %}
             </td>
             <td class="p-3">
-              <div class="flex gap-1.5 flex-wrap">
+              <div class="flex min-w-[210px] flex-wrap items-center gap-1.5">
+                <details class="basis-full rounded-xl border border-slate-800 bg-slate-900/50 p-2">
+                  <summary class="cursor-pointer list-none text-[11px] font-semibold text-amber-300 hover:text-amber-200">
+                    <i class="fa-solid fa-film mr-1"></i>Manage trailer
+                    {% if m.trailer_video_path %}<span class="ml-1 text-emerald-400">· Uploaded video active</span>
+                    {% elif m.youtube_trailer_key %}<span class="ml-1 text-slate-400">· YouTube link saved</span>{% endif %}
+                  </summary>
+                  <form method="POST" enctype="multipart/form-data" action="{{ url_for('update_movie_trailer', movie_id=m.id) }}" class="mt-2 space-y-2">
+                    <label class="block text-[10px] text-slate-400">YouTube trailer link or ID
+                      <input type="text" name="youtube_trailer" value="{% if m.youtube_trailer_key %}https://youtu.be/{{ m.youtube_trailer_key }}{% endif %}" placeholder="Paste a YouTube link" aria-label="YouTube trailer for {{ m.title }}" class="mt-1 w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-white">
+                    </label>
+                    <label class="block text-[10px] text-slate-400">Or upload MP4/WebM (up to 250 MB)
+                      <input type="file" name="trailer_video" accept="video/mp4,video/webm,.mp4,.webm" aria-label="Upload trailer video for {{ m.title }}" class="mt-1 w-full text-[9px] text-slate-400">
+                    </label>
+                    <p class="text-[10px] text-slate-500">An uploaded video replaces the YouTube trailer.</p>
+                    <button type="submit" class="px-2.5 py-1.5 bg-amber-600/20 hover:bg-amber-600 text-amber-300 hover:text-white text-[10px] font-semibold rounded-lg">Save trailer</button>
+                  </form>
+                </details>
                 <form method="POST" action="{{ url_for('toggle_movie_status', movie_id=m.id) }}">
                   <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium rounded-lg transition">
                     {% if m.is_upcoming %}→ Now Showing{% else %}→ Coming Soon{% endif %}
@@ -102,6 +133,13 @@
                 <form method="POST" action="{{ url_for('toggle_rerelease', movie_id=m.id) }}">
                   <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 text-[10px] font-medium rounded-lg transition">
                     {% if m.is_rerelease %}→ Fresh{% else %}→ Re-Release{% endif %}
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('fetch_cast', movie_id=m.id) }}"
+                      onsubmit="this.querySelector('button').textContent = 'Fetching…'">
+                  <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-sky-300 text-[10px] font-medium rounded-lg transition"
+                          title="Pull cast & director from TMDb">
+                    🎭 {% if m.tmdb_id %}Update cast{% else %}Fetch cast{% endif %}
                   </button>
                 </form>
                 <form method="POST" action="{{ url_for('delete_movie', movie_id=m.id) }}"
@@ -116,21 +154,28 @@
         {% else %}
           <tr><td colspan="7" class="p-3 text-slate-500">No movies added yet.</td></tr>
         {% endfor %}
+        <tr data-filter-empty class="hidden"><td colspan="7" class="p-3 text-slate-500">No movies match your search.</td></tr>
       </tbody>
     </table>
   </div>
 </section>
 
 <section class="glass-card rounded-2xl p-6 space-y-4">
-  <h2 class="text-lg font-bold text-white">Showtimes ({{ showtimes|length }})</h2>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-bold text-white">Showtimes <span class="text-sm text-slate-500">({{ showtimes|length }})</span></h2>
+      <p class="text-[11px] text-slate-500 mt-0.5">Check scheduled screenings and remaining seats.</p>
+    </div>
+    <input type="search" data-table-filter="showtimes-table" aria-label="Search showtimes" placeholder="Search showtimes" class="w-52 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400">
+  </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-xs text-slate-300">
       <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
         <tr><th class="p-3">ID</th><th class="p-3">Movie</th><th class="p-3">Theatre</th><th class="p-3">Screen</th><th class="p-3">Date</th><th class="p-3">Time</th><th class="p-3">Left</th></tr>
       </thead>
-      <tbody class="divide-y divide-slate-800">
+      <tbody id="showtimes-table" class="divide-y divide-slate-800">
         {% for s in showtimes %}
-          <tr>
+          <tr data-admin-row>
             <td class="p-3">{{ s.id }}</td>
             <td class="p-3 font-semibold text-white">{{ s.movie.title }}</td>
             <td class="p-3">{{ s.theater }}</td>
@@ -142,8 +187,28 @@
         {% else %}
           <tr><td colspan="7" class="p-3 text-slate-500">No showtimes configured yet.</td></tr>
         {% endfor %}
+        <tr data-filter-empty class="hidden"><td colspan="7" class="p-3 text-slate-500">No showtimes match your search.</td></tr>
       </tbody>
     </table>
   </div>
 </section>
+<script>
+  document.querySelectorAll('[data-table-filter]').forEach((input) => {
+    const tableBody = document.getElementById(input.dataset.tableFilter);
+    if (!tableBody) return;
+    const rows = Array.from(tableBody.querySelectorAll('[data-admin-row]'));
+    const emptyRow = tableBody.querySelector('[data-filter-empty]');
+
+    input.addEventListener('input', () => {
+      const query = input.value.trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      rows.forEach((row) => {
+        const matches = row.textContent.toLocaleLowerCase().includes(query);
+        row.classList.toggle('hidden', !matches);
+        if (matches) visibleCount += 1;
+      });
+      if (emptyRow) emptyRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
+    });
+  });
+</script>
 {% endblock %}

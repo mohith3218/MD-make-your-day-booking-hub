@@ -29,7 +29,7 @@
               {% if b.showtime %}{{ b.showtime.show_date.strftime('%d %b') }} · {{ b.showtime.show_time }}{% else %}—{% endif %}
             </td>
             <td class="p-3">{{ b.seats }}</td>
-            <td class="p-3 font-bold text-[#FF2E63] whitespace-nowrap">₹{{ '%.0f'|format(b.total_amount) }}</td>
+            <td class="p-3 font-bold text-[#C9A84C] whitespace-nowrap">₹{{ '%.0f'|format(b.total_amount) }}</td>
             <td class="p-3">{{ b.payment.method if b.payment else '—' }}</td>
             <td class="p-3"><span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ c }}-500/10 text-{{ c }}-400 border border-{{ c }}-500/20">{{ b.status }}</span></td>
           </tr>

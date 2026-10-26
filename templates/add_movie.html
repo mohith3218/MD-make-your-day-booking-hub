@@ -8,14 +8,14 @@
     <a href="{{ url_for('admin') }}" class="text-xs text-slate-400 hover:text-white">← Admin</a>
   </div>
 
-  <form method="POST" class="space-y-4">
-    <input type="text" name="title" placeholder="Movie title" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
-    <textarea name="description" rows="3" placeholder="Description" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]"></textarea>
-    <input type="number" name="duration" placeholder="Duration (minutes)" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+  <form method="POST" enctype="multipart/form-data" class="space-y-4">
+    <input type="text" name="title" placeholder="Movie title" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
+    <textarea name="description" rows="3" placeholder="Description" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]"></textarea>
+    <input type="number" name="duration" placeholder="Duration (minutes)" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
 
     <div class="space-y-1">
       <label class="text-xs font-semibold text-slate-400">Listing Category</label>
-      <select name="category" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      <select name="category" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
         <option value="showing">🎬 Now Showing (Currently running)</option>
         <option value="upcoming">🗓️ Coming Soon (Upcoming release)</option>
       </select>
@@ -23,7 +23,7 @@
 
     <div class="space-y-1">
       <label class="text-xs font-semibold text-slate-400">Release Type</label>
-      <select name="release_type" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      <select name="release_type" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
         <option value="fresh">✨ Fresh Release (New movie)</option>
         <option value="rerelease">🔁 Re-Release (Classic / returning to screens)</option>
       </select>
@@ -31,19 +31,29 @@
 
     <div class="space-y-1">
       <label class="text-xs font-semibold text-slate-400">Release Date (Optional)</label>
-      <input type="date" name="release_date" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      <input type="date" name="release_date" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
     </div>
 
     <div class="flex gap-3">
-      <select name="language" class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      <select name="language" class="flex-1 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
         {% for l in ['Telugu', 'Hindi', 'English', 'Tamil', 'Malayalam', 'Kannada'] %}<option>{{ l }}</option>{% endfor %}
       </select>
-      <select name="certificate" class="w-32 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
+      <select name="certificate" class="w-32 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
         {% for c in ['U', 'U/A', 'A'] %}<option>{{ c }}</option>{% endfor %}
       </select>
     </div>
-    <input type="text" name="poster" placeholder="Poster URL (https://...jpg)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#FF2E63]">
-    <button type="submit" class="w-full py-3 bg-[#FF2E63] hover:bg-rose-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-rose-600/30">Add Movie</button>
+    <input type="text" name="poster" placeholder="Poster URL (https://...jpg)" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
+    <div class="space-y-1">
+      <label for="youtube_trailer" class="text-xs font-semibold text-slate-400">YouTube Trailer (optional)</label>
+      <input id="youtube_trailer" type="text" name="youtube_trailer" placeholder="Paste a YouTube video link or video ID" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
+      <p class="text-[10px] text-slate-500">Use the trailer’s standard YouTube watch link, youtu.be link, or video ID.</p>
+    </div>
+    <div class="space-y-1">
+      <label for="trailer_video" class="text-xs font-semibold text-slate-400">Or upload trailer video</label>
+      <input id="trailer_video" type="file" name="trailer_video" accept="video/mp4,video/webm,.mp4,.webm" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-xs file:text-white">
+      <p class="text-[10px] text-slate-500">MP4 or WebM, up to 250 MB. An uploaded video takes priority over the YouTube link.</p>
+    </div>
+    <button type="submit" class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">Add Movie</button>
   </form>
 </div>
 {% endblock %}

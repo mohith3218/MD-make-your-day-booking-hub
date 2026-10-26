@@ -16,10 +16,10 @@
   <form method="POST" class="glass-card rounded-2xl p-5 space-y-4">
     <div class="flex items-center justify-between gap-3">
       <h2 class="text-sm font-bold text-white">Seating arrangement (JSON)</h2>
-      <button type="submit" class="px-4 py-2 bg-[#FF2E63] hover:bg-rose-600 text-white text-xs font-semibold rounded-xl transition">Save layout</button>
+      <button type="submit" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">Save layout</button>
     </div>
     <textarea name="layout_json" rows="26" spellcheck="false"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-[11px] leading-relaxed text-slate-300 font-mono focus:outline-none focus:border-[#FF2E63]">{{ layout_json }}</textarea>
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-[11px] leading-relaxed text-slate-300 font-mono focus:outline-none focus:border-[#C9A84C]">{{ layout_json }}</textarea>
 
     <div class="text-[10px] text-slate-500 leading-relaxed space-y-1">
       <p><span class="text-slate-300 font-semibold">label</span> row letter · <span class="text-slate-300 font-semibold">count</span> seats in that row (rows can differ)</p>
@@ -38,7 +38,7 @@
         {% for cls in grid %}
           <div class="pt-3 pb-1 flex items-center gap-2">
             <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300">{{ cls.name }}</span>
-            <span class="text-[10px] text-[#FF2E63] font-bold">₹{{ '%.0f'|format(cls.price) }}</span>
+            <span class="text-[10px] text-[#C9A84C] font-bold">₹{{ '%.0f'|format(cls.price) }}</span>
             <span class="flex-1 border-t border-dashed border-slate-800"></span>
             <span class="text-[10px] text-slate-600">{{ cls.seats }}</span>
           </div>
@@ -57,7 +57,7 @@
           {% endfor %}
         {% endfor %}
         <div class="pt-6">
-          <div class="h-2 bg-gradient-to-r from-[#FF2E63]/10 via-[#FF2E63] to-[#FF2E63]/10 rounded-full screen-glow w-2/3 mx-auto"></div>
+          <div class="h-2 bg-gradient-to-r from-[#C9A84C]/10 via-[#C9A84C] to-[#C9A84C]/10 rounded-full screen-glow w-2/3 mx-auto"></div>
           <p class="text-[10px] tracking-[0.3em] text-center text-slate-500 uppercase mt-2">Screen</p>
         </div>
       </div>
