@@ -1259,7 +1259,6 @@
       if (extEl) extEl.textContent = `${exitInfo.distMeters}m (${exitInfo.isLeft ? 'Left' : 'Right'})`;
     }
     document.getElementById('ar-empty-state').classList.add('hidden');
-    postVRPreviewState();
   }
 
   function refreshPovViews() {
@@ -1543,7 +1542,9 @@
       }
     });
     b.addEventListener('click', () => {
-      try { toggleSeatSelection(b); }
+      try {
+        if (toggleSeatSelection(b)) postVRPreviewState(false, null, true);
+      }
       catch (err) { console.warn('Seat selection error:', err); }
     });
   });
@@ -1627,21 +1628,37 @@
     setInterval(syncParty, 2000);
   }
 
-  setInterval(async () => {
+  let availabilityPollRunning = false;
+  const availabilityPoll = setInterval(async () => {
+    if (availabilityPollRunning || document.hidden) return;
+    availabilityPollRunning = true;
     try {
       const res = await fetch('{{ url_for("seat_availability", showtime_id=showtime.id) }}');
+      if (!res.ok) throw new Error('Seat availability request failed');
       const data = await res.json();
-      const gone = new Set([...data.booked, ...data.held]);
+      const booked = new Set(data.booked || []);
+      const held = new Set(data.held || []);
+      let selectionChanged = false;
       document.querySelectorAll('.seat-btn').forEach(b => {
         const id = b.dataset.seat;
-        if (gone.has(id) && !selected.has(id)) {
-          b.disabled = true;
-          b.classList.remove('seat-avail', 'seat-btn');
-          b.classList.add(data.booked.includes(id) ? 'seat-booked' : 'seat-held');
+        const unavailable = booked.has(id) || held.has(id);
+        if (unavailable && selected.has(id)) {
+          selected.delete(id);
+          b.classList.remove('seat-sel');
+          selectionChanged = true;
         }
+        b.disabled = unavailable;
+        b.classList.toggle('seat-avail', !unavailable && !selected.has(id));
+        b.classList.toggle('seat-sel', !unavailable && selected.has(id));
+        b.classList.toggle('seat-booked', booked.has(id));
+        b.classList.toggle('seat-held', held.has(id));
       });
-    } catch (e) {}
+      if (selectionChanged) paint();
+      updateImmersiveBookingPanel();
+      postVRPreviewState();
+    } catch (e) {} finally { availabilityPollRunning = false; }
   }, 10000);
+  window.addEventListener('pagehide', () => clearInterval(availabilityPoll), { once: true });
 
   setInterval(async () => {
     try {
@@ -1668,6 +1685,7 @@
       btn3d.setAttribute('aria-pressed', 'true');
       btn2d.setAttribute('aria-pressed', 'false');
       setInlineCamera('overview');
+      document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:resume' }, window.location.origin);
     } else {
       btn2d.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white shadow";
       btn3d.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
@@ -1676,6 +1694,7 @@
       theaterWrapper.classList.remove('theater-expanded');
       btn3d.setAttribute('aria-pressed', 'false');
       btn2d.setAttribute('aria-pressed', 'true');
+      document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:pause' }, window.location.origin);
     }
   }
 
@@ -1794,6 +1813,7 @@
       ? activePovSeat
       : document.querySelector('.seat-btn.seat-sel[data-seat]') || document.querySelector('.seat-btn.seat-avail[data-seat]');
     modal.classList.remove('hidden');
+    document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:pause' }, window.location.origin);
     const frame = document.getElementById('vr-preview-frame');
     if (!frame.dataset.loaded) {
       frame.onload = () => {
@@ -1816,9 +1836,12 @@
       frame.src = 'about:blank';
       frame.dataset.loaded = '';
     }
+    if (document.getElementById('btn-view-3d')?.getAttribute('aria-pressed') === 'true') {
+      document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:resume' }, window.location.origin);
+    }
   }
 
-  function postVRPreviewState(isInitial = false, onlyFrame = null) {
+  function postVRPreviewState(isInitial = false, onlyFrame = null, cameraRequest = false) {
     const frames = onlyFrame ? [onlyFrame] : [
       document.getElementById('vr-inline-frame'),
       document.getElementById('vr-preview-frame')
@@ -1828,9 +1851,11 @@
       frame.contentWindow.postMessage({
         type: isInitial ? 'cinewave:init' : 'cinewave:selection-state',
         selectedSeats: [...selected.keys()],
+        unavailableSeats: [...document.querySelectorAll('[data-seat].seat-booked, [data-seat].seat-held')].map(button => button.dataset.seat),
         // Keep the initial camera in the full-room view. Later seat changes
         // still move the camera to the seat the customer is inspecting.
-        activeSeat: isInitial ? '' : (activePovSeat?.dataset?.seat || '')
+        activeSeat: activePovSeat?.dataset?.seat || '',
+        cameraRequest: Boolean(cameraRequest)
       }, window.location.origin);
     });
   }
@@ -1839,8 +1864,18 @@
     const frames = [document.getElementById('vr-inline-frame'), document.getElementById('vr-preview-frame')];
     const fromPreview = frames.some(frame => frame && event.source === frame.contentWindow);
     if (!fromPreview || event.origin !== window.location.origin) return;
+    if (event.data?.type === 'cinewave:ready') {
+      postVRPreviewState(false, event.source === document.getElementById('vr-inline-frame')?.contentWindow
+        ? document.getElementById('vr-inline-frame') : document.getElementById('vr-preview-frame'));
+      return;
+    }
+    if (event.data?.type === 'cinewave:fallback-close') {
+      if (event.source === document.getElementById('vr-preview-frame')?.contentWindow) close3dArModal();
+      else toggleTheaterView('2d');
+      return;
+    }
     if (event.data?.type === 'cinewave:toggle-seat') {
-      const seatButton = document.querySelector(`.seat-btn[data-seat="${event.data.seatId}"]`);
+      const seatButton = [...document.querySelectorAll('.seat-btn')].find(button => button.dataset.seat === event.data.seatId);
       if (seatButton && !seatButton.disabled) toggleSeatSelection(seatButton);
       postVRPreviewState();
     } else if (event.data?.type === 'cinewave:checkout') {

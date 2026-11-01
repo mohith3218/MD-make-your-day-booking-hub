@@ -269,8 +269,13 @@
         body.preview-embedded #metrics-panel,
         body.preview-embedded #minimap-drawer,
         body.preview-embedded > .fixed.bottom-3 { display: none !important; }
-        /* Keep the saved seat layout visible if a browser cannot draw WebGL. */
-        #dom-auditorium-fallback { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:clamp(12px,3vh,28px); padding:clamp(90px,13vh,130px) 18px 90px; overflow:auto; perspective:1100px; background:radial-gradient(ellipse at 50% 8%,rgba(201,168,76,.16),transparent 34%),linear-gradient(180deg,#10131b,#07090e 78%); }
+        /* Only show the lightweight map after WebGL actually fails. */
+        #dom-auditorium-fallback { position:absolute; inset:0; z-index:5; display:none; flex-direction:column; align-items:center; justify-content:flex-start; gap:clamp(12px,3vh,28px); padding:clamp(90px,13vh,130px) 18px 90px; overflow:auto; perspective:1100px; background:radial-gradient(ellipse at 50% 8%,rgba(201,168,76,.16),transparent 34%),linear-gradient(180deg,#10131b,#07090e 78%); }
+        body.webgl-fallback #dom-auditorium-fallback { display:flex; }
+        body.webgl-fallback #canvas-container { visibility:hidden; }
+        #dom-auditorium-fallback .fallback-seat { appearance:none; padding:0; cursor:pointer; }
+        #dom-auditorium-fallback .fallback-seat:disabled { cursor:not-allowed; }
+        #dom-auditorium-fallback .fallback-seat.fallback-selected { outline:2px solid #f4d783; box-shadow:0 0 12px #e9bd54; }
         #dom-auditorium-fallback .fallback-screen { flex:0 0 auto; width:min(62vw,720px); height:clamp(46px,10vh,100px); display:grid; place-items:center; border-radius:50% / 16%; border:2px solid rgba(239,205,125,.72); background:linear-gradient(180deg,#343a48,#080a10 72%); box-shadow:0 0 42px rgba(201,168,76,.22),inset 0 0 32px rgba(255,255,255,.08); color:#f8e6b7; font:700 clamp(10px,1.5vw,15px) Inter,sans-serif; letter-spacing:.18em; text-transform:uppercase; }
         #dom-auditorium-fallback .fallback-bowl { width:min(92vw,1100px); min-height:250px; display:flex; flex-direction:column-reverse; align-items:center; justify-content:flex-start; gap:clamp(4px,.9vh,9px); transform:rotateX(18deg); transform-origin:top center; padding:8px 12px 22px; border-radius:46% 46% 18px 18px / 15% 15% 18px 18px; background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(0,0,0,.35)); }
         #dom-auditorium-fallback .fallback-row { display:flex; align-items:center; justify-content:center; gap:clamp(2px,.35vw,5px); width:max-content; max-width:100%; }
@@ -289,6 +294,8 @@
     <!-- 3D WebGL Viewport Container -->
     <div id="canvas-container" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></div>
     <div id="dom-auditorium-fallback" aria-label="Screen seat layout preview">
+        <p id="fallback-explanation" role="status" class="max-w-3xl text-center text-sm text-slate-300">3D preview unavailable. Seat selection below still uses the booking system.</p>
+        <button type="button" onclick="window.parent.postMessage({type:'cinewave:fallback-close'},location.origin)" class="neo-btn rounded-xl px-4 py-2 text-sm font-semibold text-amber-200">Return to booking page</button>
         <div class="fallback-screen">{{ screen_type }} · Screen</div>
         <div class="fallback-bowl">
             {% for row in preview.rowDefs|reverse %}
@@ -296,15 +303,15 @@
                 <span class="fallback-row-label">{{ row.label }}</span>
                 {% for seat_id, seat_state in row.seats.items() %}
                     {% if seat_state != 'available' %}
-                    <span class="fallback-seat fallback-unavailable" title="{{ seat_id }} · unavailable"></span>
+                    <button type="button" data-seat="{{ seat_id }}" data-seat-kind="{% if 'reclin' in row.className|lower or 'sofa' in row.className|lower %}fallback-recliner{% elif 'vip' in row.className|lower or 'prime' in row.className|lower or 'premium' in row.className|lower or 'gold' in row.className|lower %}fallback-premium{% else %}fallback-standard{% endif %}" class="fallback-seat fallback-unavailable" title="{{ seat_id }} · unavailable" aria-label="{{ seat_id }} unavailable" disabled></button>
                     {% elif 'reclin' in row.className|lower or 'sofa' in row.className|lower %}
-                    <span class="fallback-seat fallback-recliner" title="{{ seat_id }} · {{ row.className }}"></span>
+                    <button type="button" data-seat="{{ seat_id }}" class="fallback-seat fallback-recliner" title="{{ seat_id }} · {{ row.className }}" aria-label="Select seat {{ seat_id }}" onclick="window.parent.postMessage({type:'cinewave:toggle-seat',seatId:this.dataset.seat,cameraRequest:true},location.origin); this.classList.toggle('fallback-selected')"></button>
                     {% elif 'vip' in row.className|lower or 'prime' in row.className|lower or 'premium' in row.className|lower or 'gold' in row.className|lower %}
-                    <span class="fallback-seat fallback-premium" title="{{ seat_id }} · {{ row.className }}"></span>
+                    <button type="button" data-seat="{{ seat_id }}" class="fallback-seat fallback-premium" title="{{ seat_id }} · {{ row.className }}" aria-label="Select seat {{ seat_id }}" onclick="window.parent.postMessage({type:'cinewave:toggle-seat',seatId:this.dataset.seat,cameraRequest:true},location.origin); this.classList.toggle('fallback-selected')"></button>
                     {% else %}
-                    <span class="fallback-seat fallback-standard" title="{{ seat_id }} · {{ row.className }}"></span>
+                    <button type="button" data-seat="{{ seat_id }}" class="fallback-seat fallback-standard" title="{{ seat_id }} · {{ row.className }}" aria-label="Select seat {{ seat_id }}" onclick="window.parent.postMessage({type:'cinewave:toggle-seat',seatId:this.dataset.seat,cameraRequest:true},location.origin); this.classList.toggle('fallback-selected')"></button>
                     {% endif %}
-                    {% if loop.index in row.aislesAfter %}<span class="fallback-aisle"></span>{% endif %}
+                    {% if seat_id|replace(row.label, '')|int in row.aislesAfter %}<span class="fallback-aisle"></span>{% endif %}
                 {% endfor %}
             </div>
             {% endfor %}
@@ -410,6 +417,10 @@
                 <i class="fa-solid fa-lightbulb"></i>
                 <span id="lights-label" class="hidden sm:inline text-[11px]">Showtime</span>
             </button>
+            <label class="sr-only" for="quality-select">Preview quality</label>
+            <select id="quality-select" onchange="setRenderQuality(this.value)" class="neo-btn max-w-[92px] rounded-lg px-1.5 py-1.5 text-[10px] text-slate-200" title="Adjust preview performance">
+                <option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option>
+            </select>
         </div>
     </header>
 
@@ -723,16 +734,11 @@
         // Make renderer failures visible on the preview itself instead of leaving a black canvas.
         function showPreviewRuntimeError(error) {
             const host = document.getElementById('canvas-container');
-            if (!host || document.getElementById('preview-runtime-error')) return;
+            if (!host) return;
+            document.body.classList.add('webgl-fallback');
             const message = String(error && (error.message || error.reason || error) || 'Unknown rendering error');
-            const panel = document.createElement('div');
-            panel.id = 'preview-runtime-error';
-            panel.className = 'absolute inset-0 z-50 flex items-center justify-center p-6 text-center';
-            panel.style.cssText = 'background:rgba(3,5,10,.94);color:#f8fafc;font:14px/1.5 Inter, sans-serif;';
-            panel.innerHTML = '<div style="max-width:640px"><strong style="font-size:20px">3D preview could not render</strong><p style="color:#cbd5e1;margin-top:12px">' +
-                message.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])) +
-                '</p></div>';
-            host.appendChild(panel);
+            const detail = document.getElementById('fallback-explanation');
+            if (detail) detail.textContent = `3D preview unavailable (${message}). Use this seat map or return to the booking page.`;
         }
         window.addEventListener('error', event => showPreviewRuntimeError(event.message || event.error));
         window.addEventListener('unhandledrejection', event => showPreviewRuntimeError(event.reason));
@@ -741,9 +747,13 @@
         const currentAudi = {{ preview|tojson }};
         const VIZAG_AUDITORIUMS = { project: currentAudi };
         let currentAudiKey = 'project';
+        // The hover rings are added immediately below, so the scene must exist
+        // before their first use (const bindings are in a temporal dead zone).
+        const scene = new THREE.Scene();
 
         // Dynamic Seat State Registry
         const seatRegistry = new Map(); // 'E8' -> seat metadata + 3D group & meshes
+        let seatInstanceMeshes = [];
         let selectedSeats = new Set();
         let activePOVSeatId = currentAudi.defaultSeat;
         let activeRowIdx = 4;
@@ -756,46 +766,24 @@
         let hoverTimer = null;
         let hoverPreviewSeatId = null;
 
-        // Bootstrapping: the seat preview depends on THREE + the inline build function.
+        // One idempotent boot path. The scene is built once and camera/seat
+        // changes reuse it; retry loops previously started duplicate loops.
+        let previewBooted = false;
         function bootPreview() {
-            if (typeof THREE === 'undefined' || typeof buildParametricAuditorium === 'undefined') {
-                let guard = 0;
-                const attempt = () => {
-                    if (typeof THREE !== 'undefined' && typeof buildParametricAuditorium !== 'undefined') {
-                        loadVizagAuditorium('project');
-                        camera.position.copy(cameraTargetPos);
-                        animate();
-                        return;
-                    }
-                    if (++guard > 120) {
-                        showNetworkSetupWarning();
-                        return;
-                    }
-                    requestAnimationFrame(attempt);
-                };
-                attempt();
+            if (previewBooted) return;
+            if (typeof THREE === 'undefined' || typeof buildParametricAuditorium !== 'function') {
+                showPreviewRuntimeError('The locally bundled Three.js library is unavailable.');
                 return;
             }
-            loadVizagAuditorium('project');
-            camera.position.copy(cameraTargetPos);
-            animate();
-        }
-
-        function showNetworkSetupWarning() {
-            const container = document.getElementById('canvas-container');
-            if (!container) return;
-            const warn = document.createElement('div');
-            warn.id = 'preview-network-warning';
-            warn.className =
-                'absolute inset-0 z-50 flex items-center justify-center text-center p-6 pointer-events-none';
-            warn.innerHTML =
-                '<div class="max-w-md">' +
-                '<div class="text-4xl mb-3">🎬</div>' +
-                '<div class="text-white text-xl font-display font-bold mb-2">CineWave 3D preview could not start</div>' +
-                '<div class="text-slate-400 text-sm leading-relaxed mb-4">This screen needs the Tailwind and Three.js network scripts to render the 3D seat view. If you are on a restricted network or a browser that blocks external scripts, the page shell still loaded fine — only the 3D view is blocked.</div>' +
-                '<div class="text-slate-500 text-xs">Try: open on a normal network, disable script blockers for this site, or use the 2D seat map if available.</div>' +
-                '</div>';
-            container.appendChild(warn);
+            previewBooted = true;
+            try {
+                loadVizagAuditorium('project');
+                camera.position.copy(cameraTargetPos);
+                startAnimationLoop();
+            } catch (error) {
+                previewBooted = false;
+                showPreviewRuntimeError(error);
+            }
         }
 
         // A thin glowing outline ring rendered just above the hovered / selected seat.
@@ -846,18 +834,68 @@
          * 2. THREE.JS SCENE, RENDERER, CAMERA & DYNAMIC AMBILIGHT SETUP
          ********************************************************************/
         const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x04060a);
         scene.fog = new THREE.FogExp2(0x04060a, 0.014);
 
         const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 600);
+        let dustParticles = null;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        const isLowPowerDevice = (navigator.deviceMemory && navigator.deviceMemory <= 2)
+            || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2)
+            || matchMedia('(max-width: 640px)').matches;
+        const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let renderQuality = isLowPowerDevice ? 'low' : 'balanced';
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'default' });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
         container.appendChild(renderer.domElement);
+        document.getElementById('quality-select').value = renderQuality;
+        function setRenderQuality(value) {
+            renderQuality = ['low', 'balanced', 'high'].includes(value) ? value : 'balanced';
+            const scale = renderQuality === 'low' ? 1 : (renderQuality === 'balanced' ? 1.5 : 1.75);
+            const fps = renderQuality === 'low' ? 20 : (renderQuality === 'balanced' ? 30 : 60);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, scale));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.domElement.dataset.maxFps = String(fps);
+            if (dustParticles) dustParticles.visible = renderQuality !== 'low' && !reducedMotion;
+        }
+        setRenderQuality(renderQuality);
+        let animationFrameId = 0;
+        let lastFrameAt = 0;
+        let animationDestroyed = false;
+        function startAnimationLoop() {
+            if (animationDestroyed || document.hidden || !container.isConnected || animationFrameId) return;
+            clock.start();
+            animationFrameId = requestAnimationFrame(animate);
+        }
+        function pauseAnimationLoop() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animationFrameId = 0;
+        }
+        function destroyPreview() {
+            animationDestroyed = true;
+            pauseAnimationLoop();
+            customVideoEl.pause();
+            customVideoEl.removeAttribute('src');
+            customVideoEl.load();
+            screenTexture.dispose();
+            renderer.dispose();
+            renderer.forceContextLoss();
+        }
+        renderer.domElement.addEventListener('webglcontextlost', event => {
+            event.preventDefault();
+            pauseAnimationLoop();
+            showPreviewRuntimeError('Graphics memory was exhausted. Use the seat map or reload the preview.');
+        });
+        document.addEventListener('visibilitychange', () => document.hidden ? pauseAnimationLoop() : startAnimationLoop());
+        window.addEventListener('pagehide', destroyPreview, { once: true });
+        window.addEventListener('message', event => {
+            if (event.origin !== location.origin || event.source !== window.parent) return;
+            if (event.data?.type === 'cinewave:pause') pauseAnimationLoop();
+            if (event.data?.type === 'cinewave:resume') startAnimationLoop();
+        });
 
         // Ambient & House Lights
         const ambientLight = new THREE.AmbientLight(0x182238, 0.75);
@@ -881,7 +919,6 @@
         scene.add(screenLightRight);
 
         // Volumetric Projector Dust Particles
-        let dustParticles = null;
         function createProjectorDust() {
             const count = 220;
             const geo = new THREE.BufferGeometry();
@@ -1046,6 +1083,7 @@
                 screenLightCenter.color.setHSL(0.08 + pulse * 0.03, 0.95, 0.55);
                 screenLightLeft.color.setHSL(0.04, 0.9, 0.48);
                 screenLightRight.color.setHSL(0.11, 0.9, 0.50);
+                sCtx.restore();
 
             } else if (screenChannel === 'scifi') {
                 const pulse = Math.sin(time * 1.4) * 0.5 + 0.5;
@@ -1376,11 +1414,6 @@
             // Soft, bevelled upholstery panels keep the seat silhouette clean
             // at both overview distance and close seat POV.
             const upholsteryGeo = new THREE.SphereGeometry(1, 24, 18);
-            const seatCushionGeo = upholsteryGeo;
-            const headrestGeo = upholsteryGeo;
-            const lumbarGeo = upholsteryGeo;
-            const armrestGeo = upholsteryGeo;
-            const footrestGeo = upholsteryGeo;
             const backShape = new THREE.Shape();
             backShape.moveTo(-0.4, 0.02);
             backShape.bezierCurveTo(-0.48, 0.02, -0.49, 0.14, -0.44, 0.22);
@@ -1395,28 +1428,43 @@
                 depth: 0.14, bevelEnabled: true, bevelSegments: 4,
                 bevelThickness: 0.045, bevelSize: 0.035, curveSegments: 10
             });
-            const insetShape = new THREE.Shape();
-            insetShape.moveTo(-0.3, 0.17);
-            insetShape.quadraticCurveTo(-0.35, 0.2, -0.34, 0.31);
-            insetShape.lineTo(-0.32, 0.89);
-            insetShape.quadraticCurveTo(-0.31, 1.08, -0.18, 1.09);
-            insetShape.lineTo(0.18, 1.09);
-            insetShape.quadraticCurveTo(0.31, 1.08, 0.32, 0.89);
-            insetShape.lineTo(0.34, 0.31);
-            insetShape.quadraticCurveTo(0.35, 0.2, 0.3, 0.17);
-            insetShape.quadraticCurveTo(0, 0.12, -0.3, 0.17);
-            const seatBackInsetGeo = new THREE.ExtrudeGeometry(insetShape, {
-                depth: 0.045, bevelEnabled: true, bevelSegments: 3,
-                bevelThickness: 0.025, bevelSize: 0.02, curveSegments: 8
-            });
-            const stitchGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.72, 8);
-            const armSupportGeo = new THREE.CylinderGeometry(0.045, 0.065, 0.34, 12);
-            const seatPedestalGeo = new THREE.CylinderGeometry(0.08, 0.11, 0.2, 12);
-            const cupholderGeo = new THREE.CylinderGeometry(0.066, 0.058, 0.085, 16);
-            const cupholderRingGeo = new THREE.TorusGeometry(0.061, 0.012, 8, 18);
-            const cupholderMat = new THREE.MeshStandardMaterial({ color: 0x06070a, metalness: 0.45, roughness: 0.28 });
+            // Three instanced batches replace the many individual seat meshes:
+            // upholstery (cushion/headrest/footrest), backs, and armrests.
+            // Instance colors preserve availability, class and cart states.
+            const seatCapacity = config.rowDefs.reduce((sum, row) => {
+                const start = Number(row.start || 1);
+                const count = Number(row.count || 0);
+                const blocked = new Set(row.blocked || []);
+                let blockedInRow = 0;
+                for (let n = start; n < start + count; n++) if (blocked.has(`${row.label}${n}`)) blockedInRow++;
+                return sum + Math.max(0, count - blockedInRow);
+            }, 0);
+            const upholsteryMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0.01 });
+            const armGeometry = new THREE.SphereGeometry(1, 10, 8);
+            const cushionInstances = new THREE.InstancedMesh(upholsteryGeo, upholsteryMaterial, Math.max(1, seatCapacity * 3));
+            const backInstances = new THREE.InstancedMesh(seatBackGeo, upholsteryMaterial, Math.max(1, seatCapacity));
+            const armInstances = new THREE.InstancedMesh(armGeometry, matArmrest, Math.max(1, seatCapacity * 2));
+            seatInstanceMeshes = [cushionInstances, backInstances, armInstances];
+            cushionInstances.count = backInstances.count = armInstances.count = 0;
+            cushionInstances.userData.instanceSeatIds = [];
+            backInstances.userData.instanceSeatIds = [];
+            armInstances.userData.instanceSeatIds = [];
+            auditoriumGroup.add(cushionInstances, backInstances, armInstances);
+            interactiveSeatMeshes.push(cushionInstances, backInstances);
+            function writeSeatPart(seat, part) {
+                const child = new THREE.Object3D();
+                child.position.copy(part.position);
+                child.rotation.x = part.rotationX || 0;
+                child.scale.copy(part.scale);
+                child.updateMatrix();
+                const matrix = seat.group.matrix.clone().multiply(child.matrix);
+                part.mesh.setMatrixAt(part.index, matrix);
+                part.mesh.instanceMatrix.needsUpdate = true;
+                part.mesh.userData.instanceSeatIds[part.index] = seat.id;
+            }
 
             const rowConfigByLabel = new Map(config.rowDefs.map(row => [row.label, row]));
+            let seatInstanceIndex = 0;
             rows.forEach((rowLetter, rIdx) => {
                 const rowConfig = rowConfigByLabel.get(rowLetter);
                 if (!rowConfig) return;
@@ -1439,7 +1487,7 @@
                 const rowUnits = rowConfig.count * rowSpan + aisles.length * 1.1 + Number(rowConfig.offset || 0);
                 for (let sNum = firstSeat; sNum < firstSeat + rowConfig.count; sNum++) {
                     const seatId = `${rowLetter}${sNum}`;
-                    if (rowConfig.blocked.includes(seatId)) continue;
+                    if ((rowConfig.blocked || []).includes(seatId)) continue;
                     const seatIndex = sNum - firstSeat;
                     const aislesBefore = aisles.filter(aisle => sNum > aisle).length;
                     const seatX = (seatIndex * rowSpan + rowSpan / 2 + aislesBefore * 1.1
@@ -1461,77 +1509,55 @@
                     // back behind the seated camera instead of in its sightline.
                     seatGroup.rotation.y = Math.atan2(seatX, rowZ - screenSurfaceZ);
 
-                    let mat = isOccupied ? matOccupied : (isRecliner ? matReclinerAvail : (isVIP ? matVipAvail : matStdAvail));
-                    if (!isOccupied && selectedSeats.has(seatId)) mat = matSelectedCart;
-                    if (seatId === activePOVSeatId && !selectedSeats.has(seatId)) mat = matActivePOV;
-
-                    const cushion = new THREE.Mesh(seatCushionGeo, mat);
-                    cushion.position.set(0, 0.43, 0);
-                    cushion.scale.set(0.5, 0.17, 0.47);
-                    cushion.userData = { seatId };
-                    seatGroup.add(cushion);
-
-                    const backPivot = new THREE.Group();
-                    backPivot.position.set(0, 0.48, 0.32);
-                    backPivot.rotation.x = -0.14;
-                    const backrest = new THREE.Mesh(seatBackGeo, mat);
-                    backrest.position.set(0, 0, -0.1);
-                    backrest.userData = { seatId };
-                    backPivot.add(backrest);
-                    const headrest = new THREE.Mesh(headrestGeo, mat);
-                    headrest.position.set(0, 1.1, 0.09);
-                    headrest.scale.set(0.33, 0.2, 0.12);
-                    headrest.userData = { seatId };
-                    backPivot.add(headrest);
-                    const backInset = new THREE.Mesh(seatBackInsetGeo, matSeatInset);
-                    backInset.position.set(0, 0.02, 0.065);
-                    backInset.userData = { seatId };
-                    backPivot.add(backInset);
-                    const lumbar = new THREE.Mesh(lumbarGeo, matSeatInset);
-                    lumbar.position.set(0, 0.4, 0.125);
-                    lumbar.scale.set(0.3, 0.18, 0.055);
-                    backPivot.add(lumbar);
-                    [-0.365, 0.365].forEach(x => {
-                        const stitch = new THREE.Mesh(stitchGeo, matSeatStitch);
-                        stitch.position.set(x, 0.62, 0.13);
-                        stitch.scale.y = 0.84;
-                        backPivot.add(stitch);
+                    seatGroup.updateMatrix();
+                    seatGroup.updateMatrixWorld(true);
+                    const part = (mesh, index, position, scale, rotationX = 0, kind = '') => ({
+                        mesh, index, position: new THREE.Vector3(...position),
+                scale: new THREE.Vector3(...scale), rotationX, kind
                     });
-                    seatGroup.add(backPivot);
-
-                    const pedestal = new THREE.Mesh(seatPedestalGeo, matArmrest);
-                    pedestal.position.set(0, 0.13, -0.12);
-                    seatGroup.add(pedestal);
-                    const armL = new THREE.Mesh(armrestGeo, mat);
-                    armL.position.set(-0.52, 0.65, 0.035);
-                    armL.scale.set(0.13, 0.115, 0.43);
-                    seatGroup.add(armL);
-                    const armR = new THREE.Mesh(armrestGeo, mat);
-                    armR.position.set(0.52, 0.65, 0.035);
-                    armR.scale.set(0.13, 0.115, 0.43);
-                    seatGroup.add(armR);
-                    [-0.52, 0.52].forEach(x => {
-                        const support = new THREE.Mesh(armSupportGeo, matArmrest);
-                        support.position.set(x, 0.4, 0.035);
-                        seatGroup.add(support);
+                    const base = seatInstanceIndex++;
+                    const backIndex = base;
+                    const upholsteryStart = base * 3;
+                    const armStart = base * 2;
+                    const reclineTilt = seatId === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
+                    const isWide = rowSpan > 1;
+                    const seatWidth = rowSpan * (isRecliner ? 1.12 : (isVIP ? 1.07 : (isWide ? 1 : 1)));
+                    const seatHeight = isRecliner ? 0.72 : (isVIP ? 0.69 : 0.67);
+                    const seatDepth = isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82);
+                    const seat = {
+                        id: seatId, row: rowLetter, rowIndex: rIdx, num: sNum,
+                        isOccupied, isVIP, isRecliner, tier, price,
+                        worldPos: seatGroup.position.clone(),
+                        eyePos: seatGroup.localToWorld(new THREE.Vector3(0, 1.35, -0.58)),
+                        group: seatGroup,
+                        instanceParts: [
+                            part(cushionInstances, upholsteryStart, [0, 0.43, 0], [0.5 * seatWidth, 0.17 * seatHeight, 0.47 * seatDepth]),
+                            part(cushionInstances, upholsteryStart + 1, [0, 1.58, 0.41], [0.33 * seatWidth, 0.2 * seatHeight, 0.12 * seatDepth]),
+                            part(cushionInstances, upholsteryStart + 2, [0, 0.22, 0.72], isRecliner ? [0.43 * seatWidth, 0.105 * seatHeight, 0.27 * seatDepth] : [0, 0, 0]),
+                            part(backInstances, backIndex, [0, 0.48, 0.22], [seatWidth, seatHeight, seatDepth], reclineTilt, 'back'),
+                            part(armInstances, armStart, [-0.52 * seatWidth, 0.65, 0.035], [0.13 * seatWidth, 0.115 * seatHeight, 0.43 * seatDepth]),
+                            part(armInstances, armStart + 1, [0.52 * seatWidth, 0.65, 0.035], [0.13 * seatWidth, 0.115 * seatHeight, 0.43 * seatDepth])
+                        ],
+                        meshes: [
+                            { mesh: cushionInstances, index: upholsteryStart },
+                            { mesh: cushionInstances, index: upholsteryStart + 1 },
+                            { mesh: backInstances, index: backIndex },
+                            ...(isRecliner ? [{ mesh: cushionInstances, index: upholsteryStart + 2 }] : [])
+                        ],
+                        updateTransforms() {
+                            this.group.updateMatrix();
+                            this.instanceParts.forEach(item => writeSeatPart(this, item));
+                        }
+                    };
+                    seat.instanceParts.forEach(item => {
+                        item.mesh.userData.partKind = item.kind;
+                        item.mesh.count = Math.max(item.mesh.count, item.index + 1);
+                        writeSeatPart(seat, item);
                     });
-                    const cup = new THREE.Mesh(cupholderGeo, cupholderMat);
-                    cup.position.set(0.52, 0.72, 0.31);
-                    seatGroup.add(cup);
-                    const cupRing = new THREE.Mesh(cupholderRingGeo, matSeatStitch);
-                    cupRing.rotation.x = Math.PI / 2;
-                    cupRing.position.set(0.52, 0.766, 0.31);
-                    seatGroup.add(cupRing);
-
-                    if (isRecliner) {
-                        const footrest = new THREE.Mesh(footrestGeo, mat);
-                        footrest.position.set(0, 0.22, 0.72);
-                        footrest.scale.set(0.43, 0.105, 0.27);
-                        seatGroup.add(footrest);
-                    }
-
-                    auditoriumGroup.add(seatGroup);
-                    interactiveSeatMeshes.push(cushion, backrest, headrest, backInset, lumbar);
+                    seat.meshes.forEach(ref => { ref.mesh.userData.instanceSeatIds[ref.index] = seatId; });
+                    seatRegistry.set(seatId, seat);
+                    const initialColor = isOccupied ? matOccupied.color : (isRecliner ? matReclinerAvail.color : (isVIP ? matVipAvail.color : matStdAvail.color));
+                    seat.meshes.forEach(ref => ref.mesh.setColorAt(ref.index, initialColor));
 
                     if (aisles.includes(sNum)) {
                         const stripGeo = new THREE.BoxGeometry(0.14, 0.04, 2.3);
@@ -1544,36 +1570,26 @@
                     // Put the camera at seated eye height on the seat's front
                     // side. The local -Z direction faces the screen; transforming
                     // it through the seat group also handles side-row rotation.
-                    const eyePos = seatGroup.localToWorld(new THREE.Vector3(0, 1.35, -0.58));
-                    seatRegistry.set(seatId, {
-                        id: seatId, row: rowLetter, rowIndex: rIdx, num: sNum,
-                        isOccupied, isVIP, isRecliner, tier, price,
-                        worldPos: new THREE.Vector3(seatX, rowY, rowZ), eyePos,
-                        meshes: [cushion, backrest, headrest, backInset, lumbar], backPivot, group: seatGroup
-                    });
                 }
+            });
+            [cushionInstances, backInstances, armInstances].forEach(mesh => {
+                if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+                mesh.instanceMatrix.needsUpdate = true;
             });
         }
         function refreshAllSeatMaterials() {
             seatRegistry.forEach((seat) => {
-                let targetMat = seat.isOccupied
-                    ? matOccupied
-                    : (seat.isRecliner ? matReclinerAvail : (seat.isVIP ? matVipAvail : matStdAvail));
-                if (selectedSeats.has(seat.id)) targetMat = matSelectedCart;
-                else if (seat.id === activePOVSeatId) targetMat = matActivePOV;
-                seat.meshes.forEach(m => { m.material = targetMat; });
+                const targetColor = seat.isOccupied ? matOccupied.color
+                    : (selectedSeats.has(seat.id) ? matSelectedCart.color
+                    : (seat.id === activePOVSeatId ? matActivePOV.color
+                    : (seat.isRecliner ? matReclinerAvail.color : (seat.isVIP ? matVipAvail.color : matStdAvail.color))));
+                seat.meshes.forEach(ref => ref.mesh.setColorAt(ref.index, targetColor));
+                const back = seat.instanceParts.find(item => item.kind === 'back');
+                if (back) back.rotationX = seat.id === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
 
-                // Apply recline angle to active POV seat
-                if (seat.backPivot) {
-                    const tilt = seat.id === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
-                    seat.backPivot.rotation.x = tilt;
-                }
-
-                // Gentle hover lift for the seat currently under the pointer.
-                const wantElevation = (seat.group && seat.group.userData && seat.group.userData.hoverElevation) || 0;
-                seat.group.position.y += (wantElevation - (seat.group.userData.prevElevation || 0));
-                seat.group.userData.prevElevation = wantElevation;
+                seat.updateTransforms();
             });
+            seatInstanceMeshes.forEach(mesh => { if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; });
         }
 
         /********************************************************************
@@ -1937,8 +1953,11 @@
                     }
                 }
                 const prev = ud.prevElevation || 0;
-                seat.group.position.y += (wantElev - prev);
-                ud.prevElevation = wantElev;
+                if (Math.abs(wantElev - prev) > 0.0001) {
+                    seat.group.position.y += (wantElev - prev);
+                    ud.prevElevation = wantElev;
+                    seat.updateTransforms();
+                }
             });
         }
 
@@ -2060,16 +2079,20 @@
         }
 
         function receiveProjectSelectionState(message) {
+            const unavailable = new Set(message.unavailableSeats || []);
+            seatRegistry.forEach(seat => { seat.isOccupied = unavailable.has(seat.id); });
             selectedSeats = new Set((message.selectedSeats || []).filter(seatId => {
                 const seat = seatRegistry.get(seatId);
                 return seat && !seat.isOccupied;
             }));
+            document.querySelectorAll('#dom-auditorium-fallback [data-seat]').forEach(button =>
+                button.classList.toggle('fallback-selected', selectedSeats.has(button.dataset.seat)));
             refreshAllSeatMaterials();
             render2DMinimap();
             if (message.activeSeat && seatRegistry.has(message.activeSeat)) {
                 const active = seatRegistry.get(message.activeSeat);
                 activePOVSeatId = active.id;
-                if (cameraMode === 'seat') {
+                if (message.cameraRequest === true) {
                     selectAndFlyToSeat(active.row, active.num, false);
                 } else {
                     // Keep an overview or camera preset steady while the parent
@@ -2105,7 +2128,8 @@
         // Resolve the first seat mesh hit into a seat id (deduplicates the 5 seat meshes).
         function seatIdFromHit(hit) {
             if (!hit) return null;
-            const id = hit.object.userData && hit.object.userData.seatId;
+            const id = hit.object.userData?.instanceSeatIds?.[hit.instanceId]
+                || (hit.object.userData && hit.object.userData.seatId);
             if (!id) return null;
             const seat = seatRegistry.get(id);
             return seat ? id : null;
@@ -2566,26 +2590,37 @@
         const eulerRot = new THREE.Euler(0, 0, 0, 'YXZ');
         const quatBase = new THREE.Quaternion();
         const quatOffset = new THREE.Quaternion();
-        const dummyCam = new THREE.Object3D();
+        // Cameras look down local -Z while Object3D.lookAt faces +Z; using a
+        // camera here avoids the previous 180° flip away from the screen.
+        const dummyCam = new THREE.PerspectiveCamera();
 
         function animate() {
-            requestAnimationFrame(animate);
-            const delta = Math.min(clock.getDelta(), 0.05);
+            animationFrameId = 0;
+            if (animationDestroyed || document.hidden || !container.isConnected) return;
+            const now = performance.now();
+            const maxFps = Number(renderer.domElement.dataset.maxFps || 30);
+            if (now - lastFrameAt < 1000 / maxFps) {
+                animationFrameId = requestAnimationFrame(animate);
+                return;
+            }
+            const frameGap = now - lastFrameAt;
+            lastFrameAt = now;
+            const delta = Math.min(Math.max(frameGap / 1000, clock.getDelta()), 0.05);
             const elapsed = clock.elapsedTime;
             const cameraBlend = 1 - Math.exp(-6 * delta);
             const rotationBlend = 1 - Math.exp(-8 * delta);
 
             // 1. Update Live Blockbuster Movie Screen Canvas & Ambilight
-            renderDynamicScreenCanvas(elapsed);
+            if (!reducedMotion || lastFrameAt % 500 < frameGap) renderDynamicScreenCanvas(elapsed);
 
             // 2. Pulse 3D Green Floor Egress Beacon Nodes toward Nearest Exit
-            egressNodes.forEach((node, idx) => {
+            if (!reducedMotion) egressNodes.forEach((node, idx) => {
                 const wave = Math.sin(elapsed * 5.0 - idx * 0.7) * 0.5 + 0.5;
                 node.scale.setScalar(0.75 + wave * 0.65);
             });
 
             // 3. Subtle Projector Dust Drift
-            if (dustParticles) {
+            if (dustParticles && !reducedMotion && renderQuality !== 'low') {
                 dustParticles.rotation.y = Math.sin(elapsed * 0.15) * 0.04;
             }
 
@@ -2634,6 +2669,7 @@
 
                 camera.translateX(-0.032);
             }
+            animationFrameId = requestAnimationFrame(animate);
         }
 
         window.addEventListener('resize', () => {
@@ -2642,82 +2678,40 @@
             renderer.setSize(w, h);
             camera.aspect = (isVRStereo ? w / 2 : w) / h;
             camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, renderQuality === 'high' ? 1.75 : (renderQuality === 'balanced' ? 1.5 : 1)));
         });
 
-        // Kick off the 3D seat preview immediately. The external libraries targeted by this
-        // file (Tailwind CDN, THREE r128, Font Awesome) are normal-network scripts; when a
-        // browser blocks those network requests (common on restricted/walled-garden networks),
-        // the page will still render its shell and report a clear setup status instead of a
-        // blank screen. On a normal network the onload path runs the scene immediately.
-        (function bootPreview() {
-            if (typeof THREE === 'undefined' || typeof buildParametricAuditorium === 'undefined') {
-                // Retry each frame until the expected symbols exist, then build the scene once.
-                let guard = 0;
-                const attempt = () => {
-                    if (typeof THREE !== 'undefined' && typeof buildParametricAuditorium !== 'undefined') {
-                        loadVizagAuditorium('project');
-                        camera.position.copy(cameraTargetPos);
-                        animate();
-                        return;
-                    }
-                    if (++guard > 120) {
-                        showNetworkSetupWarning();
-                        return;
-                    }
-                    requestAnimationFrame(attempt);
-                };
-                attempt();
-                return;
-            }
-            loadVizagAuditorium('project');
-            camera.position.copy(cameraTargetPos);
-            animate();
-        })();
-        // Also attempt immediately so the page doesn't wait for the window load event.
-        // Start the 3D preview now if the symbols are already available. If not, keep
-        // retrying each animation frame (and also listen for the window load event) until
-        // they arrive or we time out and show a clear network/script-blocker notice.
-        function tryBootNow() { /* noop placeholder */ }
-        // Start the scene now if the required symbols are already on the page. If not, keep
-        // retrying each animation frame (and also listen for window load) until they arrive or
-        // we time out and show a clear network / script-blocker notice instead of a blank view.
-        function bootIfReady() {
-            if (typeof THREE === 'undefined' || typeof buildParametricAuditorium === 'undefined') return false;
+        // Start once after the DOM is ready. All dependencies are local and
+        // loaded synchronously before this script.
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootPreview, { once: true });
+        } else {
             bootPreview();
-            return true;
         }
-        if (!bootIfReady()) {
-            let guard = 0;
-            const attempt = () => {
-                if (bootIfReady()) return;
-                if (++guard > 120) {
-                    showNetworkSetupWarning();
-                    return;
+    </script>
+    <script>
+        // Keep the low-memory seat-map fallback synchronized even if Three.js
+        // or WebGL fails before the main preview script finishes initializing.
+        (() => {
+            let announced = false;
+            window.addEventListener('message', event => {
+                if (event.origin !== location.origin || event.source !== window.parent) return;
+                if (!['cinewave:init', 'cinewave:selection-state'].includes(event.data?.type)) return;
+                const selected = new Set(event.data.selectedSeats || []);
+                const unavailable = new Set(event.data.unavailableSeats || []);
+                document.querySelectorAll('#dom-auditorium-fallback [data-seat]').forEach(button => {
+                    const isUnavailable = unavailable.has(button.dataset.seat);
+                    button.disabled = isUnavailable;
+                    button.classList.toggle('fallback-unavailable', isUnavailable);
+                    if (!isUnavailable && button.dataset.seatKind) button.classList.add(button.dataset.seatKind);
+                    button.classList.toggle('fallback-selected', selected.has(button.dataset.seat));
+                });
+                if (!announced) {
+                    announced = true;
+                    window.parent.postMessage({ type: 'cinewave:ready' }, location.origin);
                 }
-                requestAnimationFrame(attempt);
-            };
-            attempt();
-            window.addEventListener('load', () => bootIfReady());
-        // Also run immediately once more in case the load event already fired before this block.
-        bootIfReady();
-        }
-
-        function showNetworkSetupWarning() {
-            const container = document.getElementById('canvas-container');
-            if (!container) return;
-            const warn = document.createElement('div');
-            warn.id = 'preview-network-warning';
-            warn.className =
-                'absolute inset-0 z-50 flex items-center justify-center text-center p-6 pointer-events-none';
-            warn.innerHTML =
-                '<div class="max-w-md">' +
-                '<div class="text-4xl mb-3">🎬</div>' +
-                '<div class="text-white text-xl font-display font-bold mb-2">CineWave 3D preview could not start</div>' +
-                '<div class="text-slate-400 text-sm leading-relaxed mb-4">This screen needs the Tailwind and Three.js network scripts to render the 3D seat view. If you are on a restricted network or a browser that blocks external scripts, the page shell still loaded fine — only the 3D view is blocked.</div>' +
-                '<div class="text-slate-500 text-xs">Try: open on a normal network, disable script blockers for this site, or use the 2D seat map if available.</div>' +
-                '</div>';
-            container.appendChild(warn);
-        }
+            });
+        })();
     </script>
 </body>
 </html>
