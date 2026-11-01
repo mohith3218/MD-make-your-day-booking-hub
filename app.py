@@ -1356,6 +1356,9 @@ def vr_seat_preview(showtime_id):
         abort(404)
 
     layout = showtime.layout or {}
+    geometry_errors = sl.validate_auditorium_geometry(layout)
+    if geometry_errors:
+        abort(422, description="This screen layout needs correction before the 3D preview can safely render it: " + geometry_errors[0])
     unavailable = showtime.booked_seat_ids() | showtime.held_seat_ids()
     dynamic = showtime.dynamic_pricing_info
     row_defs = []
@@ -1382,6 +1385,7 @@ def vr_seat_preview(showtime_id):
                 'seatSpan': max(1, int(row.get('seat_span', 1))),
                 'classCode': code, 'className': cls.get('name', 'Standard'),
                 'price': price, 'seats': seats,
+                'level_id': row.get('level_id'),
             })
 
     if not row_defs:
@@ -1408,6 +1412,7 @@ def vr_seat_preview(showtime_id):
         height = float(screen.get('height_m') or (width / aspect))
     except (TypeError, ValueError):
         height = width / aspect
+    geometry = sl.auditorium_geometry(layout, row_defs, fallback_aspect)
     all_seat_ids = [seat_id for row in row_defs for seat_id in row['seats']]
     available_ids = [seat_id for row in row_defs for seat_id, state in row['seats'].items() if state == 'available']
     middle_row = row_defs[len(row_defs) // 2]
@@ -1418,10 +1423,11 @@ def vr_seat_preview(showtime_id):
     preview = {
         'name': f'{showtime.theater} · {showtime.screen.name}',
         'movieTitle': showtime.movie.title,
-        'sub': f'{showtime.screen.screen_type} · {len(row_defs)} rows · {sum(len(r["seats"]) for r in row_defs)} seats',
+        'sub': f'{showtime.screen.screen_type} · {len(row_defs)} rows · {sum(len(r["seats"]) for r in row_defs)} seats' + (' · dimensions estimated' if geometry.get('estimated') else ''),
         'rows': [row['label'] for row in row_defs], 'rowDefs': row_defs,
         'cols': max_seat, 'aislesAfter': [], 'vipRows': [], 'reclinerRows': [],
         'screenWidth': width, 'screenHeight': height,
+        'geometry': geometry,
         'visual': layout.get('visual') or {
             'seat_color': '#51252d', 'wall_color': '#11151d',
             'trim_color': '#c9a84c', 'seat_style': 'standard',
@@ -2690,6 +2696,10 @@ def add_screen():
         except json.JSONDecodeError as e:
             flash(f"Layout JSON is invalid: {e}")
             return redirect(url_for('add_screen'))
+        geometry_errors = sl.validate_auditorium_geometry(layout)
+        if geometry_errors:
+            flash("Screen layout was not added: " + " ".join(geometry_errors[:4]))
+            return redirect(url_for('add_screen'))
         screen = Screen(theater_id=theater_id, name=name,
                         screen_type=request.form.get('screen_type', '2D'))
         screen.layout = layout
@@ -2716,6 +2726,10 @@ def edit_layout(screen_id):
         except json.JSONDecodeError as e:
             flash(f"Layout JSON is invalid: {e}")
             return redirect(url_for('edit_layout', screen_id=screen_id))
+        geometry_errors = sl.validate_auditorium_geometry(layout)
+        if geometry_errors:
+            flash("Layout was not saved: " + " ".join(geometry_errors[:4]))
+            return redirect(url_for('edit_layout', screen_id=screen_id))
         screen.layout = layout
         db.session.commit()
         flash(f"Layout saved — {screen.total_seats} seats.")
@@ -2723,7 +2737,12 @@ def edit_layout(screen_id):
 
     grid = sl.build_layout(screen.layout)
     return render_template('edit_layout.html', screen=screen, grid=grid,
-                           layout_json=json.dumps(screen.layout, indent=2))
+                           layout_json=json.dumps(screen.layout, indent=2),
+                           geometry_json=json.dumps({
+                               'screen': (screen.layout or {}).get('screen', {}),
+                               'room': (screen.layout or {}).get('room', {}),
+                               'levels': (screen.layout or {}).get('levels', []),
+                           }, indent=2))
 
 
 @app.route('/admin/add_showtime', methods=['GET', 'POST'])

@@ -5,6 +5,9 @@ import app as A
 A.app.config['WTF_CSRF_ENABLED'] = False
 
 def main():
+    # Keep the development launcher aligned with app.py: this performs only
+    # idempotent migrations/seeding and merges missing geometry metadata.
+    A.init_db()
     print('LISTEN http://127.0.0.1:5000')
     A.app.run(host='127.0.0.1', port=5000)
 

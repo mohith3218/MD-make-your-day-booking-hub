@@ -1172,6 +1172,7 @@
         let auditoriumCenterTarget = new THREE.Vector3(0, 5, 0);
         let auditoriumRearWallZ = 11;
         let auditoriumOverviewCamera = new THREE.Vector3(0, 16, -22);
+        let auditoriumOverviewFov = 58;
 
         // Shared PBR Materials
         // Soft upholstery palette: velvet, brass, and deep jade; selection and
@@ -1205,6 +1206,27 @@
         }
 
         function buildParametricAuditorium(config) {
+            // Release generated geometry from the previous layout while keeping
+            // global palette materials and the shared movie texture alive.
+            const keepMaterials = new Set([matStdAvail, matVipAvail, matReclinerAvail,
+                matSelectedCart, matActivePOV, matOccupied, matArmrest, matSeatInset, matSeatStitch]);
+            const oldGeometries = new Set();
+            const oldMaterials = new Set();
+            const oldTextures = new Set();
+            auditoriumGroup.traverse(object => {
+                if (!object.isMesh) return;
+                if (object.geometry) oldGeometries.add(object.geometry);
+                const materials = Array.isArray(object.material) ? object.material : [object.material];
+                materials.forEach(material => {
+                    if (material && !keepMaterials.has(material)) {
+                        oldMaterials.add(material);
+                        if (material.map && material.map !== screenTexture) oldTextures.add(material.map);
+                    }
+                });
+            });
+            oldGeometries.forEach(geometry => geometry.dispose());
+            oldMaterials.forEach(material => material.dispose());
+            oldTextures.forEach(texture => texture.dispose());
             // Clear existing 3D objects
             while (auditoriumGroup.children.length > 0) {
                 auditoriumGroup.remove(auditoriumGroup.children[0]);
@@ -1221,23 +1243,29 @@
             matStdAvail.color.set(seatBaseColor);
             matVipAvail.color.set(trimBaseColor);
             matReclinerAvail.color.set(seatBaseColor);
-            const widestRow = Math.max(1, ...config.rowDefs.map(row => row.count * row.seatSpan + row.aislesAfter.length * 1.1 + row.offset));
-            const hallHalfWidth = (widestRow * 1.38) / 2 + 3.4;
-            const rowSpacing = Number(config.rowSpacing || 2.45);
-            const stadiumSlope = Number(config.stadiumSlope || 0.55);
-            const lastRowZ = -5.5 + (rows.length - 1) * rowSpacing;
-            const rearRowY = 0.35 + (rows.length - 1) * stadiumSlope;
+            const geometry = config.geometry || {};
+            const physicalRoom = geometry.room || {};
+            const physicalScreen = geometry.screen || {};
+            const rowPositions = geometry.rows || [];
+            const widestRow = Math.max(1, ...config.rowDefs.map(row => row.count * row.seatSpan * 0.62 + row.aislesAfter.length * 0.85 + row.offset * 0.62));
+            const hallHalfWidth = Math.max(widestRow / 2 + 2.5, Number(physicalRoom.width || widestRow + 5) / 2);
+            const rowSpacing = Number(config.rowSpacing || 1.15);
+            const stadiumSlope = Number(config.stadiumSlope || 0.18);
+            const farthestRowZ = Math.max(8, ...rowPositions.map(p => Number(p.z || 0)));
+            const rearRowY = Math.max(0.35, ...rowPositions.map(p => Number(p.y || 0)));
+            const roomHeight = Math.max(Number(physicalRoom.height || 8), physicalScreen.bottom + physicalScreen.height + 2, rearRowY + 4);
 
             // 1. Giant Curved Cinema Screen
-            const thetaLength = Math.max(0.06, config.screenCurve * Math.PI);
-            const radius = Math.max(8, Number(config.screenWidth || 18) / thetaLength);
+            const configuredCurve = Number(physicalScreen.curve ?? ((physicalScreen.surface === 'flat' || physicalScreen.surface === 'led') ? 0 : (config.screenCurve ?? 0.3)));
+            const thetaLength = (physicalScreen.surface === 'flat' || physicalScreen.surface === 'led' || configuredCurve === 0) ? 0 : Math.max(0.01, configuredCurve * Math.PI);
+            const radius = thetaLength ? Math.max(8, Number(physicalScreen.width || config.screenWidth || 18) / thetaLength) : 0;
             // Flip the auditorium so the screen faces into the room from the -Z end.
             // CylinderGeometry uses x = r·sin(theta), z = r·cos(theta).
             const thetaStart = -thetaLength / 2;
-            const screenSurfaceZ = -lastRowZ - Math.max(10, rowSpacing * 4);
-            const screenY = config.screenHeight * 0.56;
-            auditoriumRearWallZ = 5.5 + Math.max(5.5, rowSpacing * 2.2);
-            const hallDepth = auditoriumRearWallZ - screenSurfaceZ + 4;
+            const screenSurfaceZ = 0;
+            const screenY = Number(physicalScreen.bottom || 1) + Number(physicalScreen.height || config.screenHeight) / 2;
+            auditoriumRearWallZ = Math.max(Number(physicalRoom.depth || farthestRowZ + 8), farthestRowZ + 5);
+            const hallDepth = auditoriumRearWallZ + 4;
             const hallCenterZ = (screenSurfaceZ + auditoriumRearWallZ) / 2;
             // Keep the seated sightline above nearby seat backs so the screen
             // and the room remain visible in the first-person preview.
@@ -1247,13 +1275,20 @@
             // concourse, so the projection booth wall cannot block the view.
             // A raised rear camera clears nearby seat backs while keeping the
             // full seating bowl and screen in frame.
-            auditoriumOverviewCamera.set(0, Math.max(9, rearRowY + 5), auditoriumRearWallZ - Math.max(3, hallDepth * 0.06));
+            auditoriumOverviewCamera.set(0, Math.max(5, rearRowY + 4, roomHeight * 0.62), auditoriumRearWallZ - Math.max(2, hallDepth * 0.06));
+            const viewDistance = auditoriumOverviewCamera.distanceTo(auditoriumCenterTarget);
+            const viewAspect = Math.max(0.7, renderer.domElement.clientWidth / Math.max(1, renderer.domElement.clientHeight));
+            const verticalFit = roomHeight / Math.max(1, viewDistance);
+            const horizontalFit = (hallHalfWidth * 2) / Math.max(1, viewDistance * viewAspect);
+            auditoriumOverviewFov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.max(verticalFit, horizontalFit) * 0.62)), 30, 78);
             camera.far = Math.max(160, hallDepth + radius * 2 + 60);
             camera.updateProjectionMatrix();
             currentLookAtTarget.copy(screenCenterTarget);
             desiredLookAtTarget.copy(screenCenterTarget);
-            const screenGeo = new THREE.CylinderGeometry(radius, radius, config.screenHeight, 64, 1, true, thetaStart, thetaLength);
-            screenGeo.scale(-1, 1, 1);
+            const screenGeo = thetaLength
+                ? new THREE.CylinderGeometry(radius, radius, physicalScreen.height || config.screenHeight, 64, 1, true, thetaStart, thetaLength)
+                : new THREE.PlaneGeometry(physicalScreen.width || config.screenWidth, physicalScreen.height || config.screenHeight);
+            if (thetaLength) screenGeo.scale(-1, 1, 1);
 
             const uvAttr = screenGeo.attributes.uv;
             for (let i = 0; i < uvAttr.count; i++) {
@@ -1263,16 +1298,18 @@
             const screenMat = new THREE.MeshBasicMaterial({ map: screenTexture, side: THREE.DoubleSide });
             const screenMesh = new THREE.Mesh(screenGeo, screenMat);
             // Keep the center of the curved screen on its visible surface.
-            screenMesh.position.set(0, screenY, screenSurfaceZ - radius);
+            screenMesh.position.set(0, screenY, thetaLength ? screenSurfaceZ - radius : screenSurfaceZ);
             auditoriumGroup.add(screenMesh);
 
             // Screen Gold/Cyan Ambient Frame
-            const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, config.screenHeight + 0.5, 64, 1, true, thetaStart - 0.01, Math.min(Math.PI * 0.65, thetaLength + 0.02));
-            frameGeo.scale(-1, 1, 1);
-            const frameMat = new THREE.MeshBasicMaterial({ color: trimBaseColor, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
-            const frameMesh = new THREE.Mesh(frameGeo, frameMat);
-            frameMesh.position.copy(screenMesh.position);
-            auditoriumGroup.add(frameMesh);
+            if (thetaLength) {
+                const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, (physicalScreen.height || config.screenHeight) + 0.5, 64, 1, true, thetaStart - 0.01, thetaLength + 0.02);
+                frameGeo.scale(-1, 1, 1);
+                const frameMat = new THREE.MeshBasicMaterial({ color: trimBaseColor, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
+                const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+                frameMesh.position.copy(screenMesh.position);
+                auditoriumGroup.add(frameMesh);
+            }
 
             // Front Stage Deck + Subwoofer Array + LED Strip
             const stageGeo = new THREE.BoxGeometry(hallHalfWidth * 2, 0.9, 5.5);
@@ -1289,11 +1326,45 @@
 
             // 2. Floor, Acoustic Ribbed Side Walls & Dolby Atmos Speaker Arrays
             const wallMat = new THREE.MeshStandardMaterial({ color: wallBaseColor, roughness: 0.85, metalness: 0.15 });
-            const floorGeo = new THREE.PlaneGeometry(hallHalfWidth * 2.4, hallDepth);
+            const floorGeo = new THREE.PlaneGeometry(hallHalfWidth * 2, hallDepth);
             const floorMesh = new THREE.Mesh(floorGeo, wallMat);
             floorMesh.rotation.x = -Math.PI / 2;
             floorMesh.position.set(0, 0, hallCenterZ);
             auditoriumGroup.add(floorMesh);
+
+            // Elevated levels receive one structural deck and simple continuous
+            // guard rails, keeping object count independent of seat count.
+            const levelRows = new Map();
+            config.rowDefs.forEach((row, index) => {
+                const pos = rowPositions[index] || {};
+                const id = pos.levelId || 'main';
+                if (!levelRows.has(id)) levelRows.set(id, []);
+                levelRows.get(id).push({ row, pos });
+            });
+            (geometry.levels || []).forEach(level => {
+                if (!['balcony', 'mezzanine'].includes(String(level.type || '').toLowerCase())) return;
+                const entries = levelRows.get(level.id) || [];
+                if (!entries.length) return;
+                const near = Math.min(...entries.map(e => Number(e.pos.z || 0))) - 1.1;
+                const far = Math.max(...entries.map(e => Number(e.pos.z || 0))) + 1.3;
+                const deckY = Math.max(0, Number(level.base_elevation_m || 4) - 0.25);
+                const deck = new THREE.Mesh(new THREE.BoxGeometry(hallHalfWidth * 1.92, 0.5, far - near), wallMat);
+                deck.position.set(0, deckY, (far + near) / 2);
+                auditoriumGroup.add(deck);
+                const supportGeo = new THREE.BoxGeometry(0.42, Math.max(0.5, deckY), 0.42);
+                [-0.72, 0.72].forEach(side => {
+                    const support = new THREE.Mesh(supportGeo, wallMat);
+                    support.position.set(side * hallHalfWidth, deckY / 2, (far + near) / 2);
+                    auditoriumGroup.add(support);
+                });
+                const railMat = new THREE.MeshStandardMaterial({ color: trimBaseColor, roughness: 0.45, metalness: 0.42 });
+                const rail = new THREE.Mesh(new THREE.BoxGeometry(hallHalfWidth * 1.88, 0.08, 0.08), railMat);
+                rail.position.set(0, deckY + 1.05, near + 0.25);
+                auditoriumGroup.add(rail);
+                const railBack = rail.clone();
+                railBack.position.z = far - 0.25;
+                auditoriumGroup.add(railBack);
+            });
 
             const spkBoxGeo = new THREE.BoxGeometry(0.45, 0.85, 0.55);
             const spkMat = new THREE.MeshStandardMaterial({ color: 0x05070b, roughness: 0.4, metalness: 0.7 });
@@ -1302,40 +1373,42 @@
 
             for (let side of [-1, 1]) {
                 const wallX = side * hallHalfWidth;
-                const sideWallGeo = new THREE.BoxGeometry(0.6, 19, hallDepth);
+                const sideWallGeo = new THREE.BoxGeometry(0.35, roomHeight, hallDepth);
                 const sideWall = new THREE.Mesh(sideWallGeo, wallMat);
-                sideWall.position.set(wallX, 8.5, hallCenterZ);
+                sideWall.position.set(wallX, roomHeight / 2, hallCenterZ);
                 auditoriumGroup.add(sideWall);
 
-                for (let z = screenSurfaceZ + 1; z <= auditoriumRearWallZ - 3; z += 4.2) {
-                    const panelGeo = new THREE.BoxGeometry(0.35, 10, 2.8);
+                for (let z = screenSurfaceZ + 1; z <= auditoriumRearWallZ - 3; z += Math.max(3.5, hallDepth / 12)) {
+                    const panelHeight = Math.min(10, roomHeight * 0.66);
+                    const panelY = roomHeight * 0.53;
+                    const panelGeo = new THREE.BoxGeometry(0.35, panelHeight, 2.8);
                     const panelMat = new THREE.MeshStandardMaterial({ color: 0x121826, roughness: 0.9 });
                     const panel = new THREE.Mesh(panelGeo, panelMat);
-                    panel.position.set(wallX - side * 0.25, 6.8, z);
+                    panel.position.set(wallX - side * 0.25, panelY, z);
                     auditoriumGroup.add(panel);
 
                     // Wall Sconce Neon Bar
-                    const sconceGeo = new THREE.BoxGeometry(0.1, 4.2, 0.1);
+                    const sconceGeo = new THREE.BoxGeometry(0.1, Math.min(4.2, roomHeight * 0.38), 0.1);
                     const sconceMat = new THREE.MeshBasicMaterial({ color: z < 0 ? 0x00f0ff : 0xC9A84C });
                     const sconce = new THREE.Mesh(sconceGeo, sconceMat);
-                    sconce.position.set(wallX - side * 0.42, 7.2, z + 1.65);
+                    sconce.position.set(wallX - side * 0.42, roomHeight * 0.56, z + 1.65);
                     auditoriumGroup.add(sconce);
 
                     // 3D Dolby Atmos Wall Surround Speaker + Blue LED
                     const spk = new THREE.Mesh(spkBoxGeo, spkMat);
-                    spk.position.set(wallX - side * 0.48, 8.8, z);
+                    spk.position.set(wallX - side * 0.48, roomHeight * 0.72, z);
                     auditoriumGroup.add(spk);
 
                     const led = new THREE.Mesh(spkLedGeo, spkLedMat);
-                    led.position.set(wallX - side * 0.72, 8.8, z);
+                    led.position.set(wallX - side * 0.72, roomHeight * 0.72, z);
                     auditoriumGroup.add(led);
                 }
             }
 
             // Rear Projection Booth Wall & Volumetric Light Cone
-            const backWallGeo = new THREE.BoxGeometry(hallHalfWidth * 2.1, 19, 1);
+            const backWallGeo = new THREE.BoxGeometry(hallHalfWidth * 2.1, roomHeight, 1);
             const backWall = new THREE.Mesh(backWallGeo, wallMat);
-            backWall.position.set(0, 8.5, auditoriumRearWallZ);
+            backWall.position.set(0, roomHeight / 2, auditoriumRearWallZ);
             auditoriumGroup.add(backWall);
 
             const beamGeo = new THREE.ConeGeometry(7.8, hallDepth, 32, 1, true);
@@ -1348,7 +1421,7 @@
             });
             const beamMesh = new THREE.Mesh(beamGeo, beamMat);
             beamMesh.rotation.x = -Math.PI / 2;
-            beamMesh.position.set(0, rearRowY + 4.8, hallCenterZ);
+            beamMesh.position.set(0, roomHeight * 0.82, hallCenterZ);
             auditoriumGroup.add(beamMesh);
 
             // 3. BUILD 4 ILLUMINATED 3D EMERGENCY EXIT WAY DOORS (EXIT 1 - EXIT 4)
@@ -1463,35 +1536,35 @@
                 part.mesh.userData.instanceSeatIds[part.index] = seat.id;
             }
 
-            const rowConfigByLabel = new Map(config.rowDefs.map(row => [row.label, row]));
             let seatInstanceIndex = 0;
             rows.forEach((rowLetter, rIdx) => {
-                const rowConfig = rowConfigByLabel.get(rowLetter);
+                const rowConfig = config.rowDefs[rIdx];
                 if (!rowConfig) return;
-                const rowZ = 5.5 - rIdx * rowSpacing;
-                const rowY = 0.35 + (rows.length - 1 - rIdx) * stadiumSlope;
+                const rowPhysical = rowPositions[rIdx] || { z: 7 + rIdx * rowSpacing, y: rIdx * stadiumSlope, riserHeight: stadiumSlope };
+                const rowZ = Number(rowPhysical.z);
+                const rowY = Number(rowPhysical.y);
                 const isVIP = /vip|prime|premium|gold/i.test(rowConfig.className);
                 const isRecliner = /reclin|insignia|luxe/i.test(rowConfig.className);
                 const rowSpan = Math.max(1, rowConfig.seatSpan || 1);
                 const aisles = rowConfig.aislesAfter || [];
 
-                const riserGeo = new THREE.BoxGeometry(hallHalfWidth * 1.92, rowY, 2.45);
+                const riserGeo = new THREE.BoxGeometry(hallHalfWidth * 1.92, Math.max(0.08, Number(rowPhysical.riserHeight || stadiumSlope)), Number(rowPhysical.rowSpacing || rowSpacing));
                 const riserMat = new THREE.MeshStandardMaterial({
                     color: isRecliner ? 0x16121e : (isVIP ? 0x131724 : 0x0c1018), roughness: 0.8
                 });
                 const riserMesh = new THREE.Mesh(riserGeo, riserMat);
-                riserMesh.position.set(0, rowY / 2, rowZ);
+                riserMesh.position.set(0, Math.max(0, rowY - Number(rowPhysical.riserHeight || stadiumSlope) / 2), rowZ);
                 auditoriumGroup.add(riserMesh);
 
                 const firstSeat = Number(rowConfig.start || 1);
-                const rowUnits = rowConfig.count * rowSpan + aisles.length * 1.1 + Number(rowConfig.offset || 0);
+                const rowWidthM = rowConfig.count * rowSpan * 0.62 + aisles.length * 0.85 + Number(rowConfig.offset || 0) * 0.62;
                 for (let sNum = firstSeat; sNum < firstSeat + rowConfig.count; sNum++) {
                     const seatId = `${rowLetter}${sNum}`;
                     if ((rowConfig.blocked || []).includes(seatId)) continue;
                     const seatIndex = sNum - firstSeat;
                     const aislesBefore = aisles.filter(aisle => sNum > aisle).length;
-                    const seatX = (seatIndex * rowSpan + rowSpan / 2 + aislesBefore * 1.1
-                        + Number(rowConfig.offset || 0) - rowUnits / 2) * 1.32;
+                    const seatX = seatIndex * rowSpan * 0.62 + rowSpan * 0.31 + aislesBefore * 0.85
+                        + Number(rowConfig.offset || 0) * 0.62 - rowWidthM / 2;
                     const isOccupied = rowConfig.seats[seatId] !== 'available';
                     const tier = rowConfig.className || 'Standard';
                     const price = Number(rowConfig.price || 0);
@@ -1521,7 +1594,7 @@
                     const armStart = base * 2;
                     const reclineTilt = seatId === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
                     const isWide = rowSpan > 1;
-                    const seatWidth = rowSpan * (isRecliner ? 1.12 : (isVIP ? 1.07 : (isWide ? 1 : 1)));
+                    const seatWidth = rowSpan * (isRecliner ? 0.68 : (isVIP ? 0.62 : 0.58));
                     const seatHeight = isRecliner ? 0.72 : (isVIP ? 0.69 : 0.67);
                     const seatDepth = isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82);
                     const seat = {
@@ -1829,7 +1902,7 @@
             if (mode === 'overview') {
                 // Use a wide, fixed field of view for the first view so the
                 // screen, seating bowl, and aisle fit together in the frame.
-                camera.fov = 78;
+                camera.fov = auditoriumOverviewFov;
                 camera.updateProjectionMatrix();
                 cameraTargetPos.copy(auditoriumOverviewCamera);
                 // Keep the first wide view aimed down the hall at the screen,
@@ -1852,6 +1925,18 @@
         function setCameraPreset(preset) {
             if (preset === 'overview') return setCameraMode('overview');
             if (preset === 'seat') return setCameraMode('seat');
+            if (preset === 'balcony') {
+                const balconyRows = (currentAudi.geometry?.rows || []).filter(row => ['balcony', 'mezzanine'].includes(String(row.levelType || '').toLowerCase()));
+                if (!balconyRows.length) return setCameraMode('overview');
+                const middle = balconyRows[Math.floor(balconyRows.length / 2)];
+                cameraMode = preset;
+                updateCameraModeButtons();
+                cameraTargetPos.set(0, Number(middle.y) + 2.2, Number(middle.z) + 3.5);
+                desiredLookAtTarget.set(0, screenCenterTarget.y, screenCenterTarget.z);
+                targetYawOffset = 0;
+                targetPitchOffset = 0;
+                return;
+            }
             cameraMode = preset;
             updateCameraModeButtons();
             targetYawOffset = 0;
@@ -1859,11 +1944,8 @@
             if (preset === 'stage') {
                 cameraTargetPos.set(0, Math.max(2.8, screenCenterTarget.y * 0.42), screenCenterTarget.z + 4.5);
                 desiredLookAtTarget.copy(auditoriumCenterTarget);
-            } else if (preset === 'balcony') {
-                cameraTargetPos.set(auditoriumOverviewCamera.x, auditoriumOverviewCamera.y + 2, auditoriumOverviewCamera.z - 2.5);
-                desiredLookAtTarget.copy(auditoriumCenterTarget);
             } else if (preset === 'birdseye') {
-                cameraTargetPos.set(0.1, Math.max(24, auditoriumOverviewCamera.y + 12), auditoriumCenterTarget.z);
+                cameraTargetPos.set(0.1, auditoriumOverviewCamera.y + Math.max(8, auditoriumOverviewCamera.y * 0.7), auditoriumCenterTarget.z);
                 desiredLookAtTarget.copy(auditoriumCenterTarget);
             }
         }

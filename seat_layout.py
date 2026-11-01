@@ -38,6 +38,166 @@ from __future__ import annotations
 
 import math
 
+
+def auditorium_geometry(layout: dict, row_defs: list[dict], fallback_aspect: float = 1.85) -> dict:
+    """Normalize optional physical layout metadata and estimate missing dimensions in metres.
+
+    `classes` are pricing groups. Rows share a physical level unless a row explicitly
+    names a level_id; price classes never create floors implicitly.
+    """
+    screen = layout.get("screen") if isinstance(layout.get("screen"), dict) else {}
+    room = layout.get("room") if isinstance(layout.get("room"), dict) else {}
+    explicit_levels = layout.get("levels") if isinstance(layout.get("levels"), list) else []
+    levels = {}
+    for item in explicit_levels:
+        if isinstance(item, dict) and item.get("id"):
+            levels[str(item["id"])] = item
+    row_levels = [str(r.get("level_id") or "main") for r in row_defs]
+    for level_id in row_levels:
+        levels.setdefault(level_id, {"id": level_id, "name": "Main floor", "type": "floor"})
+    warnings = []
+    if not screen.get("width_m") or not screen.get("height_m"):
+        warnings.append("Screen dimensions are estimated; enter measured width_m and height_m to replace them.")
+    if not room.get("width_m") or not room.get("depth_m") or not room.get("height_m"):
+        warnings.append("Room dimensions are estimated from the seating layout.")
+    widest = max((max(1, int(row.get("count", 0))) * max(1, int(row.get("seatSpan", 1))) * .62 for row in row_defs), default=8)
+    width = float(screen.get("width_m") or max(6.0, min(30.0, widest)))
+    aspect = float(screen.get("aspect_ratio") or fallback_aspect)
+    height = float(screen.get("height_m") or width / max(.1, aspect))
+    max_row_units = max((int(r.get("count", 0)) * int(r.get("seatSpan", 1)) * .62 + len(r.get("aislesAfter", [])) * .85 + int(r.get("offset", 0)) * .62 for r in row_defs), default=8)
+    needed_width = max(max_row_units + 5.0, width + 2.0)
+    room_width = float(room.get("width_m") or needed_width)
+    if room_width < needed_width:
+        warnings.append(f"Configured room width ({room_width:g} m) is narrower than seating plus side clearance ({needed_width:g} m); preview expands to fit.")
+        room_width = needed_width
+    default_spacing = float(screen.get("row_spacing_m") or 1.15)
+    row_positions = []
+    per_level_index = {}
+    level_row_counts = {}
+    for level_id in row_levels:
+        level_row_counts[level_id] = level_row_counts.get(level_id, 0) + 1
+    main_row_count = row_levels.count("main")
+    balcony_front = 7.0 + main_row_count * default_spacing + 3.0
+    for i, row in enumerate(row_defs):
+        level_id = row_levels[i]
+        level = levels[level_id]
+        idx = per_level_index.get(level_id, 0)
+        per_level_index[level_id] = idx + 1
+        spacing = float(level.get("row_spacing_m") or default_spacing)
+        riser = float(level.get("riser_height_m") or .18)
+        is_balcony = str(level.get("type") or "").lower() in {"balcony", "mezzanine"}
+        base = float(level.get("base_elevation_m", 4.0 if is_balcony else 0) or 0)
+        front = float(level.get("front_distance_m") or (balcony_front if is_balcony else 7.0))
+        level_row_index = level_row_counts[level_id] - idx - 1
+        row_positions.append({"levelId": level_id, "levelIndex": idx, "x": 0,
+                              "z": front + level_row_index * spacing,
+                              "y": base + level_row_index * riser,
+                              "rowSpacing": spacing, "riserHeight": riser,
+                              "levelType": str(level.get("type") or "floor")})
+    furthest = max((abs(p["z"]) for p in row_positions), default=12)
+    needed_depth = furthest + 8.0
+    deepest = float(room.get("depth_m") or needed_depth)
+    if deepest < needed_depth:
+        warnings.append(f"Configured room depth ({deepest:g} m) does not include row and rear clearance ({needed_depth:g} m); preview expands to fit.")
+        deepest = needed_depth
+    tallest_level = max((float(level.get("base_elevation_m") or 0) +
+                         max(0, per_level_index.get(level_id, 1)-1) * float(level.get("riser_height_m") or .18)
+                         for level_id, level in levels.items()), default=0)
+    needed_height = max(float(screen.get("bottom_m") or 1) + height + 2, tallest_level + 4)
+    room_height = float(room.get("height_m") or needed_height)
+    if room_height < needed_height:
+        warnings.append(f"Configured room height ({room_height:g} m) is below screen/seating clearance ({needed_height:g} m); preview expands to fit.")
+        room_height = needed_height
+    surface = str(screen.get("surface") or "curved").lower()
+    curve = float(screen.get("curve", 0 if surface in {"flat", "led"} else .3))
+    return {"screen": {"width": width, "height": height,
+                       "bottom": float(screen.get("bottom_m", 1.0)),
+                       "surface": surface,
+                       "curve": curve, "aspect": aspect},
+            "room": {"width": room_width, "depth": deepest, "height": room_height},
+            "levels": list(levels.values()), "rows": row_positions,
+            "estimated": bool(warnings), "warnings": warnings}
+
+
+def validate_auditorium_geometry(layout: dict) -> list[str]:
+    """Validate seat identity and explicitly supplied physical geometry."""
+    errors = []
+    if not isinstance(layout, dict) or not isinstance(layout.get("classes", []), list):
+        return ["Layout must be an object with a classes array."]
+    seen = set()
+    for cls in layout.get("classes", []):
+        if not isinstance(cls, dict):
+            errors.append("Each class must be an object.")
+            continue
+        for row in cls.get("rows", []):
+            if not isinstance(row, dict) or not row.get("label"):
+                errors.append("Each row must be an object with a label.")
+                continue
+            try:
+                start, count = int(row.get("start", 1)), int(row.get("count", 0))
+            except (TypeError, ValueError):
+                errors.append(f"Row {row['label']} needs integer start and count values.")
+                continue
+            if start < 1 or count < 0 or count > 500:
+                errors.append(f"Row {row['label']} has an invalid seat range.")
+                continue
+            blocked = set(row.get("blocked") or [])
+            for n in range(start, start + count):
+                seat_id = f"{row['label']}{n}"
+                if seat_id in seen:
+                    errors.append(f"Seat ID {seat_id} is repeated across rows or price classes.")
+                    break
+                seen.add(seat_id)
+    for section_name in ("screen", "room"):
+        section = layout.get(section_name, {})
+        if section and not isinstance(section, dict):
+            errors.append(f"{section_name} metadata must be an object.")
+            continue
+        if isinstance(section, dict):
+            for key, value in section.items():
+                if key.endswith("_m"):
+                    try:
+                        number = float(value)
+                        if not math.isfinite(number) or number < (0 if key == "bottom_m" else .01) or number > 200:
+                            raise ValueError
+                    except (TypeError, ValueError):
+                        errors.append(f"{section_name}.{key} must be a positive measurement in metres (up to 200 m).")
+    level_ids = set()
+    for level in layout.get("levels", []):
+        if not isinstance(level, dict) or not level.get("id"):
+            errors.append("Every physical level must be an object with an id.")
+            continue
+        if str(level["id"]) in level_ids:
+            errors.append(f"Physical level id {level['id']} is repeated.")
+        level_ids.add(str(level["id"]))
+        for key, value in level.items():
+            if key.endswith("_m"):
+                try:
+                    number = float(value)
+                    if not math.isfinite(number) or abs(number) > 200 or (key == "base_elevation_m" and number < 0) or (key != "base_elevation_m" and number <= 0):
+                        raise ValueError
+                except (TypeError, ValueError):
+                    errors.append(f"levels[{level['id']}].{key} must be a valid measurement in metres.")
+    for cls in layout.get("classes", []):
+        if not isinstance(cls, dict):
+            continue
+        for row in cls.get("rows", []):
+            if isinstance(row, dict) and row.get("level_id") and str(row["level_id"]) not in level_ids:
+                errors.append(f"Row {row.get('label', '?')} references missing physical level {row['level_id']}.")
+    screen = layout.get("screen", {})
+    if isinstance(screen, dict):
+        surface = screen.get("surface")
+        if surface and str(surface).lower() not in {"flat", "curved", "led", "imax"}:
+            errors.append("screen.surface must be flat, curved, led, or imax.")
+        if "curve" in screen:
+            try:
+                curve = float(screen["curve"])
+                if not math.isfinite(curve) or curve < 0 or curve > .75:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors.append("screen.curve must be between 0 and 0.75; use 0 for a flat screen.")
+    return errors
+
 # how many seats one user may book in a single transaction (BookMyShow uses 10)
 MAX_SEATS_PER_BOOKING = 10
 

@@ -78,9 +78,11 @@ def main():
     assert 'currentAudi.rowDefs' in preview_html and 'jagadamba' not in preview_html
     assert 'Acoustic Ribbed Side Walls' in preview_html and 'Rear Projection Booth Wall' in preview_html
     assert 'sideWall.position' in preview_html and 'backWall.position' in preview_html
-    assert 'screenSurfaceZ = -lastRowZ - Math.max(10, rowSpacing * 4)' in preview_html
-    assert 'screenMesh.position.set(0, screenY, screenSurfaceZ - radius)' in preview_html
-    assert 'auditoriumRearWallZ = 5.5 + Math.max(5.5, rowSpacing * 2.2)' in preview_html
+    assert 'const rowPositions = geometry.rows || []' in preview_html
+    assert 'const screenSurfaceZ = 0' in preview_html
+    assert 'screenMesh.position.set(0, screenY, thetaLength ? screenSurfaceZ - radius : screenSurfaceZ)' in preview_html
+    assert 'auditoriumRearWallZ = Math.max(Number(physicalRoom.depth || farthestRowZ + 8), farthestRowZ + 5)' in preview_html
+    assert 'auditoriumOverviewFov' in preview_html and 'new THREE.InstancedMesh' in preview_html
     assert 'cameraTargetPos.copy(auditoriumOverviewCamera)' in preview_html
     inline_preview = c1.get(f'/book/{show_id}/vr-preview?embed=1')
     assert inline_preview.status_code == 200

@@ -21,8 +21,32 @@
     <textarea name="layout_json" rows="26" spellcheck="false"
               class="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-[11px] leading-relaxed text-slate-300 font-mono focus:outline-none focus:border-[#C9A84C]">{{ layout_json }}</textarea>
 
+    <details class="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+      <summary class="cursor-pointer text-xs font-bold text-[#C9A84C]">Physical auditorium geometry (metres)</summary>
+      <p class="text-[10px] text-slate-400 my-2">These controls update only screen, room and physical-level metadata. Seat rows and price classes stay in the JSON editor.</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 my-3">
+        {% for key, label in [('screen_width_m','Screen width'),('screen_height_m','Screen height'),('screen_bottom_m','Screen bottom'),('room_width_m','Room width'),('room_depth_m','Room depth'),('room_height_m','Room height'),('row_spacing_m','Row spacing'),('riser_height_m','Riser height'),('level_elevation_m','Floor elevation'),('front_distance_m','Front row distance')] %}
+          <label class="text-[10px] text-slate-400">{{ label }}
+            <input data-geometry="{{ key }}" type="number" min="0" step="0.01" class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-white">
+          </label>
+        {% endfor %}
+        <label class="text-[10px] text-slate-400">Screen surface
+          <select data-geometry="surface" class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-white">
+            <option value="curved">Curved projection</option><option value="flat">Flat</option><option value="led">LED</option><option value="imax">IMAX style</option>
+          </select>
+        </label>
+        <label class="text-[10px] text-slate-400">Curve amount (0 = flat)
+          <input data-geometry="curve" type="number" min="0" max="0.75" step="0.01" class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-white">
+        </label>
+      </div>
+      <label class="block text-[10px] text-slate-400">Physical levels (advanced JSON; rows use <code>level_id</code>)
+        <textarea id="levels_json" rows="5" spellcheck="false" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-[10px] font-mono text-slate-300"></textarea>
+      </label>
+      <p class="text-[10px] text-slate-500 mt-2">Example level: <code>{"id":"balcony","name":"Balcony","type":"balcony","base_elevation_m":4.2,"front_distance_m":22}</code>. Price categories never create floors.</p>
+    </details>
+
     <div class="text-[10px] text-slate-500 leading-relaxed space-y-1">
-      <p>Optional top-level <span class="text-slate-300 font-semibold">screen</span> settings control the preview: <span class="text-slate-300 font-semibold">width_m</span> and <span class="text-slate-300 font-semibold">height_m</span> set the real screen shape; <span class="text-slate-300 font-semibold">aspect_ratio</span> is a fallback (for example 2.39).</p>
+      <p>Geometry marked as estimated is inferred from seats until measured dimensions are entered. Add <span class="text-slate-300 font-semibold">screen.width_m / height_m / bottom_m / surface / curve</span> and <span class="text-slate-300 font-semibold">room.width_m / depth_m / height_m</span> in metres.</p>
       <p><span class="text-slate-300 font-semibold">label</span> row letter · <span class="text-slate-300 font-semibold">count</span> seats in that row (rows can differ)</p>
       <p><span class="text-slate-300 font-semibold">aisles_after</span> put a walkway after these seat numbers</p>
       <p><span class="text-slate-300 font-semibold">blocked</span> seat ids that do not exist, e.g. ["A7"]</p>
@@ -62,7 +86,88 @@
           <p class="text-[10px] tracking-[0.3em] text-center text-slate-500 uppercase mt-2">Screen</p>
         </div>
       </div>
+    <p id="layout-validation" class="text-xs rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-slate-300" role="status">Edit values above; the layout will be checked before it is saved.</p>
     </div>
   </div>
 </div>
+<script>
+const geometryInitial = {{ geometry_json|safe }};
+const geoScreen = geometryInitial.screen || {};
+const geoRoom = geometryInitial.room || {};
+const geoLevels = geometryInitial.levels || [];
+const geometryValues = {
+  screen_width_m: geoScreen.width_m, screen_height_m: geoScreen.height_m,
+  screen_bottom_m: geoScreen.bottom_m, surface: geoScreen.surface || 'curved',
+  curve: geoScreen.curve, room_width_m: geoRoom.width_m,
+  room_depth_m: geoRoom.depth_m, room_height_m: geoRoom.height_m,
+  row_spacing_m: geoScreen.row_spacing_m,
+  riser_height_m: geoLevels[0]?.riser_height_m,
+  level_elevation_m: geoLevels[0]?.base_elevation_m,
+  front_distance_m: geoLevels[0]?.front_distance_m
+};
+document.querySelectorAll('[data-geometry]').forEach(input => {
+  const value = geometryValues[input.dataset.geometry];
+  if (value !== undefined && value !== null) input.value = value;
+});
+document.getElementById('levels_json').value = JSON.stringify(geoLevels, null, 2);
+document.querySelector('form').addEventListener('submit', event => {
+  try {
+    const layoutInput = document.querySelector('[name="layout_json"]');
+    const layout = JSON.parse(layoutInput.value);
+    const screen = {...(layout.screen || {})};
+    const room = {...(layout.room || {})};
+    const number = key => { const value = document.querySelector(`[data-geometry="${key}"]`).value; return value === '' ? undefined : Number(value); };
+    for (const [key, value] of Object.entries({width_m:number('screen_width_m'), height_m:number('screen_height_m'), bottom_m:number('screen_bottom_m'), curve:number('curve'), row_spacing_m:number('row_spacing_m')})) if (value !== undefined) screen[key] = value;
+    screen.surface = document.querySelector('[data-geometry="surface"]').value;
+    for (const [key, value] of Object.entries({width_m:number('room_width_m'), depth_m:number('room_depth_m'), height_m:number('room_height_m')})) if (value !== undefined) room[key] = value;
+    let levels = JSON.parse(document.getElementById('levels_json').value || '[]');
+    const rowSpacing = number('row_spacing_m');
+    const riserHeight = number('riser_height_m');
+    const elevation = number('level_elevation_m');
+    const frontDistance = number('front_distance_m');
+    if (!levels.length && [rowSpacing, riserHeight, elevation, frontDistance].some(value => value !== undefined)) {
+      levels = [{id:'main', name:'Main floor', type:'floor'}];
+      for (const cls of (layout.classes || [])) for (const row of (cls.rows || [])) row.level_id = 'main';
+    }
+    for (const level of levels) {
+      if (rowSpacing !== undefined) level.row_spacing_m = rowSpacing;
+      if (riserHeight !== undefined) level.riser_height_m = riserHeight;
+      if (elevation !== undefined) level.base_elevation_m = elevation;
+      if (frontDistance !== undefined) level.front_distance_m = frontDistance;
+    }
+    if (Object.keys(screen).length) layout.screen = screen;
+    if (Object.keys(room).length) layout.room = room;
+    layout.levels = levels;
+    const errors = [];
+    const knownLevels = new Set(levels.map(level => String(level.id)));
+    const ids = new Set();
+    for (const cls of (layout.classes || [])) for (const row of (cls.rows || [])) {
+      const start = Number(row.start || 1), count = Number(row.count || 0);
+      if (!row.label || !Number.isInteger(start) || !Number.isInteger(count) || start < 1 || count < 0 || count > 500) errors.push(`Row ${row.label || '?'} has an invalid range.`);
+      if (row.level_id && !knownLevels.has(String(row.level_id))) errors.push(`Row ${row.label} refers to missing level ${row.level_id}.`);
+      for (let seat = start; seat < start + count; seat++) {
+        const id = `${row.label}${seat}`;
+        if (ids.has(id)) { errors.push(`Seat ID ${id} is repeated.`); break; }
+        ids.add(id);
+      }
+    }
+    for (const [section, keys] of [[screen, ['width_m','height_m','bottom_m']], [room, ['width_m','depth_m','height_m']]])
+      for (const key of keys) if (section[key] !== undefined && (!Number.isFinite(Number(section[key])) || Number(section[key]) < (key === 'bottom_m' ? 0 : 0.01) || Number(section[key]) > 200)) errors.push(`${key} is outside its valid metre range.`);
+    const status = document.getElementById('layout-validation');
+    if (errors.length) {
+      event.preventDefault();
+      status.textContent = `Please fix before saving: ${[...new Set(errors)].slice(0, 5).join(' ')}`;
+      status.className = 'text-xs rounded-lg border border-rose-700 bg-rose-950/50 p-3 text-rose-200';
+      status.focus?.();
+      return;
+    }
+    status.textContent = `Geometry is valid · ${ids.size} seat IDs · ${levels.length || 1} configured physical level(s).`;
+    status.className = 'text-xs rounded-lg border border-emerald-700 bg-emerald-950/40 p-3 text-emerald-200';
+    layoutInput.value = JSON.stringify(layout, null, 2);
+  } catch (error) {
+    event.preventDefault();
+    alert(`Geometry or seating JSON is invalid: ${error.message}`);
+  }
+});
+</script>
 {% endblock %}

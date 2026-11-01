@@ -1127,6 +1127,64 @@ def _attach_auditorium_visual(layout, theater_name, screen_type):
     }
 
 
+def _attach_known_screen_geometry(layout, theater_name, screen_name):
+    """Add only published screen measurements; all unmeasured room data stays estimated."""
+    screen_label = str(layout.get("screen_label", "")).upper()
+    if theater_name == "AAA Cinemas" and screen_name == "Screen 7" and "Q-LUXON" in screen_label:
+        published = {
+            "width_m": 70 * 0.3048, "height_m": 30 * 0.3048,
+            "aspect_ratio": 70 / 30, "surface": "flat", "curve": 0,
+            "source": "https://thirdeyecinemas.com/aaa-cinemas-vizag-introduces-indias-first-led-projection-q-luxon-screen/",
+        }
+    elif theater_name == "Sri Melody":
+        published = {
+            "width_m": 58.8 * 0.3048, "height_m": 32 * 0.3048,
+            "aspect_ratio": 58.8 / 32, "surface": "flat", "curve": 0,
+            "source": "https://www.hyderabadtheatres.com/screen/sri-melody-hdr-dolby-atmos-vizag-melody/",
+        }
+    elif theater_name == "Jagadamba Theatre" and screen_name == "70MM Main" and "70MM" in screen_label:
+        published = {
+            "width_m": 77.0 * 0.3048, "height_m": 32.2 * 0.3048,
+            "aspect_ratio": 77.0 / 32.2,
+            "surface": "curved", "curve": 0.3,
+            "source": "https://theatresdb.com/screen/jagadamba-complex-jagadamba/",
+        }
+        # The seed names three actual seating sections; source descriptions
+        # distinguish upper and lower balcony. Heights/distances are model
+        # estimates for an editable preview, not surveyed architectural data.
+        layout.setdefault("levels", [
+            {"id": "upper-balcony", "name": "Upper Balcony", "type": "balcony",
+             "base_elevation_m": 8.0, "front_distance_m": 34.0,
+             "row_spacing_m": 1.15, "riser_height_m": 0.16},
+            {"id": "lower-balcony", "name": "Lower Balcony", "type": "balcony",
+             "base_elevation_m": 4.0, "front_distance_m": 20.0,
+             "row_spacing_m": 1.15, "riser_height_m": 0.16},
+            {"id": "stalls", "name": "First Class", "type": "floor",
+             "base_elevation_m": 0.0, "front_distance_m": 7.0,
+             "row_spacing_m": 1.15, "riser_height_m": 0.16},
+        ])
+        for cls in layout.get("classes", []):
+            name = str(cls.get("name", "")).lower()
+            level_id = ("upper-balcony" if "upper balcony" in name else
+                        "lower-balcony" if "lower balcony" in name else
+                        "stalls" if "first class" in name else None)
+            if level_id:
+                for row in cls.get("rows", []):
+                    row.setdefault("level_id", level_id)
+    else:
+        return False
+    # Preserve every administrator value and fill only absent published fields.
+    current = layout.setdefault("screen", {})
+    if not isinstance(current, dict):
+        return False
+    changed = False
+    for key, value in published.items():
+        if key not in current:
+            current[key] = value
+            changed = True
+    return changed
+
+
 def seed_vizag_theaters(db, Theater, Screen, verbose=True):
     """Idempotent: adds any missing Vizag theatre / screen with real seat layouts, never duplicates."""
     created_t = created_s = updated_l = 0
@@ -1153,6 +1211,7 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
 
         for screen_name, screen_type, layout in data["screens"]:
             _attach_auditorium_visual(layout, data["name"], screen_type)
+            _attach_known_screen_geometry(layout, data["name"], screen_name)
             existing = Screen.query.filter_by(theater_id=theater.id,
                                               name=screen_name).first()
             if existing:
@@ -1161,8 +1220,44 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
                     updated_l += 1
                 else:
                     current_layout = existing.layout
+                    changed = False
                     if current_layout.get("visual") != layout.get("visual"):
                         current_layout["visual"] = layout["visual"]
+                        changed = True
+                    # Geometry metadata is merged by missing keys only; seat
+                    # rows, IDs, prices, and any admin-entered dimensions survive.
+                    known_screen = layout.get("screen")
+                    if known_screen:
+                        target = current_layout.setdefault("screen", {})
+                        if isinstance(target, dict):
+                            for key, value in known_screen.items():
+                                if key not in target:
+                                    target[key] = value
+                                    changed = True
+                    def row_signature(source):
+                        return [(cls.get("code"), row.get("label"), int(row.get("start", 1)), int(row.get("count", 0)))
+                                for cls in source.get("classes", []) for row in cls.get("rows", [])]
+                    same_seed_rows = row_signature(current_layout) == row_signature(layout)
+                    known_levels = (layout.get("levels") or []) if same_seed_rows else []
+                    if known_levels:
+                        current_levels = current_layout.setdefault("levels", [])
+                        if isinstance(current_levels, list):
+                            existing_level_ids = {str(item.get("id")) for item in current_levels if isinstance(item, dict)}
+                            for level in known_levels:
+                                if str(level.get("id")) not in existing_level_ids:
+                                    current_levels.append(level)
+                                    existing_level_ids.add(str(level.get("id")))
+                                    changed = True
+                    known_rows = {row.get("label"): row.get("level_id")
+                                  for cls in layout.get("classes", []) for row in cls.get("rows", [])
+                                  if row.get("level_id")} if same_seed_rows else {}
+                    if known_rows:
+                        for cls in current_layout.get("classes", []):
+                            for row in cls.get("rows", []):
+                                if row.get("label") in known_rows and not row.get("level_id"):
+                                    row["level_id"] = known_rows[row["label"]]
+                                    changed = True
+                    if changed:
                         existing.layout = current_layout
                         updated_l += 1
                 continue
