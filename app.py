@@ -20,15 +20,21 @@ What is new in this version
 Run:
     pip install -r requirements.txt
     python app.py            ->  http://127.0.0.1:5000
-    admin / admin123
+    On first startup, the admin password is printed once; set ADMIN_PASSWORD to choose it.
 """
 
 import csv
+import hashlib
+import html
+import hmac
 import io
 import json
 import os
 import re
 import secrets
+import smtplib
+import ssl
+from email.message import EmailMessage
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -60,16 +66,54 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
-import ai_booking_assistant
 import payments
 import seat_layout as sl
 from vizag_theaters import seed_vizag_theaters
 
+
+def load_local_dotenv():
+    """Load simple KEY=value settings from the project .env without overriding the shell."""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    try:
+        with open(env_path, encoding='utf-8') as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('export '):
+                    line = line[7:].lstrip()
+                key, separator, value = line.partition('=')
+                key = key.strip()
+                if not separator or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', key):
+                    continue
+                value = value.strip()
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+                    value = value[1:-1]
+                os.environ.setdefault(key, value)
+    except FileNotFoundError:
+        pass
+
+
+load_local_dotenv()
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'vizag-movie-booking-secret')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///vizag_movies.db'
+# Use a fresh key when one is not configured. Deployments should set SECRET_KEY
+# so sessions remain valid across restarts and app workers.
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///vizag_movies.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '').strip().lower() in {'1', 'true', 'yes'}
 app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024
+app.config['STARTUP_ID'] = secrets.token_urlsafe(10)
+app.config['SMTP_HOST'] = os.environ.get('SMTP_HOST', '').strip()
+app.config['SMTP_PORT'] = int(os.environ.get('SMTP_PORT', '587'))
+app.config['SMTP_USERNAME'] = os.environ.get('SMTP_USERNAME', '').strip()
+app.config['SMTP_PASSWORD'] = os.environ.get('SMTP_PASSWORD', '')
+app.config['SMTP_FROM_EMAIL'] = os.environ.get('SMTP_FROM_EMAIL', app.config['SMTP_USERNAME']).strip()
+app.config['SMTP_USE_SSL'] = os.environ.get('SMTP_USE_SSL', '').strip().lower() in {'1', 'true', 'yes'}
 
 # TMDb API Key
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "329d5f23baebf5312db6f28ab506ce9e")
@@ -94,6 +138,11 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)
+    email_verified = db.Column(db.Boolean, nullable=False, default=True)
+    email_otp_hash = db.Column(db.String(256), nullable=True)
+    email_otp_expires_at = db.Column(db.DateTime, nullable=True)
+    email_otp_sent_at = db.Column(db.DateTime, nullable=True)
+    email_otp_attempts = db.Column(db.Integer, nullable=False, default=0)
     phone = db.Column(db.String(15), nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
@@ -227,8 +276,15 @@ class Movie(db.Model):
             data = None
         if isinstance(data, dict):
             return data
-        if isinstance(data, list) and data and isinstance(data[0], dict):
-            return data[0]          # tolerate legacy/wrapped shapes
+        if isinstance(data, list) and data:
+            if isinstance(data[0], dict) and 'cast' in data[0]:
+                return data[0]
+            return {
+                'director': None,
+                'cast': [{'name': c.get('name', ''),
+                          'character': c.get('character') or c.get('role', ''),
+                          'profile': c.get('profile')} for c in data if isinstance(c, dict)]
+            }
         return {}
 
     def is_in_watchlist(self, user):
@@ -543,6 +599,7 @@ class Booking(db.Model):
     total_amount = db.Column(db.Float, nullable=False, default=0)   # charged amount
 
     is_split_pay = db.Column(db.Boolean, default=False)
+    split_token = db.Column(db.String(64), unique=True, nullable=True)
     snacks_json = db.Column(db.Text, default='[]')
     points_redeemed = db.Column(db.Integer, default=0)
 
@@ -551,6 +608,8 @@ class Booking(db.Model):
     lock_token = db.Column(db.String(40), nullable=True)
     booked_at = db.Column(db.DateTime, default=datetime.utcnow)
     paid_at = db.Column(db.DateTime, nullable=True)
+    ticket_email_sent_at = db.Column(db.DateTime, nullable=True)
+    ticket_email_error = db.Column(db.String(300), nullable=True)
     expires_at = db.Column(db.DateTime,
                            default=lambda: datetime.utcnow() + timedelta(minutes=SEAT_LOCK_MINUTES))
 
@@ -636,6 +695,31 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class SplitContribution(db.Model):
+    """One sandbox share from a participant toward a multi-seat booking."""
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('booking.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    share_index = db.Column(db.Integer, nullable=False)
+    amount = db.Column(db.Float, nullable=False, default=0)
+    status = db.Column(db.String(20), nullable=False, default='OPEN')
+    gateway = db.Column(db.String(30), nullable=True)
+    method = db.Column(db.String(30), nullable=True)
+    order_id = db.Column(db.String(80), nullable=True)
+    payment_id = db.Column(db.String(80), nullable=True)
+    signature = db.Column(db.String(200), nullable=True)
+    error_message = db.Column(db.String(300), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    booking = db.relationship('Booking', backref=db.backref('split_contributions', lazy=True))
+    user = db.relationship('User')
+
+    __table_args__ = (
+        db.UniqueConstraint('booking_id', 'share_index', name='uq_split_booking_share'),
+        db.UniqueConstraint('booking_id', 'user_id', name='uq_split_booking_user'),
+    )
+
+
 class Wallet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=False)
@@ -699,6 +783,18 @@ def load_user(user_id):
 
 def is_valid_email(email):
     return re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email) is not None
+
+
+def safe_local_redirect(target):
+    """Return a same-site redirect target, or None for external/unsafe URLs."""
+    if not target:
+        return None
+    if any(ord(char) < 32 for char in target) or '\\' in target:
+        return None
+    parsed = urlparse(target)
+    if parsed.scheme or parsed.netloc or not target.startswith('/') or target.startswith('//'):
+        return None
+    return target
 
 
 def admin_required():
@@ -765,6 +861,104 @@ def get_wallet(user):
     return wallet
 
 
+def smtp_is_configured():
+    return bool(app.config['SMTP_HOST'] and app.config['SMTP_FROM_EMAIL'])
+
+
+def send_email(message):
+    """Send mail through the configured SMTP relay using TLS where available."""
+    if not smtp_is_configured():
+        raise RuntimeError('Email delivery is not configured. Set SMTP_HOST and SMTP_FROM_EMAIL.')
+    context = ssl.create_default_context()
+    if app.config['SMTP_USE_SSL']:
+        with smtplib.SMTP_SSL(app.config['SMTP_HOST'], app.config['SMTP_PORT'],
+                              timeout=15, context=context) as server:
+            if app.config['SMTP_USERNAME']:
+                server.login(app.config['SMTP_USERNAME'], app.config['SMTP_PASSWORD'])
+            server.send_message(message)
+    else:
+        with smtplib.SMTP(app.config['SMTP_HOST'], app.config['SMTP_PORT'], timeout=15) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            if app.config['SMTP_USERNAME']:
+                server.login(app.config['SMTP_USERNAME'], app.config['SMTP_PASSWORD'])
+            server.send_message(message)
+
+
+def _otp_digest(code):
+    return hmac.new(app.config['SECRET_KEY'].encode(), code.encode(), hashlib.sha256).hexdigest()
+
+
+def send_registration_otp(user):
+    code = f'{secrets.randbelow(1_000_000):06d}'
+    user.email_otp_hash = _otp_digest(code)
+    user.email_otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+    user.email_otp_sent_at = datetime.utcnow()
+    user.email_otp_attempts = 0
+    db.session.commit()
+
+    message = EmailMessage()
+    message['Subject'] = 'Your MD CineWave verification code'
+    message['From'] = app.config['SMTP_FROM_EMAIL']
+    message['To'] = user.email
+    message.set_content(
+        f'Hello {user.username},\n\nYour email verification code is {code}. '
+        'It expires in 10 minutes. If you did not create this account, ignore this email.'
+    )
+    send_email(message)
+
+
+def dispatch_ticket_delivery(booking):
+    """Email a confirmed ticket and QR pass; return False without undoing payment on mail failure."""
+    user = booking.user
+    if not user or not user.email:
+        booking.ticket_email_error = 'The account has no email address.'
+        db.session.commit()
+        return False
+
+    showtime = booking.showtime
+    movie_title = showtime.movie.title
+    date_text = showtime.show_date.strftime('%a, %d %b %Y')
+    qr_payload = (f'CINEWAVE|{booking.reference}|{movie_title}|{showtime.theater}|'
+                  f'{showtime.show_date}|{showtime.show_time}|{booking.seats}')
+    message = EmailMessage()
+    message['Subject'] = f'Your MD CineWave ticket: {movie_title} ({booking.reference})'
+    message['From'] = app.config['SMTP_FROM_EMAIL']
+    message['To'] = user.email
+    message.set_content(
+        f'Your booking is confirmed.\n\nMovie: {movie_title}\nTheatre: {showtime.theater}\n'
+        f'Screen: {showtime.screen_label}\nDate: {date_text}\nTime: {showtime.show_time}\n'
+        f'Seats: {booking.seats}\nBooking reference: {booking.reference}\n\n'
+        'The attached QR code is your entry pass. Please show it at the theatre.'
+    )
+    safe_title = html.escape(movie_title)
+    message.add_alternative(
+        f'<html><body><h2>Booking confirmed</h2><p><b>{safe_title}</b></p>'
+        f'<p>{html.escape(showtime.theater)} · {html.escape(showtime.screen_label)}</p>'
+        f'<p>{html.escape(date_text)} at {html.escape(showtime.show_time)}</p>'
+        f'<p>Seats: <b>{html.escape(booking.seats)}</b></p>'
+        f'<p>Reference: <b>{html.escape(booking.reference)}</b></p>'
+        '<p>Your QR entry pass is attached to this email.</p></body></html>', subtype='html')
+    try:
+        import qrcode
+        qr_buffer = io.BytesIO()
+        qrcode.make(qr_payload).save(qr_buffer, format='PNG')
+        message.add_attachment(qr_buffer.getvalue(), maintype='image', subtype='png',
+                               filename=f'{booking.reference}-ticket-qr.png')
+        send_email(message)
+    except Exception:
+        app.logger.exception('Ticket email delivery failed for booking %s', booking.reference)
+        booking.ticket_email_error = 'Ticket email could not be delivered. Please try resending.'
+        db.session.commit()
+        return False
+
+    booking.ticket_email_sent_at = datetime.utcnow()
+    booking.ticket_email_error = None
+    db.session.commit()
+    return True
+
+
 def purge_expired_holds():
     """Release stale locks and expire unpaid bookings. Cheap, safe to call often."""
     now = datetime.utcnow()
@@ -781,9 +975,17 @@ def purge_expired_holds():
 
 
 def price_seats(showtime, seat_ids):
-    """Return (ticket_total, [{'id','class','price'}...]) using the screen layout."""
+    """Return (ticket_total, [{'id','class','price'}...]) including dynamic surge/discount."""
     layout = showtime.layout
-    prices = sl.seat_price_map(layout, showtime.price_overrides)
+    dyn = showtime.dynamic_pricing_info
+    effective_overrides = {}
+    base_overrides = showtime.price_overrides
+    for cls in layout.get("classes", []):
+        code = cls.get("code", "STD")
+        base_p = float(base_overrides.get(code, cls.get("price", 0)))
+        effective_overrides[code] = round(base_p * dyn['factor'], 2)
+
+    prices = sl.seat_price_map(layout, effective_overrides)
     classes = sl.seat_class_map(layout)
     meta = [{'id': s, 'class': classes.get(s, 'Standard'),
              'price': float(prices.get(s, 0))} for s in seat_ids]
@@ -796,6 +998,14 @@ def release_booking(booking, status='CANCELLED'):
         lock = SeatLock.query.filter_by(token=booking.lock_token).first()
         if lock:
             db.session.delete(lock)
+    # Split payments are sandbox-only. Mark any captured test shares as returned
+    # so an expired or cancelled group cannot leave a stale paid indicator.
+    for contribution in SplitContribution.query.filter_by(booking_id=booking.id).all():
+        if contribution.status == 'PAID':
+            contribution.status = 'REFUNDED'
+        elif contribution.status == 'CREATED':
+            contribution.status = 'OPEN'
+            contribution.user_id = None
     booking.status = status
     db.session.commit()
 
@@ -813,13 +1023,6 @@ def commit_seats(booking):
     db.session.flush()
 
 
-def dispatch_ticket_delivery(booking):
-    """Dispatches digital e-ticket receipt & QR pass notification to customer."""
-    recipient = getattr(booking.user, 'email', None) or booking.user.username
-    print(f"[E-Ticket Dispatch] Booking {booking.reference} ({booking.showtime.movie.title}) sent to {recipient}")
-    return True
-
-
 def finalise_paid_booking(booking, payment):
     """Commit seats, mark paid, drop the lock. Returns (ok, message)."""
     try:
@@ -831,6 +1034,11 @@ def finalise_paid_booking(booking, payment):
             lock = SeatLock.query.filter_by(token=booking.lock_token).first()
             if lock:
                 db.session.delete(lock)
+
+        # Deduct redeemed points first
+        if booking.points_redeemed and booking.points_redeemed > 0:
+            booking.user.points = max(0, (booking.user.points or 0) - booking.points_redeemed)
+
         # CinePass points reward: 10 points per ₹100 spent (20 points/₹100 for Rewatch Champion bookings!)
         is_rewatch = False
         if booking.user and booking.showtime and booking.showtime.movie:
@@ -863,6 +1071,14 @@ def finalise_paid_booking(booking, payment):
                                              amount=booking.total_amount,
                                              type='REFUND',
                                              description=f'Refund for {booking.reference}'))
+        if payment.method == 'split':
+            for contribution in SplitContribution.query.filter_by(booking_id=booking.id).all():
+                if contribution.status == 'PAID':
+                    contribution.status = 'REFUNDED'
+            if booking.lock_token:
+                lock = SeatLock.query.filter_by(token=booking.lock_token).first()
+                if lock:
+                    db.session.delete(lock)
         db.session.commit()
         return False, ("Someone completed payment for one of those seats first. "
                        "Your money has been refunded - please pick different seats.")
@@ -880,6 +1096,7 @@ def inject_globals():
     return {'wallet_balance': wallet_balance,
             'user_points': user_points,
             'gateway_live': payments.is_live_gateway(),
+            'startup_id': app.config['STARTUP_ID'],
             'today': date.today()}
 
 
@@ -931,7 +1148,7 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             get_wallet(user)
-            return redirect(request.args.get('next') or url_for('home'))
+            return redirect(safe_local_redirect(request.args.get('next')) or url_for('home'))
         flash('Invalid username or password')
     return render_template('login.html')
 
@@ -940,33 +1157,91 @@ def login():
 def register():
     if request.method == 'POST':
         username = request.form['username'].strip()
-        email = request.form.get('email', '').strip()
+        email = request.form.get('email', '').strip().lower()
         phone = request.form.get('phone', '').strip()
         password = request.form['password']
 
-        if not username or not password:
-            flash("Username and password are required.")
+        if not re.fullmatch(r'[A-Za-z0-9_.-]{3,30}', username):
+            flash('Username must be 3–30 characters and use only letters, numbers, dots, underscores, or hyphens.')
             return redirect(url_for('register'))
-        if email and not is_valid_email(email):
+        if not email or not is_valid_email(email):
             flash("Please enter a valid email address.")
+            return redirect(url_for('register'))
+        if len(password) < 6 or len(password) > 256:
+            flash('Use a password between 6 and 256 characters.')
             return redirect(url_for('register'))
         if User.query.filter_by(username=username).first():
             flash('Username already exists!')
             return redirect(url_for('register'))
-        if email and User.query.filter_by(email=email).first():
+        if User.query.filter_by(email=email).first():
             flash('An account with this email already exists!')
             return redirect(url_for('register'))
 
-        user = User(username=username, email=email or None, phone=phone or None)
+        user = User(username=username, email=email, email_verified=True, phone=phone or None)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
         create_wallet(user)
-
-        flash(f'Registered successfully! ₹{WELCOME_WALLET_BALANCE:.0f} welcome '
-              f'balance added to your wallet. Please login.')
-        return redirect(url_for('login'))
+        login_user(user)
+        flash('Your account is ready. Welcome to MD CineWave!')
+        return redirect(url_for('home'))
     return render_template('register.html')
+
+
+@app.route('/verify-email', methods=['GET', 'POST'])
+def verify_email():
+    user_id = session.get('pending_email_verification_user_id')
+    user = db.session.get(User, user_id) if user_id else None
+    if not user:
+        session.pop('pending_email_verification_user_id', None)
+        return redirect(url_for('register'))
+    if user.email_verified:
+        session.pop('pending_email_verification_user_id', None)
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        now = datetime.utcnow()
+        if user.email_otp_attempts >= 5:
+            flash('Too many incorrect codes. Request a new code after the resend cooldown.')
+        elif (not user.email_otp_hash or not user.email_otp_expires_at
+              or user.email_otp_expires_at <= now):
+            flash('Your code has expired. Request a new one.')
+        else:
+            user.email_otp_attempts += 1
+            expected = _otp_digest(code) if re.fullmatch(r'\d{6}', code) else ''
+            if hmac.compare_digest(user.email_otp_hash, expected):
+                user.email_verified = True
+                user.email_otp_hash = None
+                user.email_otp_expires_at = None
+                user.email_otp_attempts = 0
+                db.session.commit()
+                create_wallet(user)
+                session.pop('pending_email_verification_user_id', None)
+                flash('Email verified. Your account is ready; please sign in.')
+                return redirect(url_for('login'))
+            db.session.commit()
+            flash('That code is incorrect. Please try again.')
+    return render_template('verify_email.html', email=user.email)
+
+
+@app.route('/verify-email/resend', methods=['POST'])
+def resend_email_otp():
+    user_id = session.get('pending_email_verification_user_id')
+    user = db.session.get(User, user_id) if user_id else None
+    if not user or user.email_verified:
+        session.pop('pending_email_verification_user_id', None)
+        return redirect(url_for('register'))
+    if user.email_otp_sent_at and datetime.utcnow() - user.email_otp_sent_at < timedelta(seconds=60):
+        flash('Please wait one minute before requesting another code.')
+    else:
+        try:
+            send_registration_otp(user)
+            flash('A new verification code has been sent. It expires in 10 minutes.')
+        except Exception:
+            app.logger.exception('Registration OTP resend failed for user %s', user.id)
+            flash('We could not send the email right now. Please try again later.')
+    return redirect(url_for('verify_email'))
 
 
 @app.route('/logout')
@@ -1069,6 +1344,99 @@ def book(showtime_id):
                            max_seats=sl.MAX_SEATS_PER_BOOKING,
                            stats=sl.availability(layout, booked | held),
                            dynamic_info=dyn, party_code=party_code)
+
+
+@app.route('/book/<int:showtime_id>/vr-preview')
+@login_required
+def vr_seat_preview(showtime_id):
+    """Render the immersive seat preview from this show's real screen layout."""
+    purge_expired_holds()
+    showtime = Showtime.query.get_or_404(showtime_id)
+    if not showtime.screen:
+        abort(404)
+
+    layout = showtime.layout or {}
+    unavailable = showtime.booked_seat_ids() | showtime.held_seat_ids()
+    dynamic = showtime.dynamic_pricing_info
+    row_defs = []
+    prices = []
+    for cls in layout.get('classes', []):
+        code = cls.get('code', 'STD')
+        base_price = float(showtime.price_overrides.get(code, cls.get('price', 0)))
+        price = round(base_price * dynamic['factor'], 2)
+        prices.append(price)
+        for row in cls.get('rows', []):
+            start = int(row.get('start', 1))
+            count = max(0, int(row.get('count', 0)))
+            blocked = set(row.get('blocked') or [])
+            seats = {}
+            for number in range(start, start + count):
+                seat_id = f"{row['label']}{number}"
+                if seat_id in blocked:
+                    continue
+                seats[seat_id] = 'unavailable' if seat_id in unavailable else 'available'
+            row_defs.append({
+                'label': row['label'], 'start': start, 'count': count,
+                'aislesAfter': [int(a) for a in row.get('aisles_after', [])],
+                'blocked': list(blocked), 'offset': int(row.get('offset', 0)),
+                'seatSpan': max(1, int(row.get('seat_span', 1))),
+                'classCode': code, 'className': cls.get('name', 'Standard'),
+                'price': price, 'seats': seats,
+            })
+
+    if not row_defs:
+        abort(404)
+    max_seat = max((row['start'] + row['count'] - 1 for row in row_defs), default=1)
+    screen = layout.get('screen') or {}
+    screen_type = (showtime.screen.screen_type or '').upper()
+    fallback_aspect = 1.43 if 'IMAX' in screen_type else (2.2 if '70MM' in screen_type else 1.85)
+    # Seed layouts contain seat-by-seat arrangements, but most do not include
+    # surveyed auditorium dimensions. Keep supplied measurements and estimate
+    # screen width proportionally when a layout has no measurement.
+    widest_row_seats = max((row['count'] * row['seatSpan'] for row in row_defs), default=0)
+    try:
+        width = float(screen.get('width_m') or max(8.0, min(24.0, widest_row_seats * 0.62)))
+    except (TypeError, ValueError):
+        width = max(8.0, min(24.0, widest_row_seats * 0.62))
+    try:
+        aspect = float(screen.get('aspect_ratio') or fallback_aspect)
+        if aspect <= 0:
+            aspect = fallback_aspect
+    except (TypeError, ValueError):
+        aspect = fallback_aspect
+    try:
+        height = float(screen.get('height_m') or (width / aspect))
+    except (TypeError, ValueError):
+        height = width / aspect
+    all_seat_ids = [seat_id for row in row_defs for seat_id in row['seats']]
+    available_ids = [seat_id for row in row_defs for seat_id, state in row['seats'].items() if state == 'available']
+    middle_row = row_defs[len(row_defs) // 2]
+    middle_seat = middle_row['start'] + max(0, middle_row['count'] - 1) // 2
+    preferred_id = f"{middle_row['label']}{middle_seat}"
+    default_seat = preferred_id if preferred_id in available_ids else (available_ids[0] if available_ids else (all_seat_ids[0] if all_seat_ids else ''))
+
+    preview = {
+        'name': f'{showtime.theater} · {showtime.screen.name}',
+        'movieTitle': showtime.movie.title,
+        'sub': f'{showtime.screen.screen_type} · {len(row_defs)} rows · {sum(len(r["seats"]) for r in row_defs)} seats',
+        'rows': [row['label'] for row in row_defs], 'rowDefs': row_defs,
+        'cols': max_seat, 'aislesAfter': [], 'vipRows': [], 'reclinerRows': [],
+        'screenWidth': width, 'screenHeight': height,
+        'visual': layout.get('visual') or {
+            'seat_color': '#51252d', 'wall_color': '#11151d',
+            'trim_color': '#c9a84c', 'seat_style': 'standard',
+            'verified_at_theater_level': False,
+        },
+        'rowSpacing': max(1.6, min(3.8, float(screen.get('row_spacing_m', 2.45)))),
+        'screenCurve': max(0, min(0.6, float(screen.get('curve', 0.3)))),
+        'stadiumSlope': max(0.25, min(1.2, float(screen.get('stadium_slope', 0.55)))),
+        'prices': {'standard': min(prices or [0]), 'vip': max(prices or [0]), 'recliner': max(prices or [0])},
+        'defaultSeat': default_seat,
+    }
+    return render_template('vr_seat_preview.html', showtime=showtime,
+                           screen_type=showtime.screen.screen_type or 'Cinema screen',
+                           movie=showtime.movie, preview=preview,
+                           embedded=request.args.get('embed') == '1')
 
 
 @app.route('/api/movies/by-mood/<mood_code>')
@@ -1212,6 +1580,58 @@ def _load_pending(reference):
     return booking
 
 
+def _split_share_amounts(total_amount, count):
+    """Split the total into cent-accurate shares whose sum is exact."""
+    count = max(1, int(count))
+    total_cents = int(round(float(total_amount or 0) * 100))
+    base, remainder = divmod(total_cents, count)
+    return [(base + (1 if index < remainder else 0)) / 100
+            for index in range(count)]
+
+
+def _ensure_split_invite(booking):
+    if len(booking.seat_list) < 2:
+        return None
+    if not booking.split_token:
+        booking.split_token = secrets.token_urlsafe(24)
+    booking.is_split_pay = True
+    return booking.split_token
+
+
+def _ensure_split_slots(booking):
+    """Create or refresh unclaimed shares; never rewrite a share after payment starts."""
+    count = len(booking.seat_list)
+    if count < 2:
+        return []
+    rows = (SplitContribution.query.filter_by(booking_id=booking.id)
+            .order_by(SplitContribution.share_index).all())
+    if any(row.status in ('CREATED', 'PAID') for row in rows):
+        return rows
+
+    amounts = _split_share_amounts(booking.total_amount, count)
+    if len(rows) != count:
+        for row in rows:
+            db.session.delete(row)
+        rows = [SplitContribution(booking_id=booking.id, share_index=index,
+                                  amount=amount, status='OPEN')
+                for index, amount in enumerate(amounts, start=1)]
+        db.session.add_all(rows)
+    else:
+        for row, amount in zip(rows, amounts):
+            row.amount = amount
+    return rows
+
+
+def _has_split_progress(booking):
+    return SplitContribution.query.filter(
+        SplitContribution.booking_id == booking.id,
+        SplitContribution.status.in_(('CREATED', 'PAID'))).first() is not None
+
+
+def _split_invite_url(booking):
+    return url_for('split_pay', token=booking.split_token, _external=True)
+
+
 SNACK_ITEMS = [
     {"id": "popcorn_lg", "name": "Large Butter Popcorn", "price": 180, "icon": "fa-bowl-food", "desc": "Fresh tub with extra butter"},
     {"id": "pepsi_m", "name": "Chilled Pepsi 500ml", "price": 110, "icon": "fa-glass-water", "desc": "Ice-cold cinema beverage"},
@@ -1235,6 +1655,11 @@ def checkout(reference):
         flash("This booking is no longer payable.")
         return redirect(url_for('dashboard'))
 
+    if len(booking.seat_list) > 1:
+        _ensure_split_invite(booking)
+        _ensure_split_slots(booking)
+        db.session.commit()
+
     wallet = get_wallet(current_user)
     return render_template('checkout.html', booking=booking,
                            showtime=booking.showtime,
@@ -1243,19 +1668,172 @@ def checkout(reference):
                            can_use_wallet=wallet.balance >= booking.total_amount,
                            gateway=payments.gateway_name(),
                            snack_items=SNACK_ITEMS,
+                           split_pay_url=_split_invite_url(booking) if booking.split_token else '',
+                           split_started=_has_split_progress(booking),
                            user_points=current_user.points or 0)
+
+
+@app.route('/split-pay/<token>')
+def split_pay(token):
+    """Public invite view: a random token grants access to the split summary only."""
+    booking = Booking.query.filter_by(split_token=token).first_or_404()
+    if len(booking.seat_list) < 2:
+        abort(404)
+    if booking.is_expired:
+        release_booking(booking, 'EXPIRED')
+    rows = _ensure_split_slots(booking) if booking.status == 'PENDING' else (
+        SplitContribution.query.filter_by(booking_id=booking.id)
+        .order_by(SplitContribution.share_index).all())
+    db.session.commit()
+    user_share = None
+    if current_user.is_authenticated:
+        user_share = SplitContribution.query.filter_by(
+            booking_id=booking.id, user_id=current_user.id).first()
+    paid_count = sum(row.status == 'PAID' for row in rows)
+    open_count = sum(row.status == 'OPEN' and row.user_id is None for row in rows)
+    return render_template('split_pay.html', booking=booking,
+                           movie=booking.showtime.movie,
+                           showtime=booking.showtime,
+                           rows=rows, user_share=user_share,
+                           paid_count=paid_count, open_count=open_count,
+                           share_amount=booking.per_person_amount,
+                           split_gateway_available=payments.gateway_name() == 'mock')
+
+
+@app.route('/split-pay/<token>/start', methods=['POST'])
+@login_required
+def start_split_payment(token):
+    booking = Booking.query.filter_by(split_token=token).first_or_404()
+    if payments.gateway_name() != 'mock':
+        flash('Split Pay is available in sandbox mode. Use the booking holder’s checkout for live payment.')
+        return redirect(url_for('split_pay', token=token))
+    if booking.status != 'PENDING' or booking.is_expired:
+        if booking.is_expired:
+            release_booking(booking, 'EXPIRED')
+        flash('This split invite is no longer payable.')
+        return redirect(url_for('split_pay', token=token))
+    if booking.payment and booking.payment.status == 'CREATED':
+        flash('A full booking payment is already in progress. Ask the booking holder to finish or cancel it first.')
+        return redirect(url_for('split_pay', token=token))
+
+    rows = _ensure_split_slots(booking)
+    contribution = SplitContribution.query.filter_by(
+        booking_id=booking.id, user_id=current_user.id).first()
+    if contribution and contribution.status == 'PAID':
+        flash('Your share has already been paid.')
+        return redirect(url_for('split_pay', token=token))
+    if not contribution:
+        contribution = next((row for row in rows
+                             if row.status == 'OPEN' and row.user_id is None), None)
+        if not contribution:
+            flash('All remaining shares are already being paid or have been completed.')
+            db.session.commit()
+            return redirect(url_for('split_pay', token=token))
+        contribution.user_id = current_user.id
+        contribution.status = 'CREATED'
+
+    order = payments.create_order(
+        contribution.amount,
+        receipt=f'{booking.reference}-S{contribution.share_index}',
+        notes={'reference': booking.reference,
+               'split_share': str(contribution.share_index),
+               'movie': booking.showtime.movie.title})
+    contribution.gateway = 'mock'
+    contribution.method = 'split'
+    contribution.order_id = order['order_id']
+    contribution.created_at = datetime.utcnow()
+    booking.expires_at = max(booking.expires_at, datetime.utcnow() + timedelta(minutes=15))
+    lock = SeatLock.query.filter_by(token=booking.lock_token).first() if booking.lock_token else None
+    if lock:
+        lock.expires_at = booking.expires_at
+    db.session.commit()
+    return render_template('split_pay_mock.html', booking=booking,
+                           movie=booking.showtime.movie,
+                           contribution=contribution, order=order,
+                           user=current_user)
+
+
+@app.route('/split-pay/<token>/simulate/<int:contribution_id>', methods=['POST'])
+@login_required
+def simulate_split_payment(token, contribution_id):
+    booking = Booking.query.filter_by(split_token=token).first_or_404()
+    contribution = SplitContribution.query.filter_by(
+        id=contribution_id, booking_id=booking.id,
+        user_id=current_user.id).first_or_404()
+    if (payments.gateway_name() != 'mock' or booking.status != 'PENDING'
+            or contribution.status != 'CREATED' or booking.is_expired):
+        flash('This split payment is no longer active.')
+        return redirect(url_for('split_pay', token=token))
+
+    succeeded = request.form.get('outcome', 'success') == 'success'
+    result = payments.simulate_payment(contribution.order_id,
+                                       method='split', succeed=succeeded)
+    if not result['ok']:
+        contribution.status = 'OPEN'
+        contribution.user_id = None
+        contribution.error_message = result.get('error', 'Payment failed.')[:300]
+        db.session.commit()
+        flash('That share did not go through. It is available for another attempt.')
+        return redirect(url_for('split_pay', token=token))
+
+    if not payments.verify_signature(contribution.order_id,
+                                     result['payment_id'], result['signature']):
+        contribution.status = 'OPEN'
+        contribution.user_id = None
+        contribution.error_message = 'Signature verification failed'
+        db.session.commit()
+        flash('The share payment could not be verified. Please try again.')
+        return redirect(url_for('split_pay', token=token))
+
+    contribution.payment_id = result['payment_id']
+    contribution.signature = result['signature']
+    contribution.status = 'PAID'
+    db.session.commit()
+
+    rows = SplitContribution.query.filter_by(booking_id=booking.id).all()
+    paid_count = sum(row.status == 'PAID' for row in rows)
+    if paid_count == len(booking.seat_list):
+        payment = booking.payment or Payment(booking_id=booking.id)
+        payment.gateway = 'mock-split'
+        payment.method = 'split'
+        payment.order_id = f'split_{booking.reference}'
+        payment.payment_id = ','.join(row.payment_id or '' for row in rows)
+        payment.amount = booking.total_amount
+        payment.status = 'CREATED'
+        db.session.add(payment)
+        db.session.commit()
+        ok, message = finalise_paid_booking(booking, payment)
+        flash(message)
+        return redirect(url_for('ticket', reference=booking.reference) if ok
+                        else url_for('split_pay', token=token))
+
+    booking.expires_at = max(booking.expires_at,
+                             datetime.utcnow() + timedelta(minutes=15))
+    lock = SeatLock.query.filter_by(token=booking.lock_token).first() if booking.lock_token else None
+    if lock:
+        lock.expires_at = booking.expires_at
+    db.session.commit()
+    flash(f'Your share is in. {paid_count} of {len(booking.seat_list)} shares paid.')
+    return redirect(url_for('split_pay', token=token))
 
 
 @app.route('/checkout/<reference>/update_extras', methods=['POST'])
 @login_required
 def update_booking_extras(reference):
     booking = _load_pending(reference)
+    if _has_split_progress(booking):
+        flash('Extras are locked after a group member starts paying. Finish or cancel the split first.')
+        return redirect(url_for('checkout', reference=reference))
     if booking.status != 'PENDING' or booking.is_expired:
         flash("This booking is expired.")
         return redirect(url_for('book', showtime_id=booking.showtime_id))
 
     selected_snack_ids = set(request.form.getlist('snacks'))
-    redeem_pts = int(request.form.get('redeem_points', 0))
+    try:
+        requested_points = int(request.form.get('redeem_points', 0))
+    except (TypeError, ValueError):
+        flash("Enter a valid CinePass points amount.")
+        return redirect(url_for('checkout', reference=reference))
 
     snacks_chosen = []
     snack_total = 0.0
@@ -1264,9 +1842,9 @@ def update_booking_extras(reference):
             snacks_chosen.append(s)
             snack_total += s['price']
 
-    user_pts = current_user.points or 0
-    if redeem_pts > user_pts:
-        redeem_pts = 0
+    user_pts = max(0, current_user.points or 0)
+    # Never let a crafted negative value increase a user's points at payment time.
+    redeem_pts = min(max(0, requested_points), user_pts)
     discount = float(redeem_pts)
 
     base_subtotal = booking.ticket_amount + snack_total
@@ -1286,6 +1864,9 @@ def update_booking_extras(reference):
 @login_required
 def pay_with_wallet(reference):
     booking = _load_pending(reference)
+    if _has_split_progress(booking):
+        flash('A group split is in progress. Finish it from the Squad Pay invite link.')
+        return redirect(url_for('checkout', reference=reference))
     if booking.status != 'PENDING' or booking.is_expired:
         flash("This booking can no longer be paid.")
         return redirect(url_for('dashboard'))
@@ -1318,17 +1899,24 @@ def pay_with_wallet(reference):
 def pay_gateway(reference):
     """Creates the Razorpay (or mock) order and opens the payment page."""
     booking = _load_pending(reference)
+    if _has_split_progress(booking):
+        flash('A group split is in progress. Finish it from the Squad Pay invite link.')
+        return redirect(url_for('checkout', reference=reference))
     if booking.status != 'PENDING' or booking.is_expired:
         flash("This booking can no longer be paid.")
         return redirect(url_for('dashboard'))
 
     method = request.form.get('method', 'upi')
-    order = payments.create_order(
-        booking.total_amount,
-        receipt=booking.reference,
-        notes={'reference': booking.reference,
-               'movie': booking.showtime.movie.title,
-               'seats': booking.seats})
+    try:
+        order = payments.create_order(
+            booking.total_amount,
+            receipt=booking.reference,
+            notes={'reference': booking.reference,
+                   'movie': booking.showtime.movie.title,
+                   'seats': booking.seats})
+    except payments.PaymentGatewayError as exc:
+        flash(str(exc))
+        return redirect(url_for('checkout', reference=reference))
 
     payment = booking.payment or Payment(booking_id=booking.id)
     payment.gateway = order['gateway']
@@ -1366,6 +1954,10 @@ def payment_callback():
     payment = booking.payment
     if not payment:
         flash("No payment was started for this booking.")
+        return redirect(url_for('checkout', reference=reference))
+
+    if order_id != payment.order_id:
+        flash("Payment could not be matched to this booking. Please retry checkout.")
         return redirect(url_for('checkout', reference=reference))
 
     if failed:
@@ -1408,10 +2000,12 @@ def simulate(reference):
     """Sandbox 'Pay Now' / 'Simulate failure' buttons on the mock gateway page."""
     booking = _load_pending(reference)
     payment = booking.payment
-    if not payment or not payment.order_id:
-        flash("Start the payment again.")
+    if (not payment or not payment.order_id or payment.gateway != 'mock'
+            or not payment.order_id.startswith('order_mock_')):
+        abort(404)
+    if booking.status != 'PENDING' or booking.is_expired:
+        flash("This booking can no longer be paid.")
         return redirect(url_for('checkout', reference=reference))
-
     succeed = request.form.get('outcome', 'success') == 'success'
     result = payments.simulate_payment(payment.order_id,
                                        method=payment.method or 'upi',
@@ -1510,10 +2104,13 @@ def resend_ticket_delivery(reference):
     booking = Booking.query.filter_by(reference=reference).first_or_404()
     if booking.user_id != current_user.id and not current_user.is_admin:
         abort(403)
-
-    dispatch_ticket_delivery(booking)
-    recipient = current_user.email or current_user.username
-    flash(f"📧 E-ticket with QR pass dispatched to {recipient}!")
+    if booking.status != 'PAID':
+        flash('Only confirmed bookings have an e-ticket to send.')
+        return redirect(url_for('ticket', reference=reference))
+    if dispatch_ticket_delivery(booking):
+        flash(f"E-ticket with QR pass sent to {booking.user.email}.")
+    else:
+        flash('The booking is confirmed, but email delivery failed. Check the mail settings and retry.')
     return redirect(url_for('ticket', reference=reference))
 
 
@@ -2458,193 +3055,11 @@ def admin_analytics_export():
     return resp
 
 
-# ====================== AI BOOKING ASSISTANT ROUTES ======================
-
-@app.route('/api/ai/chat', methods=['POST'])
-def api_ai_chat():
-    data = request.get_json() or {}
-    user_prompt = data.get('prompt', '').strip()
-    history = data.get('history', [])
-
-    if not user_prompt:
-        return jsonify({'success': False, 'message': 'Prompt cannot be empty'}), 400
-
-    # Build DB context for AI Booking Assistant
-    try:
-        running_movies = Movie.query.filter_by(is_upcoming=False).all()
-        movies_context = [{
-            'id': m.id,
-            'title': m.title,
-            'genre': getattr(m, 'genre', 'Drama'),
-            'language': getattr(m, 'language', 'Telugu'),
-            'rating': getattr(m, 'rating', 8.5),
-            'poster': getattr(m, 'poster', None)
-        } for m in running_movies]
-
-        theaters_context = [{
-            'id': t.id,
-            'name': t.name,
-            'location': t.location
-        } for t in Theater.query.all()]
-
-        # Collect active/upcoming showtimes
-        active_showtimes = []
-        for s in Showtime.query.all():
-            if not s.is_past:
-                active_showtimes.append({
-                    'id': s.id,
-                    'movie_id': s.movie_id,
-                    'theater': s.theater,
-                    'screen_label': s.screen_label,
-                    'show_time': s.show_time,
-                    'show_date': s.show_date.strftime('%d %b') if s.show_date else 'Today',
-                    'seats_left': s.seats_left
-                })
-    except Exception:
-        movies_context = []
-        theaters_context = []
-        active_showtimes = []
-
-    context_data = {
-        'movies': movies_context,
-        'theaters': theaters_context,
-        'showtimes': active_showtimes
-    }
-
-    user_info = {}
-    if current_user.is_authenticated:
-        w = Wallet.query.filter_by(user_id=current_user.id).first()
-        user_info['wallet_balance'] = w.balance if w else 0.0
-        user_info['username'] = current_user.username
-
-    res = ai_booking_assistant.process_chat_message(
-        user_prompt,
-        history=history,
-        context_data=context_data,
-        user_info=user_info
-    )
-
-    return jsonify({
-        'success': True,
-        'response': res['response'],
-        'actions': res.get('actions', []),
-        'intent': res.get('intent', 'general'),
-        'source': 'ai_assistant'
-    })
-
-
-@app.route('/api/ai/book-direct', methods=['POST'])
-def api_ai_book_direct():
-    """
-    Direct seat allocation & hold initiated by the AI Booking Assistant.
-    """
-    if not current_user.is_authenticated:
-        return jsonify({
-            'success': False,
-            'need_login': True,
-            'message': 'Please sign in to complete your seat reservation.',
-            'login_url': url_for('login')
-        }), 401
-
-    data = request.get_json() or {}
-    showtime_id = data.get('showtime_id')
-    count = int(data.get('seat_count', 2))
-    preferred_class = data.get('preferred_class', None)
-    explicit_seats = data.get('seats', [])
-
-    showtime = Showtime.query.get(showtime_id)
-    if not showtime:
-        return jsonify({'success': False, 'message': 'Showtime not found'}), 404
-
-    if showtime.status == 'ended' or showtime.is_past:
-        return jsonify({'success': False, 'message': 'This show has already concluded.'}), 400
-
-    layout = showtime.layout
-    booked = showtime.booked_seat_ids()
-    held = showtime.held_seat_ids()
-
-    if explicit_seats:
-        selected_seats = [s.strip().upper() for s in explicit_seats if s.strip()]
-    else:
-        selected_seats = ai_booking_assistant.find_best_seats(
-            layout, booked, held, count=count, preferred_class=preferred_class
-        )
-
-    if not selected_seats or len(selected_seats) < count:
-        return jsonify({
-            'success': False,
-            'message': f"Sorry, could not find {count} available seats in the requested class."
-        }), 400
-
-    ok, msg = sl.validate_seats(layout, selected_seats)
-    if not ok:
-        return jsonify({'success': False, 'message': msg}), 400
-
-    clash = sorted(set(selected_seats) & (booked | held))
-    if clash:
-        return jsonify({
-            'success': False,
-            'message': f"Seats {', '.join(clash)} are no longer available. Please select again."
-        }), 400
-
-    ticket_amount, meta = price_seats(showtime, selected_seats)
-    amounts = payments.compute_amounts(ticket_amount, len(selected_seats))
-
-    lock = SeatLock(showtime_id=showtime.id, user_id=current_user.id,
-                    seats=",".join(selected_seats))
-    db.session.add(lock)
-    db.session.flush()
-
-    booking = Booking(
-        user_id=current_user.id,
-        showtime_id=showtime.id,
-        seats=",".join(selected_seats),
-        seat_meta_json=json.dumps(meta),
-        ticket_amount=amounts['ticket_amount'],
-        convenience_fee=amounts['convenience_fee'],
-        gst=amounts['gst'],
-        total_amount=amounts['total'],
-        status='PENDING',
-        lock_token=lock.token,
-        expires_at=lock.expires_at
-    )
-    db.session.add(booking)
-    db.session.commit()
-
-    return jsonify({
-        'success': True,
-        'reference': booking.reference,
-        'seats': booking.seats,
-        'seat_count': len(selected_seats),
-        'total_amount': booking.total_amount,
-        'checkout_url': url_for('checkout', reference=booking.reference)
-    })
-
-
-@app.route('/api/ai/movie_summary/<int:movie_id>')
-@app.route('/api/ai/movie_reviews/<int:movie_id>')
-def api_ai_movie_summary(movie_id):
-    movie = Movie.query.get_or_404(movie_id)
-    reviews = [(getattr(r, 'review', None) or getattr(r, 'comment', None))
-               for r in getattr(movie, 'user_ratings', [])
-               if (getattr(r, 'review', None) or getattr(r, 'comment', None))]
-
-    res = ai_booking_assistant.generate_movie_review_summary(movie.title, reviews)
-    return jsonify({
-        'success': True,
-        'movie_id': movie_id,
-        'movie_title': movie.title,
-        'summary': res['summary'],
-        'sentiment': res.get('sentiment', 'Positive'),
-        'score': res.get('score', '4.8/5'),
-        'source': 'ai_assistant'
-    })
-
-
 # ====================== INITIALIZATION ======================
 
 SAMPLE_LAYOUT = {
     "screen_label": "Screen 1",
+    "screen": {"width_m": 18, "height_m": 9.7},
     "classes": [
         {"code": "RECLINER", "name": "Recliner", "price": 320,
          "rows": [{"label": "A", "count": 10, "aisles_after": [5], "blocked": []},
@@ -2667,6 +3082,11 @@ def auto_migrate():
     insp = inspect(db.engine)
     wanted = {
         'user': [('phone', 'VARCHAR(15)'), ('points', 'INTEGER DEFAULT 100'),
+                 ('email_verified', 'BOOLEAN DEFAULT 1'),
+                 ('email_otp_hash', 'VARCHAR(256)'),
+                 ('email_otp_expires_at', 'DATETIME'),
+                 ('email_otp_sent_at', 'DATETIME'),
+                 ('email_otp_attempts', 'INTEGER DEFAULT 0'),
                  ('created_at', 'DATETIME'), ('bio', "VARCHAR(250) DEFAULT 'Cinema lover & movie enthusiast.'")],
         'movie': [('language', "VARCHAR(50)"), ('certificate', "VARCHAR(10)"),
                   ('rating', 'FLOAT DEFAULT 8.5'),
@@ -2681,7 +3101,10 @@ def auto_migrate():
                     ('ticket_amount', 'FLOAT'), ('convenience_fee', 'FLOAT'),
                     ('gst', 'FLOAT'), ('status', "VARCHAR(20)"),
                     ('lock_token', 'VARCHAR(40)'), ('paid_at', 'DATETIME'),
+                    ('ticket_email_sent_at', 'DATETIME'),
+                    ('ticket_email_error', 'VARCHAR(300)'),
                     ('expires_at', 'DATETIME'), ('is_split_pay', 'BOOLEAN DEFAULT 0'),
+                    ('split_token', 'VARCHAR(64)'),
                     ('snacks_json', 'TEXT'), ('points_redeemed', 'INTEGER DEFAULT 0')],
         'booked_seat': [('booking_id', 'INTEGER')],
         'movie_rating': [('has_spoiler', 'BOOLEAN DEFAULT 0')],
@@ -2877,11 +3300,15 @@ def init_db():
         admin_user = User.query.filter_by(username='admin').first()
         if not admin_user:
             admin_user = User(username='admin', email='admin@cinewave.com', is_admin=True)
-            admin_user.set_password('admin123')
+            admin_password = os.environ.get('ADMIN_PASSWORD') or secrets.token_urlsafe(18)
+            admin_user.set_password(admin_password)
             db.session.add(admin_user)
             db.session.commit()
             create_wallet(admin_user, balance=10000)
-            print("Default admin created (admin / admin123)")
+            if os.environ.get('ADMIN_PASSWORD'):
+                print("Admin account created from ADMIN_PASSWORD environment setting.")
+            else:
+                print(f"Admin account created. One-time password: {admin_password}")
 
         # make sure every existing account has a wallet with the signup bonus
         for u in User.query.all():
@@ -2904,4 +3331,5 @@ def init_db():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    debug_enabled = os.environ.get('FLASK_DEBUG', '').strip().lower() in {'1', 'true', 'yes'}
+    app.run(debug=debug_enabled)

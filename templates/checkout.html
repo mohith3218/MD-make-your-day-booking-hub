@@ -36,8 +36,20 @@
 
     <div class="border-t border-slate-800 pt-4 space-y-2 text-xs">
       <div class="flex justify-between text-slate-400"><span>Tickets ({{ booking.seat_list|length }})</span><span>₹{{ '%.2f'|format(booking.ticket_amount) }}</span></div>
+      {% if booking.snacks_list %}
+        <div class="flex justify-between text-amber-300">
+          <span>Snacks ({{ booking.snacks_list|length }})</span>
+          <span>₹{{ '%.2f'|format(booking.snacks_list|sum(attribute='price')) }}</span>
+        </div>
+      {% endif %}
       <div class="flex justify-between text-slate-400"><span>Convenience fee</span><span>₹{{ '%.2f'|format(booking.convenience_fee) }}</span></div>
       <div class="flex justify-between text-slate-400"><span>GST (18% on fee)</span><span>₹{{ '%.2f'|format(booking.gst) }}</span></div>
+      {% if booking.points_redeemed and booking.points_redeemed > 0 %}
+        <div class="flex justify-between text-emerald-400 font-semibold">
+          <span>CinePass Points Redeemed</span>
+          <span>-₹{{ '%.2f'|format(booking.points_redeemed) }}</span>
+        </div>
+      {% endif %}
       <div class="flex justify-between pt-2 border-t border-slate-800 text-sm font-bold text-white">
         <span>Amount payable</span><span class="text-[#C9A84C]">₹{{ '%.2f'|format(booking.total_amount) }}</span>
       </div>
@@ -64,11 +76,19 @@
         <strong class="text-indigo-400">₹{{ '%.2f'|format(booking.per_person_amount) }}</strong> per person.
       </p>
       <div class="flex items-center gap-2 pt-1">
-        <input type="text" readonly id="squad-link" value="{{ request.url }}" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 font-mono">
+        <input type="text" readonly id="squad-link" value="{{ split_pay_url }}" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 font-mono">
         <button type="button" onclick="copySquadLink()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition whitespace-nowrap">
           <i class="fa-solid fa-copy mr-1"></i> Copy Link
         </button>
       </div>
+    </div>
+    {% endif %}
+
+    {% if split_started %}
+    <div class="glass-card rounded-2xl p-4 border border-indigo-400/30 bg-indigo-950/25 text-xs text-indigo-100">
+      A group member has started paying. The regular full-bill buttons are paused to prevent a duplicate charge.
+      <a href="{{ split_pay_url }}" target="_blank" rel="noopener" class="font-bold text-amber-300 underline underline-offset-2">Open the split payment page</a>
+      to check progress.
     </div>
     {% endif %}
 
@@ -118,6 +138,7 @@
       </button>
     </form>
 
+    {% if not split_started %}
     <!-- wallet -->
     <form method="POST" action="{{ url_for('pay_with_wallet', reference=booking.reference) }}"
           class="glass-card rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
@@ -169,6 +190,11 @@
     <form method="POST" action="{{ url_for('cancel_booking', reference=booking.reference) }}">
       <button type="submit" class="text-[11px] text-slate-500 hover:text-[#C9A84C] transition">Cancel and release seats</button>
     </form>
+    {% else %}
+    <form method="POST" action="{{ url_for('cancel_booking', reference=booking.reference) }}" onsubmit="return confirm('Cancel this booking and return all sandbox split shares?');">
+      <button type="submit" class="text-[11px] text-slate-500 hover:text-[#C9A84C] transition">Cancel booking and return test shares</button>
+    </form>
+    {% endif %}
   </section>
 </div>
 {% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Verify email · MD CineWave{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6">
+  <div class="text-center space-y-2">
+    <h1 class="text-3xl font-black tracking-wider text-white">Verify your email</h1>
+    <p class="text-sm text-slate-400">Enter the six-digit code sent to <strong class="text-slate-200">{{ email }}</strong>.</p>
+    <p class="text-xs text-slate-500">The code expires after 10 minutes. You have up to five attempts.</p>
+  </div>
+
+  <form method="POST" class="space-y-4">
+    <label class="block text-xs text-slate-400 font-medium" for="code">Verification code</label>
+    <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+           pattern="[0-9]{6}" minlength="6" maxlength="6" required
+           class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-3 text-center text-xl tracking-[.5em] text-slate-100">
+    <button type="submit" class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-slate-950 font-semibold rounded-xl">Verify email</button>
+  </form>
+
+  <form method="POST" action="{{ url_for('resend_email_otp') }}" class="text-center">
+    <button type="submit" class="text-sm text-[#C9A84C] hover:underline">Send a new code</button>
+  </form>
+</div>
+{% endblock %}

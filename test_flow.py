@@ -14,6 +14,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 os.environ.pop('RAZORPAY_KEY_ID', None)
+os.environ.setdefault('ADMIN_PASSWORD', 'admin123')
 
 import app as A
 
@@ -68,6 +69,27 @@ def main():
     assert r.status_code == 200
     assert 'Recliner' in html and 'data-seat="A1"' in html
     assert '₹400' in html, 'per-show price override not applied'
+    assert 'function toggleSeatSelection' in html and 'toggleSeatSelection(seatEl)' in html
+    assert 'id="vr-preview-frame"' in html and 'class="seat' in html
+    vr_preview = c1.get(f'/book/{show_id}/vr-preview')
+    assert vr_preview.status_code == 200
+    preview_html = vr_preview.get_data(as_text=True)
+    assert 'INOX Varun Beach' in preview_html and 'Live screen layout' not in preview_html
+    assert 'currentAudi.rowDefs' in preview_html and 'jagadamba' not in preview_html
+    assert 'Acoustic Ribbed Side Walls' in preview_html and 'Rear Projection Booth Wall' in preview_html
+    assert 'sideWall.position' in preview_html and 'backWall.position' in preview_html
+    assert 'screenSurfaceZ = -lastRowZ - Math.max(10, rowSpacing * 4)' in preview_html
+    assert 'screenMesh.position.set(0, screenY, screenSurfaceZ - radius)' in preview_html
+    assert 'auditoriumRearWallZ = 5.5 + Math.max(5.5, rowSpacing * 2.2)' in preview_html
+    assert 'cameraTargetPos.copy(auditoriumOverviewCamera)' in preview_html
+    inline_preview = c1.get(f'/book/{show_id}/vr-preview?embed=1')
+    assert inline_preview.status_code == 200
+    assert 'preview-embedded' in inline_preview.get_data(as_text=True)
+    assert 'id="vr-inline-frame"' in html and 'data-src=' in html
+    assert 'postVRPreviewState(true, inlineVrFrame)' in html
+    assert 'grid-template-columns: minmax(270px,1fr) auto minmax(180px,1fr)' in preview_html
+    assert 'Theater seat map' in preview_html and 'Seat details' in preview_html
+    assert 'color: 0x4a2029' in preview_html and 'color: 0x205247' in preview_html
     seats_rendered = len(re.findall(r'data-seat="', html))
     print(f"1. seat map OK - {seats_rendered} selectable seats, override ₹400 applied")
 
@@ -161,6 +183,14 @@ def main():
     with A.app.app_context():
         order_id = A.Booking.query.filter_by(reference=ref4).one().payment.order_id
     r = c2.post('/pay/callback', data={'reference': ref4,
+                                       'razorpay_order_id': 'order_mock_unrelated',
+                                       'razorpay_payment_id': 'pay_fake_123',
+                                       'razorpay_signature': 'deadbeef'},
+                follow_redirects=True)
+    assert 'could not be matched' in r.get_data(as_text=True)
+    with A.app.app_context():
+        assert A.Booking.query.filter_by(reference=ref4).one().status == 'PENDING'
+    r = c2.post('/pay/callback', data={'reference': ref4,
                                        'razorpay_order_id': order_id,
                                        'razorpay_payment_id': 'pay_fake_123',
                                        'razorpay_signature': 'deadbeef'},
@@ -169,6 +199,25 @@ def main():
     with A.app.app_context():
         assert A.Booking.query.filter_by(reference=ref4).one().status == 'FAILED'
     print("9. signature check OK - forged payment response rejected, nothing charged")
+
+    # A live Razorpay order must never be markable as paid through the sandbox route.
+    r = c1.post(f'/book/{show_id}', data={'selected_seats': 'F5'}, follow_redirects=False)
+    ref_live = r.headers['Location'].rsplit('/', 1)[1]
+    c1.post(f'/pay/gateway/{ref_live}', data={'method': 'upi'})
+    with A.app.app_context():
+        live_booking = A.Booking.query.filter_by(reference=ref_live).one()
+        live_booking.payment.gateway = 'razorpay'
+        live_booking.payment.order_id = 'order_live_security_check'
+        A.db.session.commit()
+    r = c1.post(f'/pay/simulate/{ref_live}', data={'outcome': 'success'},
+                follow_redirects=False)
+    assert r.status_code == 404
+    with A.app.app_context():
+        live_booking = A.Booking.query.filter_by(reference=ref_live).one()
+        assert live_booking.status == 'PENDING'
+        assert A.BookedSeat.query.filter_by(booking_id=live_booking.id).count() == 0
+        A.release_booking(live_booking, 'CANCELLED')
+    print("9b. live payment protected - sandbox route cannot capture a Razorpay order")
 
     # ---- 10. hold expiry -------------------------------------------------
     r = c1.post(f'/book/{show_id}', data={'selected_seats': 'F1'}, follow_redirects=False)
@@ -220,6 +269,10 @@ def main():
         assert res.status_code == 200, f'{path} -> {res.status_code}'
     for path in ['/', f'/movie/1', '/dashboard', '/wallet']:
         assert c1.get(path).status_code == 200, path
+    assert not any(rule.rule.startswith('/api/ai') for rule in A.app.url_map.iter_rules())
+    home_html = c1.get('/').get_data(as_text=True).lower()
+    assert 'cinebot-widget' not in home_html and 'ai booking assistant' not in home_html
+    assert 'cinewave-hero.jpg' in home_html
     print("12. all pages render (admin + user)")
 
     # ---- 14. admin analytics page + CSV export ---------------------------
@@ -278,58 +331,24 @@ def main():
     assert r.status_code == 302
     print("15b. fetch-cast route OK - admin action handled without error")
 
-    # ---- 16. AI Booking Assistant & Summary routes ----------------------
-    r = c1.post('/api/ai/chat', json={'prompt': 'What movies are playing?'})
-    assert r.status_code == 200, r.status_code
-    data = r.get_json()
-    assert data['success'] is True and 'response' in data and len(data['response']) > 0
-    assert 'actions' in data
-    print("16a. AI Booking Assistant Chat API OK - returned assistant response and action cards")
-
-    with A.app.app_context():
-        first_m_id = A.Movie.query.first().id
-    r = c1.get(f'/api/ai/movie_summary/{first_m_id}')
-    assert r.status_code == 200, r.status_code
-    data = r.get_json()
-    assert data['success'] is True and 'summary' in data and 'sentiment' in data
-    print("16b. AI Movie Review Summary API OK - returned heuristic review summary")
-
-    # ---- 17. AI Direct Seat Allocation & Booking Flow -------------------
-    r = c1.post('/api/ai/book-direct', json={
-        'showtime_id': show_id,
-        'seat_count': 2,
-        'preferred_class': 'RECLINER'
-    })
-    assert r.status_code == 200, r.status_code
-    direct_data = r.get_json()
-    assert direct_data['success'] is True and 'reference' in direct_data
-    assert direct_data['seat_count'] == 2 and direct_data['total_amount'] > 0
-    ai_ref = direct_data['reference']
-    print(f"17. AI Direct Booking OK - Auto-allocated seats {direct_data['seats']}, ref: {ai_ref}")
-
-    # Complete wallet payment for AI booking
-    r = c1.post(f'/pay/wallet/{ai_ref}', follow_redirects=False)
-    assert f'/ticket/{ai_ref}' in r.headers['Location']
-    print("17b. AI Booking Payment OK - paid with wallet")
-
-    # ---- 18. Self-Service Cancellation with Wallet Refund --------------
+    # ---- 16. Self-Service Cancellation with Wallet Refund --------------
     with A.app.app_context():
         u = A.User.query.filter_by(username='mohith').one()
         w_before = A.Wallet.query.filter_by(user_id=u.id).one().balance
-        b_ai = A.Booking.query.filter_by(reference=ai_ref).one()
-        expected_refund = round(b_ai.ticket_amount * 0.90, 2)
+        b_cancel = A.Booking.query.filter_by(reference=ref1).one()
+        expected_refund = round(b_cancel.ticket_amount * 0.90, 2)
     
-    r = c1.post(f'/booking/{ai_ref}/refund', follow_redirects=True)
+    r = c1.post(f'/booking/{ref1}/refund', follow_redirects=True)
     assert r.status_code == 200, r.status_code
     with A.app.app_context():
         u = A.User.query.filter_by(username='mohith').one()
-        b_after = A.Booking.query.filter_by(reference=ai_ref).one()
+        b_after = A.Booking.query.filter_by(reference=ref1).one()
         w_after = A.Wallet.query.filter_by(user_id=u.id).one().balance
         assert b_after.status == 'CANCELLED'
         assert round(w_after, 2) == round(w_before + expected_refund, 2)
         # Seats should be freed up
         assert A.BookedSeat.query.filter_by(booking_id=b_after.id).count() == 0
-    print(f"18. Self-service Cancellation & Refund OK - ₹{expected_refund:.2f} credited to wallet, seats freed")
+    print(f"16. Self-service Cancellation & Refund OK - ₹{expected_refund:.2f} credited to wallet, seats freed")
 
     # ---- 19. Spoiler Shield & Keyword Auto-Detection ------------------
     with A.app.app_context():

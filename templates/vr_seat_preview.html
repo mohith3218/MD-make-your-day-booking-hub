@@ -1,0 +1,2723 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ movie.title }} · {{ showtime.theater }} 3D Seat Preview</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="{{ url_for('static', filename='js/three-r128.min.js') }}"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-neo: #0b0e17;
+            --panel-neo: rgba(13, 17, 26, 0.88);
+            --cine-gold: #C9A84C;
+            --cyan-glow: #00f0ff;
+            --emerald-glow: #10b981;
+        }
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #05070b;
+            font-family: 'Inter', sans-serif;
+            color: #e2e8f0;
+        }
+
+        .font-display {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .font-bebas {
+            font-family: 'Bebas Neue', sans-serif;
+            letter-spacing: 0.04em;
+        }
+
+        /* Neomorphic Dark Luxury Styling */
+        .neo-panel {
+            background: var(--panel-neo);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 
+                10px 10px 28px rgba(0, 0, 0, 0.85),
+                -4px -4px 16px rgba(255, 255, 255, 0.025),
+                inset 0 1px 1px rgba(255, 255, 255, 0.09);
+        }
+
+        .neo-inset {
+            background: #080a10;
+            box-shadow: 
+                inset 4px 4px 10px rgba(0, 0, 0, 0.9),
+                inset -2px -2px 6px rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .neo-btn {
+            background: linear-gradient(145deg, #151a28, #0d111a);
+            box-shadow: 
+                4px 4px 10px rgba(0, 0, 0, 0.75),
+                -2px -2px 6px rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .neo-btn:hover:not(:disabled) {
+            border-color: rgba(0, 240, 255, 0.45);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .neo-btn:active:not(:disabled), .neo-btn.active {
+            background: linear-gradient(145deg, #090c12, #131824);
+            box-shadow: 
+                inset 3px 3px 7px rgba(0, 0, 0, 0.85),
+                0 0 14px rgba(0, 240, 255, 0.28);
+            border-color: rgba(0, 240, 255, 0.7);
+            color: #00f0ff;
+        }
+
+        .neo-btn.gold-active {
+            background: linear-gradient(145deg, #241c0c, #171207);
+            box-shadow: 
+                inset 3px 3px 7px rgba(0, 0, 0, 0.85),
+                0 0 14px rgba(201, 168, 76, 0.35);
+            border-color: rgba(201, 168, 76, 0.75);
+            color: #f0d78c;
+        }
+
+        .neo-btn.emerald-active {
+            background: linear-gradient(145deg, #072218, #051610);
+            box-shadow: 
+                inset 3px 3px 7px rgba(0, 0, 0, 0.85),
+                0 0 16px rgba(16, 185, 129, 0.45);
+            border-color: rgba(16, 185, 129, 0.8);
+            color: #34d399;
+        }
+
+        .neo-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 999px;
+            background: #07090e;
+            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.9);
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 15px;
+            width: 15px;
+            border-radius: 50%;
+            background: #C9A84C;
+            box-shadow: 0 0 10px #C9A84C;
+            margin-top: -5px;
+            cursor: pointer;
+        }
+
+        /* 2D Minimap Seat Pill */
+        .seat-dot {
+            transition: all 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .seat-dot:hover:not(.occupied) {
+            transform: scale(1.3);
+            z-index: 20;
+        }
+
+        /* VR Stereo Divider Overlay */
+        #vr-stereo-overlay {
+            pointer-events: none;
+            display: none;
+        }
+        #vr-stereo-overlay.active {
+            display: flex;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080a10;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #263044;
+            border-radius: 9999px;
+        }
+
+        /* Keep the supplied auditorium and refine only the overlay UI. */
+        :root {
+            --panel-neo: rgba(12, 14, 19, 0.84);
+            --cine-gold: #c9a84c;
+            --cyan-glow: #73aeb2;
+        }
+        .neo-panel {
+            background: linear-gradient(145deg, rgba(20,21,25,.93), rgba(10,11,15,.9));
+            border-color: rgba(201,168,76,.17);
+            box-shadow: 0 18px 48px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.055);
+            border-radius: 20px;
+        }
+        .neo-inset {
+            background: rgba(7,8,11,.7);
+            border-color: rgba(255,255,255,.075);
+            box-shadow: inset 0 1px 4px rgba(0,0,0,.35);
+        }
+        .neo-btn { background: rgba(255,255,255,.045); border-color: rgba(255,255,255,.09); box-shadow: none; }
+        .neo-btn:hover:not(:disabled) { border-color: rgba(201,168,76,.48); color: #f4e4b4; transform: translateY(-1px); }
+        .neo-btn:active:not(:disabled), .neo-btn.active {
+            background: rgba(201,168,76,.14); border-color: rgba(201,168,76,.55);
+            color: #f1d88f; box-shadow: inset 0 1px rgba(255,255,255,.08);
+        }
+        .neo-btn.gold-active { background: rgba(201,168,76,.14); border-color: rgba(201,168,76,.52); color: #f1d88f; box-shadow: none; }
+        .neo-panel .text-cyan-400, .neo-panel .text-cyan-300 { color: #c6ad73 !important; }
+        .neo-panel .text-emerald-400, .neo-panel .text-emerald-300 { color: #a6c0ad !important; }
+        .neo-panel .text-purple-400 { color: #b9adca !important; }
+        #look-hint > div { background: rgba(12,14,18,.78); border-color: rgba(201,168,76,.22); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+        #btn-toggle-reserve { box-shadow: 0 8px 22px rgba(201,168,76,.16); }
+        /* Clear three-zone layout: theater identity, view controls, display settings. */
+        header.fixed {
+            display: grid;
+            grid-template-columns: minmax(270px,1fr) auto minmax(180px,1fr);
+            align-items: start;
+            gap: 12px;
+            left: 18px; right: 18px; top: 16px;
+        }
+        header.fixed > div:first-child { justify-self: start; }
+        header.fixed > div:nth-child(2) { justify-self: center; }
+        header.fixed > div:nth-child(3) { justify-self: end; }
+        header .neo-panel { border-radius: 16px; padding: 9px 12px; }
+        header .neo-btn { min-height: 36px; }
+        #metrics-panel, #minimap-drawer {
+            top: 92px; bottom: auto; max-height: calc(100dvh - 178px); overflow-y: auto;
+            border-radius: 18px; padding: 14px;
+        }
+        #metrics-panel { left: 18px; width: 306px; }
+        #minimap-drawer { right: 18px; width: 326px; }
+        #minimap-grid { max-height: min(38vh, 340px); }
+        #look-hint { top: 80px; }
+        #look-hint > div { font-size: 10px; letter-spacing: .01em; }
+        #metrics-panel > div:first-child, #minimap-drawer > div:first-child {
+            min-height: 32px; padding-bottom: 9px; border-bottom: 1px solid rgba(255,255,255,.07);
+        }
+        #metrics-panel.details-collapsed #seat-details-body { display: none; }
+        #metrics-panel.details-collapsed > div:first-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+        #dock-seat-code { color: #f1d88f; }
+        #dock-seat-tier { background: rgba(201,168,76,.12); color: #e7d5a0; }
+        body::after {
+            content: ""; position: fixed; inset: 0; z-index: 8; pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 48%, rgba(2,3,6,.22) 100%),
+                        linear-gradient(180deg, rgba(2,3,6,.14), transparent 24%, transparent 76%, rgba(2,3,6,.24));
+        }
+        #minimap-grid button.seat-dot { width: 18px; height: 18px; border-radius: 6px 6px 4px 4px; font-size: 8px; font-weight: 700; }
+        #metrics-panel > div:first-child span:first-child { color: #d4bd83; }
+        #metric-seat-title { font-size: 20px; letter-spacing: -.02em; }
+        #screen-content-select { max-width: 225px; }
+        #minimap-drawer .fa-compass { color: #d4bd83; }
+        @media (max-width: 1180px) {
+            header.fixed { grid-template-columns: 1fr auto; }
+            header.fixed > div:nth-child(2) { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
+            header.fixed > div:nth-child(3) { grid-column: 2; grid-row: 1; }
+            #look-hint { top: 126px; }
+            #metrics-panel, #minimap-drawer { top: 166px; max-height: calc(100dvh - 250px); }
+        }
+        @media (max-width: 760px) {
+            header.fixed { left: 8px; right: 8px; top: 8px; grid-template-columns: 1fr auto; gap: 6px; }
+            header.fixed > div:first-child { max-width: calc(100vw - 86px); padding: 7px 9px; }
+            header.fixed > div:first-child .h-9 { width: 30px; height: 30px; }
+            header.fixed > div:first-child p { max-width: 56vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+            header.fixed > div:nth-child(2) { grid-column: 1 / -1; grid-row: 2; justify-self: center; max-width: 100%; padding: 4px; }
+            header.fixed > div:nth-child(3) { grid-column: 2; grid-row: 1; padding: 5px; }
+            header.fixed > div:nth-child(2) select { max-width: min(46vw, 210px); }
+            #look-hint { display: none; }
+            #metrics-panel { left: 8px; top: auto; bottom: 78px; width: min(290px, calc(100vw - 16px)); max-height: 35dvh; padding: 10px; }
+            #minimap-drawer { right: 8px; top: 92px; bottom: auto; width: min(290px, calc(100vw - 16px)); max-height: 38dvh; padding: 10px; }
+            #minimap-grid { max-height: 20dvh; }
+            #metrics-panel .grid.grid-cols-2 { gap: 5px; }
+            #metrics-panel .neo-inset { padding: 7px; }
+            #metrics-panel > .neo-inset:nth-last-of-type(1) { gap: 4px; }
+            #metrics-panel > .neo-inset:nth-last-of-type(1) button { padding: 5px 6px; font-size: 9px; }
+            body > .fixed.bottom-3 { bottom: 8px; max-width: calc(100vw - 16px); gap: 8px; padding: 7px 9px; }
+            body > .fixed.bottom-3 > div:nth-child(2) { min-width: 82px; }
+            body > .fixed.bottom-3 #btn-dock-exit { padding: 8px; }
+            body > .fixed.bottom-3 > .h-10 { height: 26px; }
+        }
+        body.preview-embedded header,
+        body.preview-embedded #look-hint,
+        body.preview-embedded #metrics-panel,
+        body.preview-embedded #minimap-drawer,
+        body.preview-embedded > .fixed.bottom-3 { display: none !important; }
+        /* Keep the saved seat layout visible if a browser cannot draw WebGL. */
+        #dom-auditorium-fallback { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:clamp(12px,3vh,28px); padding:clamp(90px,13vh,130px) 18px 90px; overflow:auto; perspective:1100px; background:radial-gradient(ellipse at 50% 8%,rgba(201,168,76,.16),transparent 34%),linear-gradient(180deg,#10131b,#07090e 78%); }
+        #dom-auditorium-fallback .fallback-screen { flex:0 0 auto; width:min(62vw,720px); height:clamp(46px,10vh,100px); display:grid; place-items:center; border-radius:50% / 16%; border:2px solid rgba(239,205,125,.72); background:linear-gradient(180deg,#343a48,#080a10 72%); box-shadow:0 0 42px rgba(201,168,76,.22),inset 0 0 32px rgba(255,255,255,.08); color:#f8e6b7; font:700 clamp(10px,1.5vw,15px) Inter,sans-serif; letter-spacing:.18em; text-transform:uppercase; }
+        #dom-auditorium-fallback .fallback-bowl { width:min(92vw,1100px); min-height:250px; display:flex; flex-direction:column-reverse; align-items:center; justify-content:flex-start; gap:clamp(4px,.9vh,9px); transform:rotateX(18deg); transform-origin:top center; padding:8px 12px 22px; border-radius:46% 46% 18px 18px / 15% 15% 18px 18px; background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(0,0,0,.35)); }
+        #dom-auditorium-fallback .fallback-row { display:flex; align-items:center; justify-content:center; gap:clamp(2px,.35vw,5px); width:max-content; max-width:100%; }
+        #dom-auditorium-fallback .fallback-row-label { width:22px; flex:0 0 22px; color:#a7b0c0; font:700 10px Inter,sans-serif; text-align:right; }
+        #dom-auditorium-fallback .fallback-seat { width:clamp(7px,.9vw,13px); height:clamp(8px,1.2vh,13px); flex:0 0 auto; border-radius:4px 4px 2px 2px; border:1px solid rgba(255,255,255,.2); box-shadow:0 4px 3px rgba(0,0,0,.55); }
+        #dom-auditorium-fallback .fallback-aisle { width:clamp(8px,1.5vw,22px); flex:0 0 auto; }
+        #dom-auditorium-fallback .fallback-standard { background:linear-gradient(145deg,#8a3a47,#40141e); }
+        #dom-auditorium-fallback .fallback-premium { background:linear-gradient(145deg,#d0ae65,#70502b); }
+        #dom-auditorium-fallback .fallback-recliner { background:linear-gradient(145deg,#4c9b83,#16493e); height:clamp(10px,1.5vh,16px); }
+        #dom-auditorium-fallback .fallback-unavailable { background:#353944; opacity:.56; }
+        @media (max-width:640px) { #dom-auditorium-fallback { padding-top:100px; } #dom-auditorium-fallback .fallback-bowl { width:98vw; } }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden select-none{% if embedded %} preview-embedded{% endif %}">
+
+    <!-- 3D WebGL Viewport Container -->
+    <div id="canvas-container" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></div>
+    <div id="dom-auditorium-fallback" aria-label="Screen seat layout preview">
+        <div class="fallback-screen">{{ screen_type }} · Screen</div>
+        <div class="fallback-bowl">
+            {% for row in preview.rowDefs|reverse %}
+            <div class="fallback-row" aria-label="Row {{ row.label }}">
+                <span class="fallback-row-label">{{ row.label }}</span>
+                {% for seat_id, seat_state in row.seats.items() %}
+                    {% if seat_state != 'available' %}
+                    <span class="fallback-seat fallback-unavailable" title="{{ seat_id }} · unavailable"></span>
+                    {% elif 'reclin' in row.className|lower or 'sofa' in row.className|lower %}
+                    <span class="fallback-seat fallback-recliner" title="{{ seat_id }} · {{ row.className }}"></span>
+                    {% elif 'vip' in row.className|lower or 'prime' in row.className|lower or 'premium' in row.className|lower or 'gold' in row.className|lower %}
+                    <span class="fallback-seat fallback-premium" title="{{ seat_id }} · {{ row.className }}"></span>
+                    {% else %}
+                    <span class="fallback-seat fallback-standard" title="{{ seat_id }} · {{ row.className }}"></span>
+                    {% endif %}
+                    {% if loop.index in row.aislesAfter %}<span class="fallback-aisle"></span>{% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- VR Headset Stereo Split-Screen Mask Overlay -->
+    <div id="vr-stereo-overlay" class="fixed inset-0 z-20 items-center justify-center">
+        <div class="w-1 h-full bg-cyan-400/50 shadow-[0_0_20px_#00f0ff]"></div>
+        <div class="absolute inset-y-0 left-0 w-1/2 border-[16px] border-black/85 rounded-3xl pointer-events-none"></div>
+        <div class="absolute inset-y-0 right-0 w-1/2 border-[16px] border-black/85 rounded-3xl pointer-events-none"></div>
+        <div class="absolute top-20 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-black/85 border border-cyan-400/50 text-cyan-300 text-xs font-semibold tracking-wider uppercase shadow-2xl">
+            <i class="fa-solid fa-vr-cardboard mr-1.5"></i> VR Stereoscopic Headset Mode Active
+        </div>
+    </div>
+
+    <!-- Floating Seat Hover 3D Tooltip -->
+    <div id="seat-tooltip" class="fixed z-30 pointer-events-none hidden px-3.5 py-2 rounded-2xl neo-panel border border-cyan-400/40 text-xs font-medium text-white shadow-2xl transform -translate-x-1/2 -translate-y-full -mt-3">
+        <div class="flex items-center justify-between gap-3">
+            <span id="tooltip-title" class="font-display font-bold text-cyan-400">Select a seat</span>
+            <span id="tooltip-badge" class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">PRIME VIP</span>
+        </div>
+        <div id="tooltip-sub" class="text-[11px] text-slate-300 mt-0.5">Choose an available seat to view it</div>
+        <div id="tooltip-exit" class="text-[10px] text-emerald-400 mt-0.5">Exit distance updates by seat</div>
+    </div>
+
+    <!-- TOP BAR: BRAND, CURRENT THEATER, TRAILER SCENE & CAMERA MODES -->
+    <header class="fixed top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <!-- Brand + current auditorium -->
+        <div class="neo-panel px-3.5 py-2 rounded-2xl flex flex-wrap items-center gap-3 pointer-events-auto">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#C9A84C] to-amber-200 flex items-center justify-center shadow-[0_0_15px_rgba(201,168,76,0.4)]">
+                    <i class="fa-solid fa-film text-slate-950 text-base"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bebas text-xl tracking-wider text-amber-200 leading-none">MD CINEWAVE</span>
+                        <span class="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            IMMERSIVE PREVIEW
+                        </span>
+                    </div>
+                    <p id="active-movie-title" class="mt-1 max-w-[48vw] truncate text-xs font-bold text-white" title="{{ movie.title }}">{{ movie.title }}</p>
+                    <p id="active-theater-sub" class="text-[10px] text-slate-400">{{ showtime.theater }} · {{ showtime.screen.name }} · {{ showtime.show_date.strftime('%a, %d %b') }} {{ showtime.show_time }}</p>
+                    <p class="text-[9px] text-slate-500">Seats follow the saved screen layout · room scale is estimated</p>
+                </div>
+            </div>
+
+            <div class="h-6 w-[1px] bg-white/10 hidden sm:block"></div>
+
+            <!-- Current screen format -->
+            <div class="hidden items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2 sm:flex">
+                <i class="fa-solid fa-building-columns text-[#C9A84C] text-xs"></i>
+            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-300">{{ screen_type }}</span>
+            </div>
+        </div>
+
+        <!-- Center Camera & Screen Projection Controls -->
+        <div class="neo-panel p-1.5 rounded-2xl flex flex-wrap items-center gap-1.5 pointer-events-auto">
+            <button id="btn-pov-mode" onclick="setCameraMode('seat')" class="neo-btn active px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5" title="First-Person Eye-Level Seat View">
+                <i class="fa-solid fa-eye"></i>
+                <span>Seat POV</span>
+            </button>
+            <button id="btn-overview-mode" onclick="setCameraMode('overview')" class="neo-btn px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5" title="Cinema Drone / Balcony Overview">
+                <i class="fa-solid fa-helicopter"></i>
+                <span class="hidden sm:inline">Full theater</span>
+            </button>
+            <button id="btn-exit-Top" onclick="lookAtNearestExit()" class="neo-btn px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-emerald-400 border-emerald-500/30" title="Rotate VR Head to Nearest 3D Illuminated Exit Door">
+                <i class="fa-solid fa-person-running"></i>
+                <span>Find exit</span>
+            </button>
+            <button onclick="recenterLookAtScreen()" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs font-medium text-cyan-300" title="Snap head look straight at the screen">
+                <i class="fa-solid fa-crosshairs"></i>
+            </button>
+
+            <div class="h-5 w-[1px] bg-white/10 mx-0.5 hidden md:block"></div>
+
+            <!-- Live Movie Trailer Switcher -->
+            <div class="flex items-center gap-1.5 neo-inset px-2.5 py-1 rounded-xl">
+                <i class="fa-solid fa-circle-play text-amber-400 text-xs"></i>
+                <select id="screen-content-select" onchange="switchScreenContent(this.value)" class="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer">
+                    <option value="blockbuster" class="bg-slate-900 text-white">Now Playing: {{ movie.title }}</option>
+                    <option value="scifi" class="bg-slate-900 text-white">Sci-Fi screen demo</option>
+                    <option value="atmos" class="bg-slate-900 text-white">Audio field visualization (simulated)</option>
+                    <option value="calibration" class="bg-slate-900 text-white">Sightline calibration grid (demo)</option>
+                    <option value="custom" class="bg-slate-900 text-white">Load Custom MP4 Trailer Stream...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Right Optics: FOV, Lighting & VR Stereo -->
+        <div class="neo-panel px-3 py-2 rounded-2xl flex items-center gap-2.5 pointer-events-auto">
+            <div class="hidden xl:flex items-center gap-2">
+                <span class="text-[11px] font-medium text-slate-400">
+                    FOV <strong id="fov-label" class="text-amber-300">65°</strong>
+                </span>
+                <input id="fov-slider" type="range" min="42" max="100" value="65" class="w-20" oninput="updateFOV(this.value)">
+            </div>
+            <button id="btn-vr-stereo" onclick="toggleVRStereo()" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5" title="Toggle VR Cardboard Side-by-Side Stereo Mode">
+                <i class="fa-solid fa-vr-cardboard text-cyan-400"></i>
+                <span class="hidden md:inline">VR Stereo</span>
+            </button>
+            <button onclick="cycleHouseLights()" id="btn-lights" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-300 flex items-center gap-1" title="Cycle Cinema Lighting: Showtime Dark / Preshow Dim / Cleaning Lights">
+                <i class="fa-solid fa-lightbulb"></i>
+                <span id="lights-label" class="hidden sm:inline text-[11px]">Showtime</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Interactive Instruction Pill -->
+    <div id="look-hint" class="fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-500">
+        <div class="px-4 py-1.5 rounded-full bg-slate-950/85 border border-cyan-500/30 backdrop-blur-md text-[11px] text-slate-200 flex items-center gap-2 shadow-2xl">
+            <i class="fa-solid fa-hand-pointer text-cyan-400 animate-bounce"></i>
+            <span>Drag 360° to look around • <strong>Hover</strong> any seat to preview it • <strong>Click</strong> a seat to view and select it • Use <strong>◀ ▲ ▼ ▶ Arrows</strong> to hop to side seats • Hover over the background highlights the current preview seat • Click <strong>🏃‍♂️ Exit Way</strong> to inspect nearest exit</span>
+        </div>
+    </div>
+
+    <!-- LEFT PANEL: LIVE SEAT TELEMETRY, RECLINE CONTROL & EXIT WAYTRACKER -->
+    <aside id="metrics-panel" class="fixed left-3 bottom-24 z-30 w-72 sm:w-80 neo-panel rounded-3xl p-4 transition-all duration-300 pointer-events-auto">
+        <div class="flex items-center justify-between mb-2.5">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff] animate-pulse"></span>
+                <span class="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Seat details</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="metric-tier-badge" class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                    SELECTED SEAT
+                </span>
+                <button id="seat-details-toggle" type="button" onclick="toggleSeatDetailsCollapse()" class="neo-btn rounded-lg px-2 py-1 text-xs" aria-expanded="true" aria-controls="seat-details-body" title="Collapse seat details">
+                    <i id="seat-details-toggle-icon" class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="seat-details-body">
+        <!-- Active Seat Card -->
+        <div class="neo-inset rounded-2xl p-3 mb-2.5 flex items-center justify-between">
+            <div>
+                <div id="metric-seat-title" class="font-display font-bold text-lg text-white tracking-tight">Choose a seat</div>
+                <div id="metric-seat-price" class="font-display font-bold text-lg text-white tracking-tight">—</div>
+                <div id="metric-seat-subtitle" class="text-[11px] text-slate-400">Seat view information</div>
+            </div>
+            <div class="text-right">
+                <div id="metric-seat-price-value" class="font-display font-bold text-xl text-[#C9A84C]">—</div>
+                <div id="metric-price-spacer" class="h-5"></div>
+                <div id="metric-surge-tag" class="text-[9px] text-emerald-400 font-semibold">Ticket price</div>
+            </div>
+        </div>
+
+        <!-- 4 Telemetry Gauges -->
+        <div class="grid grid-cols-2 gap-2 mb-2.5">
+            <div class="neo-inset rounded-xl p-2.5">
+                <div class="text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>Estimated screen distance</span>
+                    <i class="fa-solid fa-ruler-horizontal text-cyan-400"></i>
+                </div>
+                <div id="metric-distance" class="font-display font-bold text-sm text-white mt-0.5">—</div>
+                <div id="metric-distance-desc" class="text-[10px] text-emerald-400 font-medium">From screen</div>
+            </div>
+
+            <div class="neo-inset rounded-xl p-2.5">
+                <div class="text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>Estimated screen angle</span>
+                    <i class="fa-solid fa-compass-drafting text-amber-400"></i>
+                </div>
+                <div id="metric-angle" class="font-display font-bold text-sm text-white mt-0.5">—</div>
+                <div id="metric-angle-desc" class="text-[10px] text-emerald-400 font-medium">Viewing angle</div>
+            </div>
+
+            <div class="neo-inset rounded-xl p-2.5">
+                <div class="text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>Relative seat score</span>
+                    <i class="fa-solid fa-wave-square text-purple-400"></i>
+                </div>
+                <div id="metric-audio" class="font-display font-bold text-sm text-white mt-0.5">—</div>
+                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+                    <div id="metric-audio-bar" class="h-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Nearest Exit Way Telemetry Card -->
+            <div class="neo-inset rounded-xl p-2.5 border border-emerald-500/25 cursor-pointer hover:border-emerald-400 transition" onclick="lookAtNearestExit()" title="Click to look at nearest Exit Door">
+                <div class="text-[10px] text-emerald-400 font-semibold flex items-center justify-between">
+                    <span>Nearest Exit Way</span>
+                    <i class="fa-solid fa-person-running text-emerald-400"></i>
+                </div>
+                <div id="metric-exit-dist" class="font-display font-bold text-sm text-white mt-0.5">—</div>
+                <div id="metric-exit-name" class="text-[10px] text-emerald-300 truncate">Select a seat to check</div>
+            </div>
+        </div>
+
+        <!-- Motorized Recliner Angle Control -->
+        <div class="neo-inset rounded-xl p-2.5 mb-2.5 flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-couch text-[#C9A84C]"></i> Seat Recline:
+            </span>
+            <div class="flex items-center gap-1">
+                <button type="button" id="recline-0" onclick="setSeatRecline(0)" class="neo-btn gold-active px-2.5 py-1 rounded-lg text-[10px] font-bold">0° Upright</button>
+                <button type="button" id="recline-1" onclick="setSeatRecline(1)" class="neo-btn px-2.5 py-1 rounded-lg text-[10px] font-bold">25° Relax</button>
+                <button type="button" id="recline-2" onclick="setSeatRecline(2)" class="neo-btn px-2.5 py-1 rounded-lg text-[10px] font-bold">45° VIP</button>
+            </div>
+        </div>
+
+        <!-- 1-Click Reserve Active POV Seat Button -->
+        <button id="btn-toggle-reserve" onclick="toggleCurrentSeatReservation()" class="w-full py-2.5 rounded-xl font-display font-bold text-xs text-slate-950 bg-gradient-to-r from-[#C9A84C] via-amber-300 to-amber-500 hover:brightness-110 active:scale-98 transition shadow-[0_0_20px_rgba(201,168,76,0.4)] flex items-center justify-center gap-2">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>Select a seat to add it</span>
+        </button>
+        </div>
+    </aside>
+
+    <!-- CENTER-BOTTOM FLOATING NEOMORPHIC 4-WAY SEAT HOPPER & EXIT WAY DOCK -->
+    <div class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 neo-panel rounded-3xl px-4 py-2.5 flex items-center gap-3 sm:gap-5 pointer-events-auto border border-cyan-500/30 shadow-[0_10px_35px_rgba(0,0,0,0.9)]">
+        <!-- 4-Way Directional Seat-Hopping Arrow Pad -->
+        <div class="flex items-center gap-1.5">
+            <button id="btn-seat-left" onclick="stepSeat(0, -1)" class="neo-btn w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white hover:text-cyan-400" title="Move to Left Side Seat (Left Arrow Key)">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+                <span class="text-[8px] font-bold text-slate-400 mt-0.5">LEFT</span>
+            </button>
+
+            <div class="flex flex-col gap-1">
+                <button id="btn-row-front" onclick="stepSeat(1, 0)" class="neo-btn w-12 h-7 rounded-lg flex items-center justify-center gap-1 text-white hover:text-cyan-400" title="Move 1 Row Closer to Screen (Up Arrow Key)">
+                    <i class="fa-solid fa-chevron-up text-[10px]"></i>
+                    <span class="text-[8px] font-bold">FRONT</span>
+                </button>
+                <button id="btn-row-back" onclick="stepSeat(-1, 0)" class="neo-btn w-12 h-7 rounded-lg flex items-center justify-center gap-1 text-white hover:text-cyan-400" title="Move 1 Row Further Back (Down Arrow Key)">
+                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                    <span class="text-[8px] font-bold">BACK</span>
+                </button>
+            </div>
+
+            <button id="btn-seat-right" onclick="stepSeat(0, 1)" class="neo-btn w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white hover:text-cyan-400" title="Move to Right Side Seat (Right Arrow Key)">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+                <span class="text-[8px] font-bold text-slate-400 mt-0.5">RIGHT</span>
+            </button>
+        </div>
+
+        <div class="h-10 w-[1px] bg-white/10"></div>
+
+        <!-- Live Active Seat & Exit Readout -->
+        <div class="min-w-[125px] sm:min-w-[145px]">
+            <div class="flex items-center gap-1.5">
+                <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">POV:</span>
+                <span id="dock-seat-code" class="font-display font-extrabold text-base text-cyan-400">—</span>
+                <span id="dock-seat-tier" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">—</span>
+            </div>
+            <div id="dock-exit-readout" class="text-[11px] text-emerald-400 font-semibold mt-0.5 truncate">Select a seat to view exits</div>
+        </div>
+
+        <!-- Inspect Nearest Exit Way Button -->
+        <button id="btn-dock-exit" onclick="lookAtNearestExit()" class="neo-btn px-3.5 py-2.5 rounded-2xl text-xs font-bold text-emerald-400 border border-emerald-500/40 flex items-center gap-2 hover:bg-emerald-500/15 transition" title="Pan VR Camera to Nearest Illuminated 3D Exit Door & Highlight Floor Egress Path">
+            <i class="fa-solid fa-person-running text-sm"></i>
+            <span class="hidden sm:inline">EXIT WAY</span>
+        </button>
+
+        <div class="h-10 w-[1px] bg-white/10 hidden md:block"></div>
+
+        <!-- Checkout Trigger -->
+        <button id="btn-book-selected" onclick="openBookingConfirmation()" class="px-4 py-2.5 rounded-2xl font-display font-bold text-xs text-slate-950 bg-gradient-to-r from-[#C9A84C] to-amber-300 hover:brightness-110 active:scale-95 transition shadow-[0_0_20px_rgba(201,168,76,0.45)] flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+            <i class="fa-solid fa-ticket"></i>
+            <div class="text-left leading-tight">
+                <div class="text-[9px] uppercase font-extrabold text-slate-900">Book (<span id="dock-cart-count">0</span>)</div>
+                <div id="dock-cart-total" class="text-xs font-black">₹0</div>
+            </div>
+        </button>
+    </div>
+
+    <!-- RIGHT PANEL: 2D INTERACTIVE RADAR MINI-MAP WITH EXIT INDICATORS -->
+    <aside id="minimap-drawer" class="fixed right-3 bottom-24 z-30 neo-panel rounded-3xl p-4 w-80 sm:w-96 transition-transform duration-300 pointer-events-auto">
+        <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-compass text-[#C9A84C] text-xs"></i>
+                <h2 class="font-display font-bold text-xs uppercase tracking-wider text-white">Theater seat map</h2>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <button onclick="jumpToSweetSpot()" class="neo-btn px-2 py-0.5 rounded-lg text-[10px] font-semibold text-amber-300" title="Jump to Best Acoustic Seat">
+                    <i class="fa-solid fa-crown mr-1"></i>Best view
+                </button>
+                <button onclick="toggleMinimapCollapse()" class="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded-lg neo-btn">
+                    <i id="minimap-toggle-icon" class="fa-solid fa-chevron-down"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="minimap-body">
+            <!-- Rear Concourse and projector booth sit opposite the screen. -->
+            <div class="flex items-center justify-between text-[9px] font-bold text-emerald-400 mt-1.5 mb-1.5 px-1">
+                <span onclick="lookAtSpecificExit('EXIT_RL')" class="cursor-pointer hover:underline flex items-center gap-1"><i class="fa-solid fa-door-open"></i> EXIT 3 (Rear L)</span>
+                <span class="text-[9px] text-slate-500">Projector Booth ↑</span>
+                <span onclick="lookAtSpecificExit('EXIT_RR')" class="cursor-pointer hover:underline flex items-center gap-1">EXIT 4 (Rear R) <i class="fa-solid fa-door-open"></i></span>
+            </div>
+
+            <!-- 2D Seating Grid Container -->
+            <div id="minimap-grid" class="space-y-1 neo-inset p-2.5 rounded-2xl max-h-56 overflow-y-auto">
+                <!-- Dynamically Populated by JS -->
+            </div>
+
+            <!-- Front Screen + Front Exit Badges -->
+            <div class="relative mt-2.5 mb-1">
+                <div class="flex items-center justify-between text-[9px] font-bold text-emerald-400 mb-1 px-1">
+                    <span onclick="lookAtSpecificExit('EXIT_FL')" class="cursor-pointer hover:underline flex items-center gap-1"><i class="fa-solid fa-door-open"></i> EXIT 1 (FL)</span>
+                    <span class="text-[8px] uppercase tracking-[0.22em] text-cyan-300/90 font-bold">Curved Cinema Screen</span>
+                    <span onclick="lookAtSpecificExit('EXIT_FR')" class="cursor-pointer hover:underline flex items-center gap-1">EXIT 2 (FR) <i class="fa-solid fa-door-open"></i></span>
+                </div>
+                <div class="w-4/5 mx-auto h-2.5 rounded-b-full border-b-2 border-cyan-400 shadow-[0_5px_14px_rgba(0,240,255,0.5)] bg-gradient-to-t from-cyan-400/25 to-transparent"></div>
+            </div>
+
+            <!-- Legend -->
+            <div class="flex flex-wrap items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-white/5 px-1 text-[10px] text-slate-400">
+                <div class="flex items-center gap-1">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-rose-800 border border-rose-500"></span> Standard
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-[#98794E] border border-[#D2B77E]"></span> Premium
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-emerald-900 border border-emerald-500"></span> Recliner
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-[#E4C67F]"></span> Selected
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-[#91CFC1]"></span> Active view
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-slate-800 border border-slate-600"></span> Unavailable
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Custom Video URL Modal -->
+    <div id="custom-video-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-md p-4">
+        <div class="neo-panel max-w-md w-full rounded-3xl p-6 border border-cyan-500/30">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
+                    <i class="fa-solid fa-film text-cyan-400"></i> Project Custom Movie Stream
+                </h3>
+                <button onclick="closeCustomVideoModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">
+                Paste a direct MP4/WebM video stream URL to project onto the curved 3D screen with real-time dynamic floor & wall light bounce.
+            </p>
+            <input id="custom-video-input" type="url"
+                value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
+                class="w-full neo-inset px-3.5 py-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400 mb-4">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeCustomVideoModal()" class="neo-btn px-4 py-2 rounded-xl text-xs font-medium text-slate-300">Cancel</button>
+                <button onclick="applyCustomVideoUrl()" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-[#C9A84C] to-amber-400 text-slate-950">
+                    Project on 3D Screen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DIGITAL E-TICKET & QR PASS CHECKOUT MODAL -->
+    <div id="booking-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-md p-4">
+        <div class="neo-panel max-w-md w-full rounded-3xl p-6 border border-[#C9A84C]/40 relative overflow-hidden">
+            <div class="absolute -top-20 -right-20 w-44 h-44 bg-[#C9A84C]/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
+                        <i class="fa-solid fa-check-double text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bebas text-2xl text-amber-200 tracking-wide">MD CINEWAVE E-TICKET</h3>
+                        <p id="modal-theater-name" class="text-xs text-slate-400">{{ showtime.theater }} · {{ showtime.screen.name }}</p>
+                    </div>
+                </div>
+                <button onclick="closeBookingConfirmation()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="neo-inset rounded-2xl p-4 mb-4 space-y-2.5 text-xs">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">VR Verified Seat(s):</span>
+                    <span id="modal-seat-list" class="font-display font-bold text-cyan-400">—</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Sightline & Acoustics:</span>
+                    <span id="modal-sightline" class="text-emerald-400 font-semibold">Estimated view · simulation only</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Nearest Emergency Exit:</span>
+                    <span id="modal-exit-way" class="text-emerald-300 font-medium">EXIT 1 (Front Left)</span>
+                </div>
+                <div class="border-t border-white/10 pt-2 flex justify-between text-sm font-bold">
+                    <span class="text-white">Total Amount (Incl. GST):</span>
+                    <span id="modal-total-price" class="text-[#C9A84C] text-base">—</span>
+                </div>
+            </div>
+
+            <div class="flex gap-2.5">
+                <button onclick="closeBookingConfirmation()" class="neo-btn flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-300">
+                    Back to VR Preview
+                </button>
+                <button onclick="completeBookingToast()" class="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-[#C9A84C] to-amber-300 shadow-[0_0_20px_rgba(201,168,76,0.4)]">
+                    Confirm & Issue Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-banner" class="fixed top-20 right-4 z-50 hidden neo-panel px-4 py-3 rounded-2xl border border-emerald-400/50 text-xs text-white shadow-2xl items-center gap-2.5">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toast-text">Seat confirmed!</span>
+    </div>
+
+    <!-- Hidden Video Element for Custom Video URL Projection -->
+    <video id="custom-video-el" crossorigin="anonymous" playsinline loop muted class="hidden"></video>
+
+    <script>
+        // Make renderer failures visible on the preview itself instead of leaving a black canvas.
+        function showPreviewRuntimeError(error) {
+            const host = document.getElementById('canvas-container');
+            if (!host || document.getElementById('preview-runtime-error')) return;
+            const message = String(error && (error.message || error.reason || error) || 'Unknown rendering error');
+            const panel = document.createElement('div');
+            panel.id = 'preview-runtime-error';
+            panel.className = 'absolute inset-0 z-50 flex items-center justify-center p-6 text-center';
+            panel.style.cssText = 'background:rgba(3,5,10,.94);color:#f8fafc;font:14px/1.5 Inter, sans-serif;';
+            panel.innerHTML = '<div style="max-width:640px"><strong style="font-size:20px">3D preview could not render</strong><p style="color:#cbd5e1;margin-top:12px">' +
+                message.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])) +
+                '</p></div>';
+            host.appendChild(panel);
+        }
+        window.addEventListener('error', event => showPreviewRuntimeError(event.message || event.error));
+        window.addEventListener('unhandledrejection', event => showPreviewRuntimeError(event.reason));
+
+        // The project supplies this screen's exact seat rows and dimensions.
+        const currentAudi = {{ preview|tojson }};
+        const VIZAG_AUDITORIUMS = { project: currentAudi };
+        let currentAudiKey = 'project';
+
+        // Dynamic Seat State Registry
+        const seatRegistry = new Map(); // 'E8' -> seat metadata + 3D group & meshes
+        let selectedSeats = new Set();
+        let activePOVSeatId = currentAudi.defaultSeat;
+        let activeRowIdx = 4;
+        let activeColNum = 8;
+
+        // --- Seat selector enhancements: hover preview, 3D hover glow, edge-locked tooltip ---
+        let hoveredSeatId = null;            // seat currently under the pointer (3D raycast)
+        let hoverPreviewActive = false;      // whether we are in hover-preview mode
+        const HOVER_PREVIEW_DELAY = 220;     // ms pointer stillness before show
+        let hoverTimer = null;
+        let hoverPreviewSeatId = null;
+
+        // Bootstrapping: the seat preview depends on THREE + the inline build function.
+        function bootPreview() {
+            if (typeof THREE === 'undefined' || typeof buildParametricAuditorium === 'undefined') {
+                let guard = 0;
+                const attempt = () => {
+                    if (typeof THREE !== 'undefined' && typeof buildParametricAuditorium !== 'undefined') {
+                        loadVizagAuditorium('project');
+                        camera.position.copy(cameraTargetPos);
+                        animate();
+                        return;
+                    }
+                    if (++guard > 120) {
+                        showNetworkSetupWarning();
+                        return;
+                    }
+                    requestAnimationFrame(attempt);
+                };
+                attempt();
+                return;
+            }
+            loadVizagAuditorium('project');
+            camera.position.copy(cameraTargetPos);
+            animate();
+        }
+
+        function showNetworkSetupWarning() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            const warn = document.createElement('div');
+            warn.id = 'preview-network-warning';
+            warn.className =
+                'absolute inset-0 z-50 flex items-center justify-center text-center p-6 pointer-events-none';
+            warn.innerHTML =
+                '<div class="max-w-md">' +
+                '<div class="text-4xl mb-3">🎬</div>' +
+                '<div class="text-white text-xl font-display font-bold mb-2">CineWave 3D preview could not start</div>' +
+                '<div class="text-slate-400 text-sm leading-relaxed mb-4">This screen needs the Tailwind and Three.js network scripts to render the 3D seat view. If you are on a restricted network or a browser that blocks external scripts, the page shell still loaded fine — only the 3D view is blocked.</div>' +
+                '<div class="text-slate-500 text-xs">Try: open on a normal network, disable script blockers for this site, or use the 2D seat map if available.</div>' +
+                '</div>';
+            container.appendChild(warn);
+        }
+
+        // A thin glowing outline ring rendered just above the hovered / selected seat.
+        let hoverRing = null;
+        const ringGeo = new THREE.RingGeometry(0.62, 0.74, 40);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x76cbb9, side: THREE.DoubleSide, transparent: true, opacity: 0.0,
+            depthWrite: false
+        });
+        const ringPivot = new THREE.Group();
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.rotation.x = -Math.PI / 2;
+        ringMesh.position.y = 0.02;
+        ringPivot.add(ringMesh);
+        scene.add(ringPivot);
+        hoverRing = ringPivot;
+
+        // Outline ring for the seat currently in the cart (multi-seat selection visual).
+        let selectedRing = null;
+        const selectedRingMat = new THREE.MeshBasicMaterial({
+            color: 0xf0d58a, side: THREE.DoubleSide, transparent: true, opacity: 0.0,
+            depthWrite: false
+        });
+        const selectedRingPivot = new THREE.Group();
+        const selectedRingMesh = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.86, 40), selectedRingMat);
+        selectedRingMesh.rotation.x = -Math.PI / 2;
+        selectedRingMesh.position.y = 0.02;
+        selectedRingPivot.add(selectedRingMesh);
+        scene.add(selectedRingPivot);
+        selectedRing = selectedRingPivot;
+
+        // Keep the tooltip from covering the seat people are trying to read.
+        let tooltipAnchor = { x: 0, y: 0 };
+
+        let cameraMode = 'overview'; // Start from the back of the auditorium, facing the screen.
+        let isVRStereo = false;
+        let lightingMode = 'movie'; // 'movie' | 'preshow' | 'house'
+        let screenChannel = 'blockbuster';
+        let reclineLevel = 0; // 0 = 0°, 1 = 25°, 2 = 45°
+
+        // 3D Exit Doors & Floor Egress Path State
+        const exitDoorsList = []; // { id, name, shortName, side, pos: Vector3, lookTarget: Vector3 }
+        let nearestExitObj = null;
+        let egressLineMesh = null;
+        const egressNodes = [];
+
+        /********************************************************************
+         * 2. THREE.JS SCENE, RENDERER, CAMERA & DYNAMIC AMBILIGHT SETUP
+         ********************************************************************/
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x04060a);
+        scene.fog = new THREE.FogExp2(0x04060a, 0.014);
+
+        const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 600);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        // Ambient & House Lights
+        const ambientLight = new THREE.AmbientLight(0x182238, 0.75);
+        scene.add(ambientLight);
+
+        const houseLight = new THREE.DirectionalLight(0xffeedd, 0.0);
+        houseLight.position.set(0, 20, 4);
+        scene.add(houseLight);
+
+        // 3 Dynamic Screen Ambilight PointLights that sample movie colors in real time
+        const screenLightCenter = new THREE.PointLight(0xffaa44, 2.8, 45, 1.4);
+        screenLightCenter.position.set(0, 6.5, -13.5);
+        scene.add(screenLightCenter);
+
+        const screenLightLeft = new THREE.PointLight(0x00f0ff, 2.0, 38, 1.5);
+        screenLightLeft.position.set(-9, 6.0, -13.0);
+        scene.add(screenLightLeft);
+
+        const screenLightRight = new THREE.PointLight(0xe11d48, 2.0, 38, 1.5);
+        screenLightRight.position.set(9, 6.0, -13.0);
+        scene.add(screenLightRight);
+
+        // Volumetric Projector Dust Particles
+        let dustParticles = null;
+        function createProjectorDust() {
+            const count = 220;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+            for (let i = 0; i < count; i++) {
+                pos[i * 3] = (Math.random() - 0.5) * 14;
+                pos[i * 3 + 1] = 4 + Math.random() * 7;
+                pos[i * 3 + 2] = -14 + Math.random() * 32;
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const mat = new THREE.PointsMaterial({
+                color: 0x99ddff,
+                size: 0.09,
+                transparent: true,
+                opacity: 0.45
+            });
+            dustParticles = new THREE.Points(geo, mat);
+            scene.add(dustParticles);
+        }
+        createProjectorDust();
+
+        /********************************************************************
+         * 3. REAL-TIME PROCEDURAL BLOCKBUSTER MOVIE SCREEN CANVAS
+         ********************************************************************/
+        const screenCanvas = document.createElement('canvas');
+        screenCanvas.width = 1024;
+        screenCanvas.height = 440;
+        const sCtx = screenCanvas.getContext('2d');
+
+        const screenTexture = new THREE.CanvasTexture(screenCanvas);
+        screenTexture.minFilter = THREE.LinearFilter;
+        screenTexture.magFilter = THREE.LinearFilter;
+
+        const stars = Array.from({ length: 150 }, () => ({
+            x: Math.random() * 1024,
+            y: Math.random() * 440,
+            z: Math.random() * 1024,
+            hue: Math.random() > 0.5 ? 35 : 195
+        }));
+
+        const emberParticles = Array.from({ length: 75 }, () => ({
+            x: Math.random() * 1024,
+            y: Math.random() * 440,
+            vx: (Math.random() - 0.3) * 3.5,
+            vy: -1.2 - Math.random() * 2.5,
+            r: 1.5 + Math.random() * 3.5,
+            alpha: 0.4 + Math.random() * 0.6
+        }));
+
+        const customVideoEl = document.getElementById('custom-video-el');
+
+        function drawScreenMovieTitle(ctx, title, width, height, color, glowColor, baseSize = 64) {
+            const maxWidth = width * 0.84;
+            const words = String(title || 'NOW SHOWING').trim().split(/\s+/);
+            let fontSize = baseSize;
+            let lines = [words.join(' ')];
+            while (fontSize > 36) {
+                ctx.font = `700 ${fontSize}px "Space Grotesk", sans-serif`;
+                lines = [];
+                let line = '';
+                words.forEach(word => {
+                    const candidate = line ? `${line} ${word}` : word;
+                    if (line && ctx.measureText(candidate).width > maxWidth) {
+                        lines.push(line);
+                        line = word;
+                    } else {
+                        line = candidate;
+                    }
+                });
+                if (line) lines.push(line);
+                if (lines.length <= 2 && lines.every(item => ctx.measureText(item).width <= maxWidth)) break;
+                fontSize -= 2;
+            }
+
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = `700 ${fontSize}px "Space Grotesk", sans-serif`;
+            ctx.fillStyle = color;
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 24;
+            const centerY = height * 0.48;
+            const lineGap = fontSize * 1.08;
+            lines.forEach((line, index) => {
+                const y = centerY + (index - (lines.length - 1) / 2) * lineGap;
+                ctx.fillText(line.toUpperCase(), width / 2, y, maxWidth);
+            });
+            ctx.restore();
+        }
+
+        function renderDynamicScreenCanvas(time) {
+            const w = screenCanvas.width;
+            const h = screenCanvas.height;
+
+            if (screenChannel === 'custom' && customVideoEl.readyState >= 2) {
+                sCtx.drawImage(customVideoEl, 0, 0, w, h);
+                screenLightCenter.color.setHSL((time * 0.07) % 1, 0.75, 0.55);
+                screenTexture.needsUpdate = true;
+                return;
+            }
+
+            if (screenChannel === 'blockbuster') {
+                // High-Octane Indian Blockbuster Trailer ("PUSHPA 2 / DEVARA 4K ATMOS")
+                const pulse = Math.sin(time * 2.1) * 0.5 + 0.5;
+                const bgGrad = sCtx.createRadialGradient(w * 0.5, h * 0.58, 30, w * 0.5, h * 0.5, w * 0.65);
+                bgGrad.addColorStop(0, `hsl(${28 + pulse * 14}, 95%, 26%)`);
+                bgGrad.addColorStop(0.55, `hsl(${12 + pulse * 10}, 85%, 11%)`);
+                bgGrad.addColorStop(1, '#040509');
+                sCtx.fillStyle = bgGrad;
+                sCtx.fillRect(0, 0, w, h);
+
+                // Dramatic Ocean / Fire Horizon Glow
+                const horizonY = h * 0.72;
+                const flare = sCtx.createLinearGradient(0, horizonY - 25, 0, h);
+                flare.addColorStop(0, `rgba(255, 140, 30, ${0.4 + pulse * 0.25})`);
+                flare.addColorStop(0.3, 'rgba(180, 35, 10, 0.35)');
+                flare.addColorStop(1, '#030408');
+                sCtx.fillStyle = flare;
+                sCtx.fillRect(0, horizonY - 25, w, h - horizonY + 25);
+
+                // Rising Fire Embers
+                for (let em of emberParticles) {
+                    em.x += em.vx;
+                    em.y += em.vy;
+                    if (em.y < 0) { em.y = h; em.x = Math.random() * w; }
+                    if (em.x > w) em.x = 0;
+                    if (em.x < 0) em.x = w;
+
+                    sCtx.fillStyle = `rgba(255, ${150 + Math.floor(pulse * 80)}, 40, ${em.alpha})`;
+                    sCtx.beginPath();
+                    sCtx.arc(em.x, em.y, em.r, 0, Math.PI * 2);
+                    sCtx.fill();
+                }
+
+                // Anamorphic Gold Streak
+                const streakY = h * 0.48 + Math.sin(time * 1.5) * 8;
+                const sGrad = sCtx.createLinearGradient(0, streakY, w, streakY);
+                sGrad.addColorStop(0, 'rgba(201, 168, 76, 0)');
+                sGrad.addColorStop(0.5, `rgba(255, 215, 110, ${0.45 + pulse * 0.3})`);
+                sGrad.addColorStop(1, 'rgba(201, 168, 76, 0)');
+                sCtx.fillStyle = sGrad;
+                sCtx.fillRect(0, streakY - 2, w, 4);
+
+                // Blockbuster Title Typography
+                sCtx.save();
+                sCtx.textAlign = 'center';
+                sCtx.fillStyle = '#fbbf24';
+                sCtx.font = '700 14px "Space Grotesk", sans-serif';
+                sCtx.fillText(`MD CINEWAVE • ${currentAudi.name.toUpperCase()}`, w / 2, h * 0.24, w * 0.84);
+
+                const activeTitle = currentAudi.movieTitle || 'NOW SHOWING';
+                drawScreenMovieTitle(sCtx, activeTitle, w, h, '#ffffff', '#f59e0b', 64);
+
+                sCtx.save();
+                sCtx.font = '600 15px "Inter", sans-serif';
+                sCtx.textAlign = 'center';
+                sCtx.fillStyle = '#fde68a';
+                sCtx.fillText(`REAL-TIME 3D SEAT POV: ${activePOVSeatId}  •  DOLBY ATMOS 64-CH`, w / 2, h * 0.64, w * 0.84);
+                sCtx.restore();
+
+                // Sync Ambilight bounce to warm gold/crimson
+                screenLightCenter.color.setHSL(0.08 + pulse * 0.03, 0.95, 0.55);
+                screenLightLeft.color.setHSL(0.04, 0.9, 0.48);
+                screenLightRight.color.setHSL(0.11, 0.9, 0.50);
+
+            } else if (screenChannel === 'scifi') {
+                const pulse = Math.sin(time * 1.4) * 0.5 + 0.5;
+                const grad = sCtx.createRadialGradient(w * 0.5, h * 0.5, 20, w * 0.5, h * 0.5, w * 0.65);
+                grad.addColorStop(0, `hsl(${192 + pulse * 25}, 90%, 24%)`);
+                grad.addColorStop(0.5, `hsl(${265 - pulse * 20}, 82%, 10%)`);
+                grad.addColorStop(1, '#03050a');
+                sCtx.fillStyle = grad;
+                sCtx.fillRect(0, 0, w, h);
+
+                const cx = w * 0.5, cy = h * 0.48;
+                for (let s of stars) {
+                    s.z -= 8.0;
+                    if (s.z <= 1) { s.z = 1024; s.x = Math.random() * w; s.y = Math.random() * h; }
+                    const k = 260 / s.z;
+                    const px = cx + (s.x - cx) * k;
+                    const py = cy + (s.y - cy) * k;
+                    if (px >= 0 && px <= w && py >= 0 && py <= h) {
+                        const size = (1 - s.z / 1024) * 3.8;
+                        sCtx.fillStyle = `hsla(${s.hue}, 100%, 80%, ${1 - s.z / 1024})`;
+                        sCtx.beginPath();
+                        sCtx.arc(px, py, size, 0, Math.PI * 2);
+                        sCtx.fill();
+                    }
+                }
+
+                drawScreenMovieTitle(sCtx, currentAudi.movieTitle || 'NOW SHOWING', w, h, '#ffffff', '#00f0ff', 60);
+                sCtx.save();
+                sCtx.textAlign = 'center';
+                sCtx.fillStyle = '#cbd5e1';
+                sCtx.font = '500 15px "Inter", sans-serif';
+                sCtx.fillText(`NOW SHOWING  •  LIVE SIGHTLINE SIMULATION  •  ACTIVE SEAT: ${activePOVSeatId}`, cx, h * 0.64, w * 0.84);
+                sCtx.restore();
+
+                screenLightCenter.color.setHSL(0.52 + pulse * 0.05, 0.95, 0.55);
+                screenLightLeft.color.setHSL(0.76, 0.85, 0.5);
+                screenLightRight.color.setHSL(0.50, 0.85, 0.5);
+
+            } else if (screenChannel === 'atmos') {
+                sCtx.fillStyle = '#050811';
+                sCtx.fillRect(0, 0, w, h);
+                const bars = 44;
+                const bw = (w - 160) / bars;
+                for (let i = 0; i < bars; i++) {
+                    const amp = (Math.sin(time * 3.2 + i * 0.3) * 0.5 + 0.5) * (Math.cos(time * 1.7 - i * 0.15) * 0.4 + 0.6);
+                    const bh = Math.max(18, amp * (h * 0.62));
+                    const hue = 185 + (i / bars) * 90;
+                    sCtx.fillStyle = `hsl(${hue}, 95%, 58%)`;
+                    sCtx.fillRect(80 + i * bw, (h - bh) / 2, bw - 4, bh);
+                }
+                sCtx.fillStyle = '#ffffff';
+                sCtx.textAlign = 'center';
+                sCtx.font = '700 32px "Space Grotesk", sans-serif';
+                sCtx.fillText(`DOLBY ATMOS 64-CHANNEL ACOUSTIC FIELD • SEAT ${activePOVSeatId}`, w / 2, 54);
+                screenLightCenter.color.setHSL((time * 0.15) % 1, 0.9, 0.55);
+
+            } else if (screenChannel === 'calibration') {
+                sCtx.fillStyle = '#070b12';
+                sCtx.fillRect(0, 0, w, h);
+                sCtx.strokeStyle = 'rgba(0, 240, 255, 0.28)';
+                sCtx.lineWidth = 1.5;
+                for (let x = 0; x <= w; x += 64) { sCtx.beginPath(); sCtx.moveTo(x, 0); sCtx.lineTo(x, h); sCtx.stroke(); }
+                for (let y = 0; y <= h; y += 64) { sCtx.beginPath(); sCtx.moveTo(0, y); sCtx.lineTo(w, y); sCtx.stroke(); }
+                sCtx.strokeStyle = '#C9A84C';
+                sCtx.lineWidth = 3;
+                sCtx.beginPath(); sCtx.arc(w / 2, h / 2, 135, 0, Math.PI * 2); sCtx.stroke();
+                sCtx.fillStyle = '#ffffff';
+                sCtx.textAlign = 'center';
+                sCtx.font = '700 34px "Space Grotesk", sans-serif';
+                sCtx.fillText(`THX / IMAX SIGHTLINE CALIBRATION • SEAT ${activePOVSeatId}`, w / 2, h * 0.46);
+            }
+
+            screenTexture.needsUpdate = true;
+        }
+
+        /********************************************************************
+         * 4. BUILD PARAMETRIC 3D AUDITORIUM, EXITS, SPEAKERS & SEATS
+         ********************************************************************/
+        const auditoriumGroup = new THREE.Group();
+        scene.add(auditoriumGroup);
+
+        const interactiveSeatMeshes = [];
+        let screenCenterTarget = new THREE.Vector3(0, 6.2, -15.5);
+        const currentLookAtTarget = new THREE.Vector3(0, 6.2, -15.5);
+        const desiredLookAtTarget = new THREE.Vector3(0, 6.2, -15.5);
+        let auditoriumCenterTarget = new THREE.Vector3(0, 5, 0);
+        let auditoriumRearWallZ = 11;
+        let auditoriumOverviewCamera = new THREE.Vector3(0, 16, -22);
+
+        // Shared PBR Materials
+        // Soft upholstery palette: velvet, brass, and deep jade; selection and
+        // the active point of view remain distinct from seat class colors.
+            const matStdAvail = new THREE.MeshStandardMaterial({ color: 0x4a2029, emissive: 0x080204, roughness: 0.78, metalness: 0.01 });
+            const matVipAvail = new THREE.MeshStandardMaterial({ color: 0x69502f, emissive: 0x080603, roughness: 0.76, metalness: 0.01 });
+            const matReclinerAvail = new THREE.MeshStandardMaterial({ color: 0x205247, emissive: 0x030b08, roughness: 0.8, metalness: 0.01 });
+        const matSelectedCart = new THREE.MeshStandardMaterial({ color: 0xf0d58a, emissive: 0x38270b, roughness: 0.38, metalness: 0.08 });
+        const matActivePOV = new THREE.MeshStandardMaterial({ color: 0x76cbb9, emissive: 0x16443a, roughness: 0.38, metalness: 0.04 });
+        const matOccupied = new THREE.MeshStandardMaterial({ color: 0x28272b, roughness: 0.55, metalness: 0.02 });
+        const matArmrest = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.62, metalness: 0.08 });
+        const matSeatInset = new THREE.MeshStandardMaterial({ color: 0x10221f, roughness: 0.82, metalness: 0.01 });
+        const matSeatStitch = new THREE.MeshStandardMaterial({ color: 0x9c8251, roughness: 0.72, metalness: 0.08 });
+
+        function createExitSignCanvasTexture(label) {
+            const c = document.createElement('canvas');
+            c.width = 256;
+            c.height = 96;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#043927';
+            ctx.fillRect(0, 0, 256, 96);
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(4, 4, 248, 88);
+            ctx.fillStyle = '#ecfdf5';
+            ctx.font = 'bold 38px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`🏃 ${label}`, 128, 48);
+            return new THREE.CanvasTexture(c);
+        }
+
+        function buildParametricAuditorium(config) {
+            // Clear existing 3D objects
+            while (auditoriumGroup.children.length > 0) {
+                auditoriumGroup.remove(auditoriumGroup.children[0]);
+            }
+            interactiveSeatMeshes.length = 0;
+            seatRegistry.clear();
+            exitDoorsList.length = 0;
+
+            const rows = config.rows;
+            const visual = config.visual || {};
+            const seatBaseColor = visual.seat_color || '#51252d';
+            const wallBaseColor = visual.wall_color || '#11151d';
+            const trimBaseColor = visual.trim_color || '#c9a84c';
+            matStdAvail.color.set(seatBaseColor);
+            matVipAvail.color.set(trimBaseColor);
+            matReclinerAvail.color.set(seatBaseColor);
+            const widestRow = Math.max(1, ...config.rowDefs.map(row => row.count * row.seatSpan + row.aislesAfter.length * 1.1 + row.offset));
+            const hallHalfWidth = (widestRow * 1.38) / 2 + 3.4;
+            const rowSpacing = Number(config.rowSpacing || 2.45);
+            const stadiumSlope = Number(config.stadiumSlope || 0.55);
+            const lastRowZ = -5.5 + (rows.length - 1) * rowSpacing;
+            const rearRowY = 0.35 + (rows.length - 1) * stadiumSlope;
+
+            // 1. Giant Curved Cinema Screen
+            const thetaLength = Math.max(0.06, config.screenCurve * Math.PI);
+            const radius = Math.max(8, Number(config.screenWidth || 18) / thetaLength);
+            // Flip the auditorium so the screen faces into the room from the -Z end.
+            // CylinderGeometry uses x = r·sin(theta), z = r·cos(theta).
+            const thetaStart = -thetaLength / 2;
+            const screenSurfaceZ = -lastRowZ - Math.max(10, rowSpacing * 4);
+            const screenY = config.screenHeight * 0.56;
+            auditoriumRearWallZ = 5.5 + Math.max(5.5, rowSpacing * 2.2);
+            const hallDepth = auditoriumRearWallZ - screenSurfaceZ + 4;
+            const hallCenterZ = (screenSurfaceZ + auditoriumRearWallZ) / 2;
+            // Keep the seated sightline above nearby seat backs so the screen
+            // and the room remain visible in the first-person preview.
+            screenCenterTarget.set(0, screenY + Math.min(1.0, config.screenHeight * 0.16), screenSurfaceZ);
+            auditoriumCenterTarget.set(0, Math.max(5, rearRowY * 0.48 + 4), hallCenterZ);
+            // Keep the overview camera inside the auditorium, in the rear
+            // concourse, so the projection booth wall cannot block the view.
+            // A raised rear camera clears nearby seat backs while keeping the
+            // full seating bowl and screen in frame.
+            auditoriumOverviewCamera.set(0, Math.max(9, rearRowY + 5), auditoriumRearWallZ - Math.max(3, hallDepth * 0.06));
+            camera.far = Math.max(160, hallDepth + radius * 2 + 60);
+            camera.updateProjectionMatrix();
+            currentLookAtTarget.copy(screenCenterTarget);
+            desiredLookAtTarget.copy(screenCenterTarget);
+            const screenGeo = new THREE.CylinderGeometry(radius, radius, config.screenHeight, 64, 1, true, thetaStart, thetaLength);
+            screenGeo.scale(-1, 1, 1);
+
+            const uvAttr = screenGeo.attributes.uv;
+            for (let i = 0; i < uvAttr.count; i++) {
+                uvAttr.setX(i, 1 - uvAttr.getX(i));
+            }
+
+            const screenMat = new THREE.MeshBasicMaterial({ map: screenTexture, side: THREE.DoubleSide });
+            const screenMesh = new THREE.Mesh(screenGeo, screenMat);
+            // Keep the center of the curved screen on its visible surface.
+            screenMesh.position.set(0, screenY, screenSurfaceZ - radius);
+            auditoriumGroup.add(screenMesh);
+
+            // Screen Gold/Cyan Ambient Frame
+            const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, config.screenHeight + 0.5, 64, 1, true, thetaStart - 0.01, Math.min(Math.PI * 0.65, thetaLength + 0.02));
+            frameGeo.scale(-1, 1, 1);
+            const frameMat = new THREE.MeshBasicMaterial({ color: trimBaseColor, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
+            const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+            frameMesh.position.copy(screenMesh.position);
+            auditoriumGroup.add(frameMesh);
+
+            // Front Stage Deck + Subwoofer Array + LED Strip
+            const stageGeo = new THREE.BoxGeometry(hallHalfWidth * 2, 0.9, 5.5);
+            const stageMat = new THREE.MeshStandardMaterial({ color: 0x080b12, roughness: 0.3, metalness: 0.5 });
+            const stageMesh = new THREE.Mesh(stageGeo, stageMat);
+            stageMesh.position.set(0, 0.45, screenSurfaceZ + 2.8);
+            auditoriumGroup.add(stageMesh);
+
+            const stageLedGeo = new THREE.BoxGeometry(hallHalfWidth * 1.85, 0.08, 0.08);
+            const stageLedMat = new THREE.MeshBasicMaterial({ color: trimBaseColor });
+            const stageLed = new THREE.Mesh(stageLedGeo, stageLedMat);
+            stageLed.position.set(0, 0.92, screenSurfaceZ + 5.6);
+            auditoriumGroup.add(stageLed);
+
+            // 2. Floor, Acoustic Ribbed Side Walls & Dolby Atmos Speaker Arrays
+            const wallMat = new THREE.MeshStandardMaterial({ color: wallBaseColor, roughness: 0.85, metalness: 0.15 });
+            const floorGeo = new THREE.PlaneGeometry(hallHalfWidth * 2.4, hallDepth);
+            const floorMesh = new THREE.Mesh(floorGeo, wallMat);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.position.set(0, 0, hallCenterZ);
+            auditoriumGroup.add(floorMesh);
+
+            const spkBoxGeo = new THREE.BoxGeometry(0.45, 0.85, 0.55);
+            const spkMat = new THREE.MeshStandardMaterial({ color: 0x05070b, roughness: 0.4, metalness: 0.7 });
+            const spkLedGeo = new THREE.SphereGeometry(0.06, 8, 8);
+            const spkLedMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+            for (let side of [-1, 1]) {
+                const wallX = side * hallHalfWidth;
+                const sideWallGeo = new THREE.BoxGeometry(0.6, 19, hallDepth);
+                const sideWall = new THREE.Mesh(sideWallGeo, wallMat);
+                sideWall.position.set(wallX, 8.5, hallCenterZ);
+                auditoriumGroup.add(sideWall);
+
+                for (let z = screenSurfaceZ + 1; z <= auditoriumRearWallZ - 3; z += 4.2) {
+                    const panelGeo = new THREE.BoxGeometry(0.35, 10, 2.8);
+                    const panelMat = new THREE.MeshStandardMaterial({ color: 0x121826, roughness: 0.9 });
+                    const panel = new THREE.Mesh(panelGeo, panelMat);
+                    panel.position.set(wallX - side * 0.25, 6.8, z);
+                    auditoriumGroup.add(panel);
+
+                    // Wall Sconce Neon Bar
+                    const sconceGeo = new THREE.BoxGeometry(0.1, 4.2, 0.1);
+                    const sconceMat = new THREE.MeshBasicMaterial({ color: z < 0 ? 0x00f0ff : 0xC9A84C });
+                    const sconce = new THREE.Mesh(sconceGeo, sconceMat);
+                    sconce.position.set(wallX - side * 0.42, 7.2, z + 1.65);
+                    auditoriumGroup.add(sconce);
+
+                    // 3D Dolby Atmos Wall Surround Speaker + Blue LED
+                    const spk = new THREE.Mesh(spkBoxGeo, spkMat);
+                    spk.position.set(wallX - side * 0.48, 8.8, z);
+                    auditoriumGroup.add(spk);
+
+                    const led = new THREE.Mesh(spkLedGeo, spkLedMat);
+                    led.position.set(wallX - side * 0.72, 8.8, z);
+                    auditoriumGroup.add(led);
+                }
+            }
+
+            // Rear Projection Booth Wall & Volumetric Light Cone
+            const backWallGeo = new THREE.BoxGeometry(hallHalfWidth * 2.1, 19, 1);
+            const backWall = new THREE.Mesh(backWallGeo, wallMat);
+            backWall.position.set(0, 8.5, auditoriumRearWallZ);
+            auditoriumGroup.add(backWall);
+
+            const beamGeo = new THREE.ConeGeometry(7.8, hallDepth, 32, 1, true);
+            const beamMat = new THREE.MeshBasicMaterial({
+                color: 0x88ddff,
+                transparent: true,
+                opacity: 0.04,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const beamMesh = new THREE.Mesh(beamGeo, beamMat);
+            beamMesh.rotation.x = -Math.PI / 2;
+            beamMesh.position.set(0, rearRowY + 4.8, hallCenterZ);
+            auditoriumGroup.add(beamMesh);
+
+            // 3. BUILD 4 ILLUMINATED 3D EMERGENCY EXIT WAY DOORS (EXIT 1 - EXIT 4)
+            const exitSpecs = [
+                { id: 'EXIT_FL', name: 'EXIT 1 (Front Left)', shortName: 'EXIT 1', side: 'Left', x: -hallHalfWidth + 0.35, y: 0.2, z: screenSurfaceZ + 3.2, rotY: Math.PI / 2 },
+                { id: 'EXIT_FR', name: 'EXIT 2 (Front Right)', shortName: 'EXIT 2', side: 'Right', x: hallHalfWidth - 0.35, y: 0.2, z: screenSurfaceZ + 3.2, rotY: -Math.PI / 2 },
+                { id: 'EXIT_RL', name: 'EXIT 3 (Rear Left)', shortName: 'EXIT 3', side: 'Left', x: -hallHalfWidth + 0.35, y: 0.2, z: auditoriumRearWallZ - 2.2, rotY: Math.PI / 2 },
+                { id: 'EXIT_RR', name: 'EXIT 4 (Rear Right)', shortName: 'EXIT 4', side: 'Right', x: hallHalfWidth - 0.35, y: 0.2, z: auditoriumRearWallZ - 2.2, rotY: -Math.PI / 2 }
+            ];
+
+            exitSpecs.forEach(ex => {
+                const exGroup = new THREE.Group();
+                exGroup.position.set(ex.x, ex.y, ex.z);
+                exGroup.rotation.y = ex.rotY;
+
+                // Heavy Acoustic Exit Door Frame
+                const doorGeo = new THREE.BoxGeometry(1.75, 2.6, 0.18);
+                const doorMat = new THREE.MeshStandardMaterial({ color: 0x071712, emissive: 0x032217, roughness: 0.5 });
+                const doorMesh = new THREE.Mesh(doorGeo, doorMat);
+                doorMesh.position.y = 1.3;
+                exGroup.add(doorMesh);
+
+                // Glowing Emerald Border Frame
+                const borderGeo = new THREE.BoxGeometry(1.88, 2.72, 0.12);
+                const borderMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+                const borderMesh = new THREE.Mesh(borderGeo, borderMat);
+                borderMesh.position.set(0, 1.3, -0.02);
+                exGroup.add(borderMesh);
+
+                // Illuminated Push-Bar Handle
+                const barGeo = new THREE.BoxGeometry(1.25, 0.09, 0.26);
+                const barMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+                const barMesh = new THREE.Mesh(barGeo, barMat);
+                barMesh.position.set(0, 1.1, 0.06);
+                exGroup.add(barMesh);
+
+                // Overhead Glowing "EXIT" Signboard
+                const signTex = createExitSignCanvasTexture(ex.shortName);
+                const signGeo = new THREE.PlaneGeometry(1.55, 0.58);
+                const signMat = new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide });
+                const signMesh = new THREE.Mesh(signGeo, signMat);
+                signMesh.position.set(0, 3.05, 0.12);
+                exGroup.add(signMesh);
+
+                // Emerald Emergency PointLight casting green floor glow
+                const exLight = new THREE.PointLight(0x10b981, 1.6, 8.5);
+                exLight.position.set(0, 2.6, 0.9);
+                exGroup.add(exLight);
+
+                auditoriumGroup.add(exGroup);
+
+                exitDoorsList.push({
+                    id: ex.id,
+                    name: ex.name,
+                    shortName: ex.shortName,
+                    side: ex.side,
+                    pos: new THREE.Vector3(ex.x, ex.y, ex.z),
+                    lookTarget: new THREE.Vector3(ex.x, ex.y + 1.6, ex.z)
+                });
+            });
+
+            // 4. BUILD STADIUM RISERS & 3D SEATING GRID
+            // Soft, bevelled upholstery panels keep the seat silhouette clean
+            // at both overview distance and close seat POV.
+            const upholsteryGeo = new THREE.SphereGeometry(1, 24, 18);
+            const seatCushionGeo = upholsteryGeo;
+            const headrestGeo = upholsteryGeo;
+            const lumbarGeo = upholsteryGeo;
+            const armrestGeo = upholsteryGeo;
+            const footrestGeo = upholsteryGeo;
+            const backShape = new THREE.Shape();
+            backShape.moveTo(-0.4, 0.02);
+            backShape.bezierCurveTo(-0.48, 0.02, -0.49, 0.14, -0.44, 0.22);
+            backShape.lineTo(-0.47, 0.88);
+            backShape.bezierCurveTo(-0.5, 1.1, -0.38, 1.24, -0.22, 1.24);
+            backShape.lineTo(0.22, 1.24);
+            backShape.bezierCurveTo(0.38, 1.24, 0.5, 1.1, 0.47, 0.88);
+            backShape.lineTo(0.44, 0.22);
+            backShape.bezierCurveTo(0.49, 0.14, 0.48, 0.02, 0.4, 0.02);
+            backShape.quadraticCurveTo(0, -0.05, -0.4, 0.02);
+            const seatBackGeo = new THREE.ExtrudeGeometry(backShape, {
+                depth: 0.14, bevelEnabled: true, bevelSegments: 4,
+                bevelThickness: 0.045, bevelSize: 0.035, curveSegments: 10
+            });
+            const insetShape = new THREE.Shape();
+            insetShape.moveTo(-0.3, 0.17);
+            insetShape.quadraticCurveTo(-0.35, 0.2, -0.34, 0.31);
+            insetShape.lineTo(-0.32, 0.89);
+            insetShape.quadraticCurveTo(-0.31, 1.08, -0.18, 1.09);
+            insetShape.lineTo(0.18, 1.09);
+            insetShape.quadraticCurveTo(0.31, 1.08, 0.32, 0.89);
+            insetShape.lineTo(0.34, 0.31);
+            insetShape.quadraticCurveTo(0.35, 0.2, 0.3, 0.17);
+            insetShape.quadraticCurveTo(0, 0.12, -0.3, 0.17);
+            const seatBackInsetGeo = new THREE.ExtrudeGeometry(insetShape, {
+                depth: 0.045, bevelEnabled: true, bevelSegments: 3,
+                bevelThickness: 0.025, bevelSize: 0.02, curveSegments: 8
+            });
+            const stitchGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.72, 8);
+            const armSupportGeo = new THREE.CylinderGeometry(0.045, 0.065, 0.34, 12);
+            const seatPedestalGeo = new THREE.CylinderGeometry(0.08, 0.11, 0.2, 12);
+            const cupholderGeo = new THREE.CylinderGeometry(0.066, 0.058, 0.085, 16);
+            const cupholderRingGeo = new THREE.TorusGeometry(0.061, 0.012, 8, 18);
+            const cupholderMat = new THREE.MeshStandardMaterial({ color: 0x06070a, metalness: 0.45, roughness: 0.28 });
+
+            const rowConfigByLabel = new Map(config.rowDefs.map(row => [row.label, row]));
+            rows.forEach((rowLetter, rIdx) => {
+                const rowConfig = rowConfigByLabel.get(rowLetter);
+                if (!rowConfig) return;
+                const rowZ = 5.5 - rIdx * rowSpacing;
+                const rowY = 0.35 + (rows.length - 1 - rIdx) * stadiumSlope;
+                const isVIP = /vip|prime|premium|gold/i.test(rowConfig.className);
+                const isRecliner = /reclin|insignia|luxe/i.test(rowConfig.className);
+                const rowSpan = Math.max(1, rowConfig.seatSpan || 1);
+                const aisles = rowConfig.aislesAfter || [];
+
+                const riserGeo = new THREE.BoxGeometry(hallHalfWidth * 1.92, rowY, 2.45);
+                const riserMat = new THREE.MeshStandardMaterial({
+                    color: isRecliner ? 0x16121e : (isVIP ? 0x131724 : 0x0c1018), roughness: 0.8
+                });
+                const riserMesh = new THREE.Mesh(riserGeo, riserMat);
+                riserMesh.position.set(0, rowY / 2, rowZ);
+                auditoriumGroup.add(riserMesh);
+
+                const firstSeat = Number(rowConfig.start || 1);
+                const rowUnits = rowConfig.count * rowSpan + aisles.length * 1.1 + Number(rowConfig.offset || 0);
+                for (let sNum = firstSeat; sNum < firstSeat + rowConfig.count; sNum++) {
+                    const seatId = `${rowLetter}${sNum}`;
+                    if (rowConfig.blocked.includes(seatId)) continue;
+                    const seatIndex = sNum - firstSeat;
+                    const aislesBefore = aisles.filter(aisle => sNum > aisle).length;
+                    const seatX = (seatIndex * rowSpan + rowSpan / 2 + aislesBefore * 1.1
+                        + Number(rowConfig.offset || 0) - rowUnits / 2) * 1.32;
+                    const isOccupied = rowConfig.seats[seatId] !== 'available';
+                    const tier = rowConfig.className || 'Standard';
+                    const price = Number(rowConfig.price || 0);
+
+                    const seatGroup = new THREE.Group();
+                    seatGroup.position.set(seatX, rowY, rowZ);
+                    if (isRecliner || isVIP || rowSpan > 1) {
+                        const widthScale = rowSpan * (isRecliner ? 1.12 : (isVIP ? 1.07 : 1));
+                        seatGroup.scale.set(widthScale, isRecliner ? 0.72 : (isVIP ? 0.69 : 0.67), isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82));
+                    } else {
+                        seatGroup.scale.set(1, 0.67, 0.82);
+                    }
+                    // The seat back is local +Z; the screen is at -Z. Aim the
+                    // seat fronts toward the screen and keep the active seat
+                    // back behind the seated camera instead of in its sightline.
+                    seatGroup.rotation.y = Math.atan2(seatX, rowZ - screenSurfaceZ);
+
+                    let mat = isOccupied ? matOccupied : (isRecliner ? matReclinerAvail : (isVIP ? matVipAvail : matStdAvail));
+                    if (!isOccupied && selectedSeats.has(seatId)) mat = matSelectedCart;
+                    if (seatId === activePOVSeatId && !selectedSeats.has(seatId)) mat = matActivePOV;
+
+                    const cushion = new THREE.Mesh(seatCushionGeo, mat);
+                    cushion.position.set(0, 0.43, 0);
+                    cushion.scale.set(0.5, 0.17, 0.47);
+                    cushion.userData = { seatId };
+                    seatGroup.add(cushion);
+
+                    const backPivot = new THREE.Group();
+                    backPivot.position.set(0, 0.48, 0.32);
+                    backPivot.rotation.x = -0.14;
+                    const backrest = new THREE.Mesh(seatBackGeo, mat);
+                    backrest.position.set(0, 0, -0.1);
+                    backrest.userData = { seatId };
+                    backPivot.add(backrest);
+                    const headrest = new THREE.Mesh(headrestGeo, mat);
+                    headrest.position.set(0, 1.1, 0.09);
+                    headrest.scale.set(0.33, 0.2, 0.12);
+                    headrest.userData = { seatId };
+                    backPivot.add(headrest);
+                    const backInset = new THREE.Mesh(seatBackInsetGeo, matSeatInset);
+                    backInset.position.set(0, 0.02, 0.065);
+                    backInset.userData = { seatId };
+                    backPivot.add(backInset);
+                    const lumbar = new THREE.Mesh(lumbarGeo, matSeatInset);
+                    lumbar.position.set(0, 0.4, 0.125);
+                    lumbar.scale.set(0.3, 0.18, 0.055);
+                    backPivot.add(lumbar);
+                    [-0.365, 0.365].forEach(x => {
+                        const stitch = new THREE.Mesh(stitchGeo, matSeatStitch);
+                        stitch.position.set(x, 0.62, 0.13);
+                        stitch.scale.y = 0.84;
+                        backPivot.add(stitch);
+                    });
+                    seatGroup.add(backPivot);
+
+                    const pedestal = new THREE.Mesh(seatPedestalGeo, matArmrest);
+                    pedestal.position.set(0, 0.13, -0.12);
+                    seatGroup.add(pedestal);
+                    const armL = new THREE.Mesh(armrestGeo, mat);
+                    armL.position.set(-0.52, 0.65, 0.035);
+                    armL.scale.set(0.13, 0.115, 0.43);
+                    seatGroup.add(armL);
+                    const armR = new THREE.Mesh(armrestGeo, mat);
+                    armR.position.set(0.52, 0.65, 0.035);
+                    armR.scale.set(0.13, 0.115, 0.43);
+                    seatGroup.add(armR);
+                    [-0.52, 0.52].forEach(x => {
+                        const support = new THREE.Mesh(armSupportGeo, matArmrest);
+                        support.position.set(x, 0.4, 0.035);
+                        seatGroup.add(support);
+                    });
+                    const cup = new THREE.Mesh(cupholderGeo, cupholderMat);
+                    cup.position.set(0.52, 0.72, 0.31);
+                    seatGroup.add(cup);
+                    const cupRing = new THREE.Mesh(cupholderRingGeo, matSeatStitch);
+                    cupRing.rotation.x = Math.PI / 2;
+                    cupRing.position.set(0.52, 0.766, 0.31);
+                    seatGroup.add(cupRing);
+
+                    if (isRecliner) {
+                        const footrest = new THREE.Mesh(footrestGeo, mat);
+                        footrest.position.set(0, 0.22, 0.72);
+                        footrest.scale.set(0.43, 0.105, 0.27);
+                        seatGroup.add(footrest);
+                    }
+
+                    auditoriumGroup.add(seatGroup);
+                    interactiveSeatMeshes.push(cushion, backrest, headrest, backInset, lumbar);
+
+                    if (aisles.includes(sNum)) {
+                        const stripGeo = new THREE.BoxGeometry(0.14, 0.04, 2.3);
+                        const stripMat = new THREE.MeshBasicMaterial({ color: isVIP || isRecliner ? 0xC9A84C : 0x00f0ff });
+                        const strip = new THREE.Mesh(stripGeo, stripMat);
+                        strip.position.set(seatX + rowSpan * 0.6 + 0.4, rowY + 0.02, rowZ);
+                        auditoriumGroup.add(strip);
+                    }
+
+                    // Put the camera at seated eye height on the seat's front
+                    // side. The local -Z direction faces the screen; transforming
+                    // it through the seat group also handles side-row rotation.
+                    const eyePos = seatGroup.localToWorld(new THREE.Vector3(0, 1.35, -0.58));
+                    seatRegistry.set(seatId, {
+                        id: seatId, row: rowLetter, rowIndex: rIdx, num: sNum,
+                        isOccupied, isVIP, isRecliner, tier, price,
+                        worldPos: new THREE.Vector3(seatX, rowY, rowZ), eyePos,
+                        meshes: [cushion, backrest, headrest, backInset, lumbar], backPivot, group: seatGroup
+                    });
+                }
+            });
+        }
+        function refreshAllSeatMaterials() {
+            seatRegistry.forEach((seat) => {
+                let targetMat = seat.isOccupied
+                    ? matOccupied
+                    : (seat.isRecliner ? matReclinerAvail : (seat.isVIP ? matVipAvail : matStdAvail));
+                if (selectedSeats.has(seat.id)) targetMat = matSelectedCart;
+                else if (seat.id === activePOVSeatId) targetMat = matActivePOV;
+                seat.meshes.forEach(m => { m.material = targetMat; });
+
+                // Apply recline angle to active POV seat
+                if (seat.backPivot) {
+                    const tilt = seat.id === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
+                    seat.backPivot.rotation.x = tilt;
+                }
+
+                // Gentle hover lift for the seat currently under the pointer.
+                const wantElevation = (seat.group && seat.group.userData && seat.group.userData.hoverElevation) || 0;
+                seat.group.position.y += (wantElevation - (seat.group.userData.prevElevation || 0));
+                seat.group.userData.prevElevation = wantElevation;
+            });
+        }
+
+        /********************************************************************
+         * 5. 3D ANIMATED GREEN FLOOR EGRESS PATH TO NEAREST EXIT WAY
+         ********************************************************************/
+        function updateNearestExitWayAndFloorPath(seat) {
+            if (!seat || exitDoorsList.length === 0) return;
+
+            let minDist = Infinity;
+            let bestExit = exitDoorsList[0];
+
+            exitDoorsList.forEach(ex => {
+                const d = seat.worldPos.distanceTo(ex.pos);
+                if (d < minDist) {
+                    minDist = d;
+                    bestExit = ex;
+                }
+            });
+
+            nearestExitObj = { exit: bestExit, dist: minDist.toFixed(1) };
+
+            // Remove old egress line & nodes
+            if (egressLineMesh) {
+                scene.remove(egressLineMesh);
+                egressLineMesh.geometry.dispose();
+            }
+            while (egressNodes.length > 0) {
+                const n = egressNodes.pop();
+                scene.remove(n);
+            }
+
+            // Build 3-point walking route: Seat Feet -> Side Wall Corridor -> Nearest Exit Door
+            const corridorX = bestExit.pos.x * 0.88;
+            const p1 = new THREE.Vector3(seat.worldPos.x, seat.worldPos.y + 0.08, seat.worldPos.z + 0.55);
+            const p2 = new THREE.Vector3(corridorX, seat.worldPos.y + 0.08, seat.worldPos.z + 0.55);
+            const p3 = new THREE.Vector3(bestExit.pos.x * 0.94, bestExit.pos.y + 0.15, bestExit.pos.z);
+
+            const lineGeo = new THREE.BufferGeometry().setFromPoints([p1, p2, p3]);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 3 });
+            egressLineMesh = new THREE.Line(lineGeo, lineMat);
+            scene.add(egressLineMesh);
+
+            // Add glowing green beacon spheres along the walking route
+            const nodeGeo = new THREE.SphereGeometry(0.11, 12, 12);
+            const nodeMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+            for (let i = 0; i <= 8; i++) {
+                const t = i / 8;
+                const pt = t < 0.45
+                    ? new THREE.Vector3().lerpVectors(p1, p2, t / 0.45)
+                    : new THREE.Vector3().lerpVectors(p2, p3, (t - 0.45) / 0.55);
+                const sphere = new THREE.Mesh(nodeGeo, nodeMat);
+                sphere.position.copy(pt);
+                sphere.userData = { phase: i * 0.6 };
+                scene.add(sphere);
+                egressNodes.push(sphere);
+            }
+        }
+
+        /********************************************************************
+         * 6. 2D INTERACTIVE RADAR MINI-MAP RENDERER
+         ********************************************************************/
+        function render2DMinimap() {
+            const gridEl = document.getElementById('minimap-grid');
+            gridEl.replaceChildren();
+            currentAudi.rowDefs.forEach(row => {
+                const rowWrap = document.createElement('div');
+                rowWrap.className = 'flex items-center justify-between gap-1';
+                const labelL = document.createElement('span');
+                labelL.className = 'w-5 shrink-0 text-[9px] font-display font-bold text-slate-400 text-center';
+                labelL.textContent = row.label;
+                rowWrap.appendChild(labelL);
+                const seatsRow = document.createElement('div');
+                seatsRow.className = 'flex items-center justify-center gap-[3px] flex-1';
+                for (let sNum = row.start; sNum < row.start + row.count; sNum++) {
+                    const seatId = `${row.label}${sNum}`;
+                    if (row.blocked.includes(seatId)) continue;
+                    const seatData = seatRegistry.get(seatId);
+                    if (!seatData) continue;
+                    const seatButton = document.createElement('button');
+                    seatButton.type = 'button';
+                    seatButton.title = `${seatData.isOccupied ? 'Unavailable · ' : ''}Row ${row.label} Seat ${sNum} (${seatData.tier} · ₹${seatData.price})`;
+                    let colorClasses = 'bg-rose-900/75 border-rose-500/60 text-rose-100 hover:border-rose-200';
+                    if (seatData.isOccupied) colorClasses = 'occupied bg-slate-800 border-slate-600 text-slate-500 cursor-not-allowed';
+                    else if (selectedSeats.has(seatId)) colorClasses = 'bg-[#E4C67F] border-[#F2DFAE] text-slate-950 font-bold shadow-[0_0_9px_rgba(228,198,127,.5)]';
+                    else if (seatId === activePOVSeatId) colorClasses = 'bg-[#91CFC1] border-white text-slate-950 font-black shadow-[0_0_9px_rgba(145,207,193,.45)] scale-125 z-10';
+                    else if (seatData.isRecliner) colorClasses = 'bg-emerald-900/80 border-emerald-500/70 text-emerald-100';
+                    else if (seatData.isVIP) colorClasses = 'bg-[#98794E] border-[#D2B77E] text-white';
+                    seatButton.className = `seat-dot h-4 w-4 rounded-t-md rounded-b-sm border text-[7px] flex items-center justify-center ${colorClasses}`;
+                    seatButton.textContent = sNum;
+                    if (!seatData.isOccupied) seatButton.onclick = () => selectAndFlyToSeat(row.label, sNum, true);
+                    seatsRow.appendChild(seatButton);
+                    if (row.aislesAfter.includes(sNum)) {
+                        const spacer = document.createElement('div');
+                        spacer.className = 'w-2 shrink-0';
+                        seatsRow.appendChild(spacer);
+                    }
+                }
+                rowWrap.appendChild(seatsRow);
+                const labelR = document.createElement('span');
+                labelR.className = 'w-5 shrink-0 text-[9px] font-display font-bold text-slate-400 text-center';
+                labelR.textContent = row.label;
+                rowWrap.appendChild(labelR);
+                gridEl.appendChild(rowWrap);
+            });
+        }
+        /********************************************************************
+         * 7. SEAT POV CAMERA NAVIGATION, 4-WAY ARROWS & EXIT WAY LOOK
+         ********************************************************************/
+        const cameraTargetPos = new THREE.Vector3();
+
+        let yawOffset = 0;
+        let pitchOffset = 0;
+        let targetYawOffset = 0;
+        let targetPitchOffset = 0;
+
+        function selectAndFlyToSeat(rowLetter, seatNum, addToCart = false) {
+            const seatId = `${rowLetter}${seatNum}`;
+            const seat = seatRegistry.get(seatId);
+            if (!seat) return;
+
+            if (addToCart) {
+                if (seat.isOccupied) return;
+                window.parent.postMessage({ type: 'cinewave:toggle-seat', seatId }, location.origin);
+            }
+
+            activePOVSeatId = seatId;
+            activeRowIdx = seat.rowIndex;
+            activeColNum = seat.num;
+
+            cameraMode = 'seat';
+            updateCameraModeButtons();
+            cameraTargetPos.copy(seat.eyePos);
+
+            // Face the screen center by default when hopping to a new seat
+            desiredLookAtTarget.copy(screenCenterTarget);
+            targetYawOffset = 0;
+            targetPitchOffset = reclineLevel * 0.12;
+
+            // Stop any pending hover preview so the committed seat is unambiguous.
+            hideHoverPreview();
+            if (seat.group) seat.group.userData.hoverElevation = 0;
+
+            updateArrowButtonStates();
+            updateNearestExitWayAndFloorPath(seat);
+            refreshAllSeatMaterials();
+            render2DMinimap();
+            updateSeatTelemetryUI(seat);
+        }
+
+        // 4-Way Directional Seat-Hopping (◀ Left, ▶ Right, ▲ Front Row, ▼ Back Row)
+        function stepSeat(dRow, dCol) {
+            if (dCol !== 0) {
+                const row = currentAudi.rowDefs[activeRowIdx];
+                if (!row) return;
+                let nextCol = activeColNum + dCol;
+                while (nextCol >= row.start && nextCol < row.start + row.count) {
+                    if (seatRegistry.has(`${row.label}${nextCol}`)) {
+                        selectAndFlyToSeat(row.label, nextCol, false);
+                        return;
+                    }
+                    nextCol += dCol;
+                }
+                return;
+            }
+
+            const nextRIdx = activeRowIdx + dRow;
+            if (nextRIdx < 0 || nextRIdx >= currentAudi.rowDefs.length) return;
+            const targetRow = currentAudi.rowDefs[nextRIdx];
+            const rowSeats = [...seatRegistry.values()].filter(seat => seat.rowIndex === nextRIdx);
+            if (!rowSeats.length) return;
+            const nextSeat = rowSeats.reduce((best, seat) =>
+                Math.abs(seat.num - activeColNum) < Math.abs(best.num - activeColNum) ? seat : best
+            );
+            selectAndFlyToSeat(targetRow.label, nextSeat.num, false);
+        }
+
+        function updateArrowButtonStates() {
+            document.getElementById('btn-row-front').disabled = (activeRowIdx >= currentAudi.rowDefs.length - 1);
+            document.getElementById('btn-row-back').disabled = (activeRowIdx <= 0);
+            const row = currentAudi.rowDefs[activeRowIdx];
+            document.getElementById('btn-seat-left').disabled = !row || activeColNum <= row.start;
+            document.getElementById('btn-seat-right').disabled = !row || activeColNum >= row.start + row.count - 1;
+        }
+
+        function lookAtNearestExit() {
+            if (!nearestExitObj) return;
+            cameraMode = 'seat';
+            updateCameraModeButtons();
+            desiredLookAtTarget.copy(nearestExitObj.exit.lookTarget);
+            targetYawOffset = 0;
+            targetPitchOffset = 0;
+
+            const dockBtn = document.getElementById('btn-dock-exit');
+            dockBtn.classList.add('emerald-active');
+            setTimeout(() => dockBtn.classList.remove('emerald-active'), 2200);
+        }
+
+        function lookAtSpecificExit(exitId) {
+            const found = exitDoorsList.find(e => e.id === exitId);
+            if (!found) return;
+            desiredLookAtTarget.copy(found.lookTarget);
+            targetYawOffset = 0;
+            targetPitchOffset = 0;
+        }
+
+        function recenterLookAtScreen() {
+            desiredLookAtTarget.copy(screenCenterTarget);
+            targetYawOffset = 0;
+            targetPitchOffset = reclineLevel * 0.12;
+        }
+
+        function setSeatRecline(level) {
+            reclineLevel = level;
+            [0, 1, 2].forEach(l => {
+                const b = document.getElementById(`recline-${l}`);
+                if (b) b.classList.toggle('gold-active', l === level);
+            });
+            targetPitchOffset = level * 0.12;
+            refreshAllSeatMaterials();
+        }
+
+        function jumpToSweetSpot() {
+            const centerX = seatRegistry.size ? [...seatRegistry.values()].reduce((sum, seat) => sum + seat.worldPos.x, 0) / seatRegistry.size : 0;
+            const centerRow = (currentAudi.rows.length - 1) * 0.48;
+            const best = [...seatRegistry.values()].filter(seat => !seat.isOccupied).reduce((choice, seat) => {
+                if (!choice) return seat;
+                const score = Math.hypot(seat.worldPos.x - centerX, (seat.rowIndex - centerRow) * 2.5);
+                const bestScore = Math.hypot(choice.worldPos.x - centerX, (choice.rowIndex - centerRow) * 2.5);
+                return score < bestScore ? seat : choice;
+            }, null);
+            if (best) selectAndFlyToSeat(best.row, best.num, false);
+        }
+
+        function setCameraMode(mode) {
+            cameraMode = mode;
+            updateCameraModeButtons();
+            if (mode === 'overview') {
+                // Use a wide, fixed field of view for the first view so the
+                // screen, seating bowl, and aisle fit together in the frame.
+                camera.fov = 78;
+                camera.updateProjectionMatrix();
+                cameraTargetPos.copy(auditoriumOverviewCamera);
+                // Keep the first wide view aimed down the hall at the screen,
+                // rather than at the room center (which can make the screen
+                // feel behind the viewer in long or unusually shaped halls).
+                desiredLookAtTarget.copy(screenCenterTarget);
+                targetYawOffset = 0;
+                targetPitchOffset = 0;
+            } else {
+                camera.fov = 65;
+                camera.updateProjectionMatrix();
+                const seat = seatRegistry.get(activePOVSeatId);
+                if (seat) cameraTargetPos.copy(seat.eyePos);
+                desiredLookAtTarget.copy(screenCenterTarget);
+                targetYawOffset = 0;
+                targetPitchOffset = reclineLevel * 0.12;
+            }
+        }
+
+        function setCameraPreset(preset) {
+            if (preset === 'overview') return setCameraMode('overview');
+            if (preset === 'seat') return setCameraMode('seat');
+            cameraMode = preset;
+            updateCameraModeButtons();
+            targetYawOffset = 0;
+            targetPitchOffset = 0;
+            if (preset === 'stage') {
+                cameraTargetPos.set(0, Math.max(2.8, screenCenterTarget.y * 0.42), screenCenterTarget.z + 4.5);
+                desiredLookAtTarget.copy(auditoriumCenterTarget);
+            } else if (preset === 'balcony') {
+                cameraTargetPos.set(auditoriumOverviewCamera.x, auditoriumOverviewCamera.y + 2, auditoriumOverviewCamera.z - 2.5);
+                desiredLookAtTarget.copy(auditoriumCenterTarget);
+            } else if (preset === 'birdseye') {
+                cameraTargetPos.set(0.1, Math.max(24, auditoriumOverviewCamera.y + 12), auditoriumCenterTarget.z);
+                desiredLookAtTarget.copy(auditoriumCenterTarget);
+            }
+        }
+
+        function updateCameraModeButtons() {
+            document.getElementById('btn-pov-mode').classList.toggle('active', cameraMode === 'seat');
+            document.getElementById('btn-overview-mode').classList.toggle('active', cameraMode === 'overview');
+        }
+
+        /********************************************************************
+         * 8. REAL-TIME TELEMETRY & CART UI UPDATER
+         ********************************************************************/
+        // Highlight state for the seat currently under the pointer in 3D.
+        let currentHighlightSeatId = null;
+        let highlightWeakenTimer = null;
+
+        function updateHoverRingAndSelectedOutline() {
+            // Hover ring follows the hovered seat (only when it is not the active POV seat).
+            const hoverSeat = hoveredSeatId && hoveredSeatId !== activePOVSeatId
+                ? seatRegistry.get(hoveredSeatId) : null;
+            if (hoverSeat && hoverPreviewActive) {
+                hoverRing.position.copy(hoverSeat.group.position);
+                hoverRing.position.y += 0.06;
+                hoverRing.lookAt(camera.position);
+                ringMat.opacity += (0.9 - ringMat.opacity) * 0.18;
+            } else {
+                ringMat.opacity += (0.0 - ringMat.opacity) * 0.18;
+            }
+            hoverRing.visible = ringMat.opacity > 0.01;
+
+            // Selected-cart outline: a brass ring over the first available seat in the cart.
+            selectedRingMat.opacity += (0.0 - selectedRingMat.opacity) * 0.12;
+            selectedRing.visible = false;
+            if (selectedSeats.size > 0) {
+                let anyVisible = false;
+                for (const id of selectedSeats) {
+                    const s = seatRegistry.get(id);
+                    if (!s || s.isOccupied) continue;
+                    anyVisible = true;
+                    selectedRing.position.copy(s.group.position);
+                    selectedRing.position.y += 0.05;
+                    selectedRing.lookAt(camera.position);
+                    selectedRingMat.opacity += (0.55 - selectedRingMat.opacity) * 0.12;
+                    selectedRing.visible = true;
+                    break; // one ring at a time is enough as a persistent cart indicator
+                }
+                if (anyVisible) selectedRing.visible = true;
+            }
+        }
+
+        function tryHighlightSeatIn3D(seatId) {
+            if (!seatId || seatId === activePOVSeatId) return;
+            const seat = seatRegistry.get(seatId);
+            if (!seat || seat.isOccupied) return;
+
+            const prev = currentHighlightSeatId && seatRegistry.get(currentHighlightSeatId);
+            if (prev && prev !== seat) {
+                if (prev.group) prev.group.userData.highlightUntil = 0;
+            }
+            currentHighlightSeatId = seatId;
+            if (seat.group) {
+                seat.group.userData.highlightUntil = performance.now() + 700;
+                if (seat.group.userData.highlightWeaken) seat.group.userData.highlightWeaken = false;
+            }
+            clearTimeout(highlightWeakenTimer);
+            highlightWeakenTimer = setTimeout(() => {
+                if (seat && seat.group) seat.group.userData.highlightUntil = 0;
+            }, 720);
+        }
+
+        function applyHoverLiftEachFrame() {
+            const now = performance.now();
+            seatRegistry.forEach((seat) => {
+                if (!seat.group) return;
+                const ud = seat.group.userData;
+                const hoverElev = ud.hoverElevation || 0;
+                let wantElev = hoverElev;
+                if (ud.highlightUntil && ud.highlightUntil > now && !ud.highlightWeaken) {
+                    wantElev = Math.max(wantElev, 0.02);
+                }
+                if (ud.highlightUntil && ud.highlightUntil <= now) {
+                    ud.highlightWeaken = true;
+                    const remaining = (ud.highlightUntil - now);
+                    if (remaining > -200) {
+                        const t = 1 - Math.min(1, Math.abs(remaining) / 200);
+                        wantElev = t * 0.02;
+                    }
+                }
+                const prev = ud.prevElevation || 0;
+                seat.group.position.y += (wantElev - prev);
+                ud.prevElevation = wantElev;
+            });
+        }
+
+        function updateSeatTelemetryUI(seat) {
+            const distMeters = seat.eyePos.distanceTo(screenCenterTarget);
+            const dx = seat.eyePos.x - screenCenterTarget.x;
+            const dy = screenCenterTarget.y - seat.eyePos.y;
+            const dz = Math.abs(seat.eyePos.z - screenCenterTarget.z);
+
+            const vertAngleDeg = Math.round(Math.abs(Math.atan2(dy, dz) * (180 / Math.PI)));
+            const horizAngleDeg = Math.round(Math.abs(Math.atan2(dx, dz) * (180 / Math.PI)));
+
+            const radialPenalty = Math.hypot(dx / 9, (seat.rowIndex - currentAudi.rows.length * 0.5) / 4);
+            const audioScore = Math.max(76, Math.min(99, Math.round(100 - radialPenalty * 13)));
+
+            document.getElementById('metric-seat-title').textContent = `Row ${seat.row} • Seat ${seat.num}`;
+            document.getElementById('metric-seat-price').textContent = `₹${seat.price}`;
+            document.getElementById('metric-seat-price-value').textContent = `₹${seat.price}`;
+            document.getElementById('metric-tier-badge').textContent = seat.tier;
+
+            document.getElementById('metric-seat-subtitle').textContent =
+                seat.isRecliner ? 'Recliner · your view' : (seat.isVIP ? 'VIP · your view' : 'Standard · your view');
+            document.getElementById('metric-tier-badge').textContent = seat.isVIP ? 'VIP' : (seat.isRecliner ? 'RECLINER' : 'SEAT');
+
+            document.getElementById('metric-distance').textContent = `${distMeters.toFixed(1)} m`;
+            const distDesc = document.getElementById('metric-distance-desc');
+            if (distMeters < 10.5) {
+                distDesc.textContent = 'Near screen (estimated)';
+                distDesc.className = 'text-[10px] text-amber-400 font-medium';
+            } else if (distMeters <= 18.5) {
+                distDesc.textContent = 'Mid-room (estimated)';
+                distDesc.className = 'text-[10px] text-emerald-400 font-medium';
+            } else {
+                distDesc.textContent = 'Far from screen (estimated)';
+                distDesc.className = 'text-[10px] text-cyan-300 font-medium';
+            }
+
+            document.getElementById('metric-angle').textContent = `${vertAngleDeg}° V / ${horizAngleDeg}° H`;
+            const angleDesc = document.getElementById('metric-angle-desc');
+            if (vertAngleDeg <= 14 && horizAngleDeg <= 16) {
+                angleDesc.textContent = 'Small screen angle';
+                angleDesc.className = 'text-[10px] text-emerald-400 font-medium';
+            } else {
+                angleDesc.textContent = 'Larger screen angle';
+                angleDesc.className = 'text-[10px] text-amber-400 font-medium';
+            }
+
+            document.getElementById('metric-audio').textContent = `${audioScore}% Relative`;            document.getElementById('metric-audio-bar').style.width = `${audioScore}%`;
+
+            if (nearestExitObj) {
+                document.getElementById('metric-exit-dist').textContent = `${nearestExitObj.dist} m (${nearestExitObj.exit.side})`;
+                document.getElementById('metric-exit-name').textContent = `${nearestExitObj.exit.shortName} • Tap to Look`;
+                document.getElementById('dock-exit-readout').textContent = `🚪 ${nearestExitObj.exit.shortName}: ${nearestExitObj.dist}m (${nearestExitObj.exit.side})`;
+            }
+
+            // Update Bottom Dock
+            document.getElementById('dock-seat-code').textContent = seat.id;
+            document.getElementById('dock-seat-tier').textContent = seat.isRecliner ? 'RECLINER' : (seat.isVIP ? 'VIP' : 'EXEC');
+
+            tryHighlightSeatIn3D(seat.id);
+
+            updateReserveButtonAndCartUI();
+        }
+
+        function toggleCurrentSeatReservation() {
+            const seat = seatRegistry.get(activePOVSeatId);
+            if (!seat || seat.isOccupied) return;
+            window.parent.postMessage({ type: 'cinewave:toggle-seat', seatId: seat.id }, location.origin);
+        }
+
+        function updateReserveButtonAndCartUI() {
+            const seat = seatRegistry.get(activePOVSeatId);
+            const btn = document.getElementById('btn-toggle-reserve');
+            if (seat && btn) {
+                const inCart = selectedSeats.has(seat.id);
+                if (seat.isOccupied) {
+                    btn.innerHTML = `<i class="fa-solid fa-ban"></i><span>Seat ${seat.id} is Sold — Hop to Next Seat</span>`;
+                    btn.className = "w-full py-2.5 rounded-xl font-display font-bold text-xs text-rose-300 bg-rose-950/60 border border-rose-700/50 cursor-not-allowed flex items-center justify-center gap-2";
+                } else if (inCart) {
+                    btn.innerHTML = `<i class="fa-solid fa-circle-check"></i><span>Seat ${seat.id} in Cart (₹${seat.price}) • Click to Remove</span>`;
+                    btn.className = "w-full py-2.5 rounded-xl font-display font-bold text-xs text-white bg-emerald-600 hover:bg-emerald-500 transition shadow-[0_0_15px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2";
+                } else {
+                    btn.innerHTML = `<i class="fa-solid fa-plus-circle"></i><span>+ Add Seat ${seat.id} to Cart (₹${seat.price})</span>`;
+                    btn.className = "w-full py-2.5 rounded-xl font-display font-bold text-xs text-slate-950 bg-gradient-to-r from-[#C9A84C] via-amber-300 to-amber-500 hover:brightness-110 transition shadow-[0_0_20px_rgba(201,168,76,0.4)] flex items-center justify-center gap-2";
+                }
+            }
+
+            const seatsArr = Array.from(selectedSeats);
+            const totalINR = seatsArr.reduce((sum, id) => sum + (seatRegistry.get(id)?.price || 200), 0);
+            document.getElementById('dock-cart-count').textContent = seatsArr.length;
+            document.getElementById('dock-cart-total').textContent = `₹${totalINR}`;
+            const checkoutButton = document.getElementById('btn-book-selected');
+            if (checkoutButton) checkoutButton.disabled = seatsArr.length === 0;
+        }
+
+        /********************************************************************
+         * 9. VIZAG AUDITORIUM SWITCHER (PARAMETRIC REBUILD)
+         ********************************************************************/
+        function loadVizagAuditorium(audiKey) {
+            currentAudiKey = 'project';
+            document.getElementById('active-theater-sub').textContent = currentAudi.sub;
+
+            const defaultSeatId = currentAudi.defaultSeat;
+            const match = defaultSeatId.match(/^(.*?)(\d+)$/);
+            if (!match) return;
+            const midRow = match[1];
+            const midCol = Number(match[2]);
+
+            selectedSeats.clear();
+            activePOVSeatId = defaultSeatId;
+            activeRowIdx = currentAudi.rows.indexOf(midRow);
+            activeColNum = midCol;
+
+            buildParametricAuditorium(currentAudi);
+            selectAndFlyToSeat(midRow, midCol, false);
+            // Start from a stable elevated rear view looking directly at this
+            // auditorium's own screen; seat POV remains available on demand.
+            setCameraMode('overview');
+        }
+
+        function receiveProjectSelectionState(message) {
+            selectedSeats = new Set((message.selectedSeats || []).filter(seatId => {
+                const seat = seatRegistry.get(seatId);
+                return seat && !seat.isOccupied;
+            }));
+            refreshAllSeatMaterials();
+            render2DMinimap();
+            if (message.activeSeat && seatRegistry.has(message.activeSeat)) {
+                const active = seatRegistry.get(message.activeSeat);
+                activePOVSeatId = active.id;
+                if (cameraMode === 'seat') {
+                    selectAndFlyToSeat(active.row, active.num, false);
+                } else {
+                    // Keep an overview or camera preset steady while the parent
+                    // synchronizes the seat selection and price state.
+                    updateSeatTelemetryUI(active);
+                    refreshAllSeatMaterials();
+                    render2DMinimap();
+                }
+            } else {
+                updateReserveButtonAndCartUI();
+            }
+        }
+
+        window.addEventListener('message', event => {
+            if (event.origin !== location.origin || event.source !== window.parent) return;
+            if (event.data?.type === 'cinewave:init' || event.data?.type === 'cinewave:selection-state') {
+                receiveProjectSelectionState(event.data);
+            } else if (event.data?.type === 'cinewave:camera-preset') {
+                setCameraPreset(event.data.preset);
+            }
+        });
+
+        /********************************************************************
+         * 10. POINTER 360° DRAG, 3D SEAT RAYCASTING & KEYBOARD SHORTCUTS
+         ********************************************************************/
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        let isDragging = false;
+        let dragDistance = 0;
+        let prevPointer = { x: 0, y: 0 };
+        const tooltipEl = document.getElementById('seat-tooltip');
+
+        // Resolve the first seat mesh hit into a seat id (deduplicates the 5 seat meshes).
+        function seatIdFromHit(hit) {
+            if (!hit) return null;
+            const id = hit.object.userData && hit.object.userData.seatId;
+            if (!id) return null;
+            const seat = seatRegistry.get(id);
+            return seat ? id : null;
+        }
+
+        function currentHoverSeatId() {
+            pointer.x = (pointer.lastX / window.innerWidth) * 2 - 1;
+            pointer.y = -(pointer.lastY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(interactiveSeatMeshes, false);
+            if (hits.length === 0) return null;
+            const id = seatIdFromHit(hits[0]);
+            return id;
+        }
+
+        container.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            dragDistance = 0;
+            prevPointer = { x: e.clientX, y: e.clientY };
+            pointer.lastX = e.clientX;
+            pointer.lastY = e.clientY;
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            pointer.lastX = e.clientX;
+            pointer.lastY = e.clientY;
+
+            if (isDragging) {
+                const dx = e.clientX - prevPointer.x;
+                const dy = e.clientY - prevPointer.y;
+                dragDistance += Math.hypot(dx, dy);
+                prevPointer = { x: e.clientX, y: e.clientY };
+
+                const sensitivity = 0.0045;
+                targetYawOffset -= dx * sensitivity;
+                targetPitchOffset -= dy * sensitivity;
+                targetPitchOffset = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, targetPitchOffset));
+
+                document.getElementById('look-hint').style.opacity = '0';
+                tooltipEl.classList.add('hidden');
+                hideHoverPreview();
+                return;
+            }
+
+            // Hover preview (no commit): show a tooltip + 3D ring after a short stillness.
+            handlePointerHover(e.clientX, e.clientY);
+        });
+
+        function handlePointerHover(clientX, clientY) {
+            pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+
+            const hits = raycaster.intersectObjects(interactiveSeatMeshes, false);
+            const hitSeatId = hits.length > 0 ? seatIdFromHit(hits[0]) : null;
+            const seat = hitSeatId ? seatRegistry.get(hitSeatId) : null;
+
+            if (seat) {
+                container.style.cursor = seat.isOccupied ? 'not-allowed' : 'pointer';
+                tooltipEl.style.left = `${clientX}px`;
+                tooltipEl.style.top = `${clientY}px`;
+                document.getElementById('tooltip-title').textContent = `Row ${seat.row} • Seat ${seat.num}`;
+                const badgeEl = document.getElementById('tooltip-badge');
+                badgeEl.textContent = seat.isOccupied ? 'SOLD' : seat.tier;
+                document.getElementById('tooltip-sub').textContent = seat.isOccupied
+                    ? 'Seat already booked'
+                    : `₹${seat.price} • Hover to preview • Click or tap to view and select this seat`;
+
+                // Lock the tooltip to a screen edge when it would cover the seat.
+                anchorTooltipToEdge(clientX, clientY);
+
+                // Show a non-committing hover preview of this seat's POV info.
+                if (!seat.isOccupied) {
+                    showHoverTelemetryPreview(seat);
+                }
+
+                if (!seat.isOccupied) {
+                    scheduleHoverPreview(seat, clientX, clientY);
+                } else {
+                    hideHoverPreview();
+                }
+                tooltipEl.classList.remove('hidden');
+                return;
+            }
+
+            // Pointer is over the background: keep a short echo of this seat's
+            // readout as the active preview, without committing a selection.
+            if (activePOVSeatId) {
+                const active = seatRegistry.get(activePOVSeatId);
+                if (active && !active.isOccupied) {
+                    clearTimeout(hoverTelemetryTimer);
+                    document.getElementById('metric-seat-title').textContent = `Row ${active.row} • Seat ${active.num}`;
+                    document.getElementById('metric-seat-price').textContent = `₹${active.price}`;
+                    document.getElementById('metric-tier-badge').textContent = active.tier.toUpperCase() === 'STANDARD' ? 'SEAT PREVIEW' : active.tier.toUpperCase();
+                    document.getElementById('metric-seat-subtitle').textContent =
+                        active.isRecliner ? 'Recliner · preview' : (active.isVIP ? 'VIP · preview' : 'Standard · preview');
+
+                    const distMeters = active.eyePos.distanceTo(screenCenterTarget);
+                    const dx = active.eyePos.x - screenCenterTarget.x;
+                    const dy = screenCenterTarget.y - active.eyePos.y;
+                    const dz = Math.abs(active.eyePos.z - screenCenterTarget.z);
+                    const vertAngleDeg = Math.round(Math.abs(Math.atan2(dy, dz) * (180 / Math.PI)));
+                    const horizAngleDeg = Math.round(Math.abs(Math.atan2(dx, dz) * (180 / Math.PI)));
+                    const radialPenalty = Math.hypot(dx / 9, (active.rowIndex - currentAudi.rows.length * 0.5) / 4);
+                    const audioScore = Math.max(76, Math.min(99, Math.round(100 - radialPenalty * 13)));
+
+                    document.getElementById('metric-distance').textContent = `${distMeters.toFixed(1)} m`;
+                    const distDesc = document.getElementById('metric-distance-desc');
+                    if (distMeters < 10.5) {
+                        distDesc.textContent = 'Near screen (estimated)';
+                        distDesc.className = 'text-[10px] text-amber-400 font-medium';
+                    } else if (distMeters <= 18.5) {
+                        distDesc.textContent = 'Mid-room (estimated)';
+                        distDesc.className = 'text-[10px] text-emerald-400 font-medium';
+                    } else {
+                        distDesc.textContent = 'Far from screen (estimated)';
+                        distDesc.className = 'text-[10px] text-cyan-300 font-medium';
+                    }
+
+                    document.getElementById('metric-angle').textContent = `${vertAngleDeg}° V / ${horizAngleDeg}° H`;
+                    const angleDesc = document.getElementById('metric-angle-desc');
+                    if (vertAngleDeg <= 14 && horizAngleDeg <= 16) {
+                        angleDesc.textContent = 'Small screen angle';
+                        angleDesc.className = 'text-[10px] text-emerald-400 font-medium';
+                    } else {
+                        angleDesc.textContent = 'Larger screen angle';
+                        angleDesc.className = 'text-[10px] text-amber-400 font-medium';
+                    }
+
+                    document.getElementById('metric-audio').textContent = `${audioScore}% Relative`;
+                    document.getElementById('metric-audio-bar').style.width = `${audioScore}%`;
+                    tryHighlightSeatIn3D(active.id);
+                }
+            }
+
+            container.style.cursor = isDragging ? 'grabbing' : 'grab';
+            tooltipEl.classList.add('hidden');
+            hideHoverPreview();
+        }
+
+        function anchorTooltipToEdge(clientX, clientY) {
+            const pad = 14;
+            const tw = tooltipEl.offsetWidth || 220;
+            const th = tooltipEl.offsetHeight || 70;
+            const right = window.innerWidth - pad;
+            const bottom = window.innerHeight - pad;
+            const fitsRight = clientX + tw / 2 < right;
+            const fitsBelow = clientY + th + pad < bottom;
+
+            if (!fitsRight && !fitsBelow) {
+                tooltipEl.style.transform = 'translate(-100%, -100%)';
+                tooltipEl.style.left = `${clientX - tw - 8}px`;
+                tooltipEl.style.top = `${clientY - th - 8}px`;
+                return;
+            }
+            if (!fitsRight) {
+                tooltipEl.style.transform = 'translate(-100%, -50%)';
+                tooltipEl.style.left = `${clientX - tw - 8}px`;
+                tooltipEl.style.top = `${clientY}px`;
+                return;
+            }
+            if (!fitsBelow) {
+                tooltipEl.style.transform = 'translate(-50%, -100%)';
+                tooltipEl.style.left = `${clientX}px`;
+                tooltipEl.style.top = `${clientY - th - 8}px`;
+                return;
+            }
+            tooltipEl.style.transform = 'translate(-50%, -100%)';
+            tooltipEl.style.left = `${clientX}px`;
+            tooltipEl.style.top = `${clientY - 14}px`;
+        }
+
+        let hoverTelemetryTimer = null;
+        const HOVER_PREVIEW_ECHO_MS = 350;
+        let hoverEchoTimer = null;
+
+        const defaultMetricSeatTitle = 'Choose a seat';
+        const defaultMetricSeatPrice = '—';
+
+        function showHoverTelemetryPreview(seat) {
+            clearTimeout(hoverTelemetryTimer);
+            // Show this seat's estimate in the metrics panel as a preview, without changing
+            // the committed active POV seat or the cart.
+            if (activePOVSeatId !== seat.id) {
+                document.getElementById('metric-seat-title').textContent = `Row ${seat.row} • Seat ${seat.num}`;
+                document.getElementById('metric-seat-price').textContent = `₹${seat.price}`;
+                document.getElementById('metric-tier-badge').textContent = seat.tier;
+                document.getElementById('metric-seat-subtitle').textContent =
+                    seat.isRecliner ? 'Recliner · preview' : (seat.isVIP ? 'VIP · preview' : 'Standard · preview');
+
+                const distMeters = seat.eyePos.distanceTo(screenCenterTarget);
+                const dx = seat.eyePos.x - screenCenterTarget.x;
+                const dy = screenCenterTarget.y - seat.eyePos.y;
+                const dz = Math.abs(seat.eyePos.z - screenCenterTarget.z);
+                const vertAngleDeg = Math.round(Math.abs(Math.atan2(dy, dz) * (180 / Math.PI)));
+                const horizAngleDeg = Math.round(Math.abs(Math.atan2(dx, dz) * (180 / Math.PI)));
+                const radialPenalty = Math.hypot(dx / 9, (seat.rowIndex - currentAudi.rows.length * 0.5) / 4);
+                const audioScore = Math.max(76, Math.min(99, Math.round(100 - radialPenalty * 13)));
+
+                document.getElementById('metric-distance').textContent = `${distMeters.toFixed(1)} m`;
+                const distDesc = document.getElementById('metric-distance-desc');
+                if (distMeters < 10.5) {
+                    distDesc.textContent = 'Near screen (estimated)';
+                    distDesc.className = 'text-[10px] text-amber-400 font-medium';
+                } else if (distMeters <= 18.5) {
+                    distDesc.textContent = 'Mid-room (estimated)';
+                    distDesc.className = 'text-[10px] text-emerald-400 font-medium';
+                } else {
+                    distDesc.textContent = 'Far from screen (estimated)';
+                    distDesc.className = 'text-[10px] text-cyan-300 font-medium';
+                }
+
+                document.getElementById('metric-angle').textContent = `${vertAngleDeg}° V / ${horizAngleDeg}° H`;
+                const angleDesc = document.getElementById('metric-angle-desc');
+                if (vertAngleDeg <= 14 && horizAngleDeg <= 16) {
+                    angleDesc.textContent = 'Small screen angle';
+                    angleDesc.className = 'text-[10px] text-emerald-400 font-medium';
+                } else {
+                    angleDesc.textContent = 'Larger screen angle';
+                    angleDesc.className = 'text-[10px] text-amber-400 font-medium';
+                }
+
+                document.getElementById('metric-audio').textContent = `${audioScore}% Relative`;
+                document.getElementById('metric-audio-bar').style.width = `${audioScore}%`;
+
+                tryHighlightSeatIn3D(seat.id);
+            }
+
+            clearTimeout(hoverEchoTimer);
+            hoverEchoTimer = setTimeout(() => {
+                const active = seatRegistry.get(activePOVSeatId);
+                if (active) {
+                    const same = active.id === seat.id;
+                    document.getElementById('metric-seat-title').textContent = same ? `Row ${active.row} • Seat ${active.num}` : defaultMetricSeatTitle;
+                    document.getElementById('metric-seat-price').textContent = same ? `₹${active.price}` : defaultMetricSeatPrice;
+                } else {
+                    document.getElementById('metric-seat-title').textContent = defaultMetricSeatTitle;
+                    document.getElementById('metric-seat-price').textContent = defaultMetricSeatPrice;
+                }
+                tryHighlightSeatIn3D(activePOVSeatId);
+            }, HOVER_PREVIEW_ECHO_MS);
+        }
+
+        function scheduleHoverPreview(seat, clientX, clientY) {
+            hoverPreviewSeatId = seat.id;
+            clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(() => {
+                if (hoverPreviewSeatId !== seat.id) return;
+                showHoverPreview(seat, clientX, clientY);
+            }, HOVER_PREVIEW_DELAY);
+        }
+
+        function showHoverPreview(seat, clientX, clientY) {
+            if (hoverPreviewActive && hoverPreviewSeatId === seat.id) return;
+            hoverPreviewActive = true;
+            hoveredSeatId = seat.id;
+
+            // Lift and gently glow the hovered seat cushion group.
+            seat.group.userData.hoverElevation = 0.06;
+
+            // Place the glow ring just above the hovered seat.
+            hoverRing.position.set(0, 0, 0);
+            hoverRing.position.copy(seat.group.position);
+            hoverRing.position.y += 0.06;
+            hoverRing.lookAt(camera.position);
+            ringMat.opacity = 0.0;
+            hoverRing.userData.targetOpacity = 0.9;
+            hoverRing.userData.seatId = seat.id;
+        }
+
+        function hideHoverPreview() {
+            if (!hoverPreviewActive) return;
+            hoverPreviewActive = false;
+            if (hoveredSeatId && seatRegistry.has(hoveredSeatId)) {
+                const s = seatRegistry.get(hoveredSeatId);
+                if (s.group) s.group.userData.hoverElevation = 0;
+            }
+            hoveredSeatId = null;
+            hoverPreviewSeatId = null;
+            clearTimeout(hoverTimer);
+            ringMat.opacity = 0.0;
+            clearTimeout(hoverTelemetryTimer);
+            clearTimeout(hoverEchoTimer);
+            // Restore the committed active-POV readout once the hover leaves.
+            const active = seatRegistry.get(activePOVSeatId);
+            if (active) updateSeatTelemetryUI(active);
+            else resetTelemetryToEmpty();
+        }
+
+        function resetTelemetryToEmpty() {
+            document.getElementById('metric-seat-title').textContent = 'Choose a seat';
+            document.getElementById('metric-seat-price').textContent = '—';
+            document.getElementById('metric-tier-badge').textContent = activePOVSeatId ? 'SEAT SELECTED' : 'CHOOSE SEAT';
+            document.getElementById('metric-seat-subtitle').textContent = 'Seat view information';
+            document.getElementById('metric-distance').textContent = '—';
+            document.getElementById('metric-distance-desc').textContent = 'From screen';
+            document.getElementById('metric-distance-desc').className = 'text-[10px] text-emerald-400 font-medium';
+            document.getElementById('metric-angle').textContent = '—';
+            document.getElementById('metric-angle-desc').textContent = 'Viewing angle';
+            document.getElementById('metric-angle-desc').className = 'text-[10px] text-emerald-400 font-medium';
+            document.getElementById('metric-audio').textContent = '—';
+            document.getElementById('metric-audio-bar').style.width = '0%';
+            document.getElementById('metric-exit-dist').textContent = '—';
+            document.getElementById('metric-exit-name').textContent = 'Select a seat to check';
+            document.getElementById('dock-seat-code').textContent = '—';
+            document.getElementById('dock-seat-tier').textContent = '—';
+        }
+
+        window.addEventListener('pointerup', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+
+            if (dragDistance < 6 && e.target === renderer.domElement) {
+                // Tap-to-select in 3D: commit the hovered seat if there is one.
+                const hitSeatId = currentHoverSeatId();
+                if (hitSeatId) {
+                    const seat = seatRegistry.get(hitSeatId);
+                    if (seat) selectAndFlyToSeat(seat.row, seat.num, true);
+                    return;
+                }
+
+                // Otherwise re-run hover detection at the up position (single-click edge case).
+                pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+                pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(pointer, camera);
+                const hits = raycaster.intersectObjects(interactiveSeatMeshes, false);
+                if (hits.length > 0) {
+                    const seatId = seatIdFromHit(hits[0]);
+                    const seat = seatId ? seatRegistry.get(seatId) : null;
+                    if (seat) selectAndFlyToSeat(seat.row, seat.num, true);
+                }
+            }
+            hideHoverPreview();
+        });
+
+        // Keyboard Arrow Keys Support for Side-Seat & Row Hopping
+        window.addEventListener('keydown', (e) => {
+            if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+            if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSeat(0, -1); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); stepSeat(0, 1); }
+            if (e.key === 'ArrowUp')    { e.preventDefault(); stepSeat(1, 0); }
+            if (e.key === 'ArrowDown')  { e.preventDefault(); stepSeat(-1, 0); }
+        });
+
+        /********************************************************************
+         * 11. UI CONTROLS: FOV, VR STEREO, HOUSE LIGHTS, MODALS
+         ********************************************************************/
+        function updateFOV(val) {
+            const numVal = parseFloat(val);
+            camera.fov = numVal;
+            camera.updateProjectionMatrix();
+            document.getElementById('fov-label').textContent = `${numVal}°`;
+        }
+
+        function toggleVRStereo() {
+            isVRStereo = !isVRStereo;
+            document.getElementById('vr-stereo-overlay').classList.toggle('active', isVRStereo);
+            document.getElementById('btn-vr-stereo').classList.toggle('active', isVRStereo);
+            if (!isVRStereo) {
+                renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+                renderer.setScissorTest(false);
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+            }
+        }
+
+        function cycleHouseLights() {
+            const modes = ['movie', 'preshow', 'house'];
+            lightingMode = modes[(modes.indexOf(lightingMode) + 1) % modes.length];
+            const labelEl = document.getElementById('lights-label');
+            if (lightingMode === 'movie') {
+                houseLight.intensity = 0.0;
+                ambientLight.intensity = 0.75;
+                if (labelEl) labelEl.textContent = 'Showtime';
+            } else if (lightingMode === 'preshow') {
+                houseLight.intensity = 0.45;
+                ambientLight.intensity = 1.05;
+                if (labelEl) labelEl.textContent = 'Preshow';
+            } else {
+                houseLight.intensity = 1.25;
+                ambientLight.intensity = 1.5;
+                if (labelEl) labelEl.textContent = 'House On';
+            }
+        }
+
+        function switchScreenContent(channel) {
+            if (channel === 'custom') {
+                document.getElementById('custom-video-modal').classList.remove('hidden');
+                document.getElementById('custom-video-modal').classList.add('flex');
+                return;
+            }
+            screenChannel = channel;
+            customVideoEl.pause();
+        }
+
+        function closeCustomVideoModal() {
+            document.getElementById('custom-video-modal').classList.add('hidden');
+            document.getElementById('custom-video-modal').classList.remove('flex');
+        }
+
+        function applyCustomVideoUrl() {
+            const url = document.getElementById('custom-video-input').value.trim();
+            if (url) {
+                customVideoEl.src = url;
+                customVideoEl.play().catch(() => {});
+                screenChannel = 'custom';
+            }
+            closeCustomVideoModal();
+        }
+
+        let seatDetailsCollapsed = false;
+        function toggleSeatDetailsCollapse() {
+            seatDetailsCollapsed = !seatDetailsCollapsed;
+            const panel = document.getElementById('metrics-panel');
+            panel.classList.toggle('details-collapsed', seatDetailsCollapsed);
+            const button = document.getElementById('seat-details-toggle');
+            button.setAttribute('aria-expanded', String(!seatDetailsCollapsed));
+            button.title = seatDetailsCollapsed ? 'Expand seat details' : 'Collapse seat details';
+            document.getElementById('seat-details-toggle-icon').className =
+                seatDetailsCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+        }
+
+        let minimapCollapsed = false;
+        function toggleMinimapCollapse() {
+            minimapCollapsed = !minimapCollapsed;
+            document.getElementById('minimap-body').classList.toggle('hidden', minimapCollapsed);
+            document.getElementById('minimap-toggle-icon').className =
+                minimapCollapsed ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+        }
+
+        function openBookingConfirmation() {
+            window.parent.postMessage({ type: 'cinewave:checkout' }, location.origin);
+        }
+
+        function closeBookingConfirmation() {
+            const modal = document.getElementById('booking-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function completeBookingToast() {
+            closeBookingConfirmation();
+            const toast = document.getElementById('toast-banner');
+            document.getElementById('toast-text').textContent =
+                `E-Ticket Issued for Seat(s) ${Array.from(selectedSeats).join(', ')} at ${currentAudi.name}!`;
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('flex');
+            }, 4200);
+        }
+
+        /********************************************************************
+         * 12. 60FPS ANIMATION LOOP & VR STEREO RENDERING PIPELINE
+         ********************************************************************/
+        const clock = new THREE.Clock();
+        const eulerRot = new THREE.Euler(0, 0, 0, 'YXZ');
+        const quatBase = new THREE.Quaternion();
+        const quatOffset = new THREE.Quaternion();
+        const dummyCam = new THREE.Object3D();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.05);
+            const elapsed = clock.elapsedTime;
+            const cameraBlend = 1 - Math.exp(-6 * delta);
+            const rotationBlend = 1 - Math.exp(-8 * delta);
+
+            // 1. Update Live Blockbuster Movie Screen Canvas & Ambilight
+            renderDynamicScreenCanvas(elapsed);
+
+            // 2. Pulse 3D Green Floor Egress Beacon Nodes toward Nearest Exit
+            egressNodes.forEach((node, idx) => {
+                const wave = Math.sin(elapsed * 5.0 - idx * 0.7) * 0.5 + 0.5;
+                node.scale.setScalar(0.75 + wave * 0.65);
+            });
+
+            // 3. Subtle Projector Dust Drift
+            if (dustParticles) {
+                dustParticles.rotation.y = Math.sin(elapsed * 0.15) * 0.04;
+            }
+
+            // 3.1 Hover preview ring slow fade per frame (smooths out timer-based pop-ins).
+            updateHoverRingAndSelectedOutline();
+
+            // 3.2 Gentle per-frame hover lift so the hovered seat settles back cleanly.
+            applyHoverLiftEachFrame();
+
+            // 4. Smoothly Interpolate Camera Position & Look Target (Screen or Exit Door)
+            camera.position.lerp(cameraTargetPos, cameraBlend);
+            currentLookAtTarget.lerp(desiredLookAtTarget, cameraBlend);
+
+            yawOffset += (targetYawOffset - yawOffset) * rotationBlend;
+            pitchOffset += (targetPitchOffset - pitchOffset) * rotationBlend;
+
+            dummyCam.position.copy(camera.position);
+            dummyCam.lookAt(currentLookAtTarget);
+            quatBase.copy(dummyCam.quaternion);
+
+            eulerRot.set(pitchOffset, yawOffset, 0, 'YXZ');
+            quatOffset.setFromEuler(eulerRot);
+            camera.quaternion.copy(quatBase).multiply(quatOffset);
+
+            // 5. Render Scene (Single View or VR Cardboard Stereo Split-Screen)
+            if (!isVRStereo) {
+                renderer.render(scene, camera);
+            } else {
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                const halfW = w / 2;
+
+                camera.aspect = halfW / h;
+                camera.updateProjectionMatrix();
+                renderer.setScissorTest(true);
+
+                renderer.setViewport(0, 0, halfW, h);
+                renderer.setScissor(0, 0, halfW, h);
+                camera.translateX(-0.032);
+                renderer.render(scene, camera);
+
+                renderer.setViewport(halfW, 0, halfW, h);
+                renderer.setScissor(halfW, 0, halfW, h);
+                camera.translateX(0.064);
+                renderer.render(scene, camera);
+
+                camera.translateX(-0.032);
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            renderer.setSize(w, h);
+            camera.aspect = (isVRStereo ? w / 2 : w) / h;
+            camera.updateProjectionMatrix();
+        });
+
+        // Kick off the 3D seat preview immediately. The external libraries targeted by this
+        // file (Tailwind CDN, THREE r128, Font Awesome) are normal-network scripts; when a
+        // browser blocks those network requests (common on restricted/walled-garden networks),
+        // the page will still render its shell and report a clear setup status instead of a
+        // blank screen. On a normal network the onload path runs the scene immediately.
+        (function bootPreview() {
+            if (typeof THREE === 'undefined' || typeof buildParametricAuditorium === 'undefined') {
+                // Retry each frame until the expected symbols exist, then build the scene once.
+                let guard = 0;
+                const attempt = () => {
+                    if (typeof THREE !== 'undefined' && typeof buildParametricAuditorium !== 'undefined') {
+                        loadVizagAuditorium('project');
+                        camera.position.copy(cameraTargetPos);
+                        animate();
+                        return;
+                    }
+                    if (++guard > 120) {
+                        showNetworkSetupWarning();
+                        return;
+                    }
+                    requestAnimationFrame(attempt);
+                };
+                attempt();
+                return;
+            }
+            loadVizagAuditorium('project');
+            camera.position.copy(cameraTargetPos);
+            animate();
+        })();
+        // Also attempt immediately so the page doesn't wait for the window load event.
+        // Start the 3D preview now if the symbols are already available. If not, keep
+        // retrying each animation frame (and also listen for the window load event) until
+        // they arrive or we time out and show a clear network/script-blocker notice.
+        function tryBootNow() { /* noop placeholder */ }
+        // Start the scene now if the required symbols are already on the page. If not, keep
+        // retrying each animation frame (and also listen for window load) until they arrive or
+        // we time out and show a clear network / script-blocker notice instead of a blank view.
+        function bootIfReady() {
+            if (typeof THREE === 'undefined' || typeof buildParametricAuditorium === 'undefined') return false;
+            bootPreview();
+            return true;
+        }
+        if (!bootIfReady()) {
+            let guard = 0;
+            const attempt = () => {
+                if (bootIfReady()) return;
+                if (++guard > 120) {
+                    showNetworkSetupWarning();
+                    return;
+                }
+                requestAnimationFrame(attempt);
+            };
+            attempt();
+            window.addEventListener('load', () => bootIfReady());
+        // Also run immediately once more in case the load event already fired before this block.
+        bootIfReady();
+        }
+
+        function showNetworkSetupWarning() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            const warn = document.createElement('div');
+            warn.id = 'preview-network-warning';
+            warn.className =
+                'absolute inset-0 z-50 flex items-center justify-center text-center p-6 pointer-events-none';
+            warn.innerHTML =
+                '<div class="max-w-md">' +
+                '<div class="text-4xl mb-3">🎬</div>' +
+                '<div class="text-white text-xl font-display font-bold mb-2">CineWave 3D preview could not start</div>' +
+                '<div class="text-slate-400 text-sm leading-relaxed mb-4">This screen needs the Tailwind and Three.js network scripts to render the 3D seat view. If you are on a restricted network or a browser that blocks external scripts, the page shell still loaded fine — only the 3D view is blocked.</div>' +
+                '<div class="text-slate-500 text-xs">Try: open on a normal network, disable script blockers for this site, or use the 2D seat map if available.</div>' +
+                '</div>';
+            container.appendChild(warn);
+        }
+    </script>
+</body>
+</html>

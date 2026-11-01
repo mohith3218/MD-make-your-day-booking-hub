@@ -33,6 +33,10 @@ CONVENIENCE_FEE_PER_SEAT = 20.0     # what BookMyShow calls "internet handling"
 GST_RATE = 0.18                     # 18% GST, charged on the convenience fee
 
 
+class PaymentGatewayError(RuntimeError):
+    """A configured live gateway could not create an order safely."""
+
+
 def is_live_gateway() -> bool:
     """True when real Razorpay keys are configured."""
     return bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET)
@@ -63,7 +67,12 @@ def create_order(amount_rupees: float, receipt: str, notes: dict | None = None) 
       {"order_id", "amount_paise", "currency", "gateway", "key_id"}
     Razorpay works in paise, so every amount is multiplied by 100.
     """
-    amount_paise = int(round(float(amount_rupees) * 100))
+    amount_rupees = float(amount_rupees)
+    if not amount_rupees > 0:
+        raise ValueError("Payment amount must be greater than zero.")
+    amount_paise = int(round(amount_rupees * 100))
+    if amount_paise <= 0:
+        raise ValueError("Payment amount is below the minimum supported amount.")
 
     if is_live_gateway():
         try:
@@ -80,7 +89,10 @@ def create_order(amount_rupees: float, receipt: str, notes: dict | None = None) 
                     "currency": "INR", "gateway": "razorpay",
                     "key_id": RAZORPAY_KEY_ID, "raw": json.dumps(order)}
         except Exception as exc:                       # keys wrong / lib missing / no net
-            print(f"[payments] Razorpay order failed ({exc}); using mock mode")
+            # Never silently turn a failed live payment into a free sandbox payment.
+            raise PaymentGatewayError(
+                "Razorpay could not create a payment order. Please retry later."
+            ) from exc
 
     # ---- mock order -------------------------------------------------------
     return {"order_id": f"order_mock_{secrets.token_hex(8)}",

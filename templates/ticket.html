@@ -11,6 +11,13 @@
       </div>
       <h1 class="text-xl font-bold text-white">Booking confirmed</h1>
       <p class="text-xs text-slate-400">Show this ticket at the entrance.</p>
+      {% if booking.ticket_email_sent_at %}
+        <p class="text-xs text-emerald-400">E-ticket emailed to {{ booking.user.email }}.</p>
+      {% elif booking.ticket_email_error %}
+        <p class="text-xs text-amber-400">Email delivery needs attention. Use “Resend E-Ticket” below.</p>
+      {% else %}
+        <p class="text-xs text-slate-400">Your e-ticket will be emailed after payment confirmation.</p>
+      {% endif %}
     </div>
   {% else %}
     <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs text-center">

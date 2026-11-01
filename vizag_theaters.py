@@ -1067,6 +1067,65 @@ RENAMES = {
     "Sangam Sarat Theatre": "Sangam Theatre",
 }
 
+# Public auditorium photos/reports are useful for surface appearance and seat
+# type, but rarely publish a measured plan for each screen. These profiles are
+# visual references only; the seat coordinates continue to come from each
+# screen's own layout above.
+AUDITORIUM_VISUAL_REFERENCES = {
+    "Sarat Theatre": {
+        "seat_color": "#71345f", "wall_color": "#17121b", "trim_color": "#bd9b6b",
+        "seat_style": "standard", "source": "https://in.bookmyshow.com/buytickets/sarat-theater-a-c-4k-dolby-atmos-vizag/cinema-viza-sttr-MT",
+    },
+    "AVR Saptagiri Theatre": {
+        "seat_color": "#31584b", "wall_color": "#111821", "trim_color": "#a94c5c",
+        "seat_style": "standard", "source": "https://yappe.in/andhra-pradesh/visakhapatnam/saptagiri-theatre/634399",
+    },
+    "SVC Gokul 2K": {
+        "seat_color": "#623c48", "wall_color": "#13151b", "trim_color": "#c9a84c",
+        "seat_style": "standard", "source": "https://yappe.in/andhra-pradesh/visakhapatnam/gokul-theater/634527",
+    },
+    "Globex Cinemas": {
+        "seat_color": "#a64f22", "wall_color": "#17120f", "trim_color": "#d59b52",
+        "seat_style": "recliner", "source": "https://yappe.in/andhra-pradesh/visakhapatnam/globex-cinema/634532",
+    },
+    "Sri Melody": {
+        "seat_color": "#254c75", "wall_color": "#0d1724", "trim_color": "#38a9c1",
+        "seat_style": "recliner", "source": "https://x.com/rahool360/status/1946268195947724868",
+    },
+    "Cinepolis Sreekanya Cineglitz": {
+        "seat_color": "#3e604b", "wall_color": "#111a17", "trim_color": "#71bf83",
+        "seat_style": "standard", "source": "https://yappe.in/andhra-pradesh/visakhapatnam/cinepolis-sree-kanya/287464",
+    },
+    "Mukta A2 Cinemas": {
+        "seat_color": "#572d2d", "wall_color": "#171313", "trim_color": "#c18b68",
+        "seat_style": "recliner", "source": "https://www.moneycontrol.com/entertainment/mukta-a2-cinemas-reopens-in-vizag-after-stunning-makeover-deets-inside-article-12982879.html",
+    },
+}
+
+
+def _attach_auditorium_visual(layout, theater_name, screen_type):
+    """Attach evidence-based room styling while retaining screen seat geometry."""
+    profile = AUDITORIUM_VISUAL_REFERENCES.get(theater_name)
+    if profile:
+        layout["visual"] = {**profile, "verified_at_theater_level": True}
+        return
+
+    # For screens without a venue photo, use conservative styling inferred
+    # from their listed seating classes. This is explicitly marked as a model.
+    classes = layout.get("classes", [])
+    has_recliners = any("reclin" in str(c.get("name", "")).lower() or
+                        "reclin" in str(c.get("code", "")).lower()
+                        for c in classes)
+    premium = any(any(word in str(c.get("name", "")).lower()
+                      for word in ("vip", "prime", "premium", "lounge"))
+                  for c in classes)
+    layout["visual"] = {
+        "seat_color": "#31594d" if has_recliners else ("#72533a" if premium else "#51252d"),
+        "wall_color": "#11151d", "trim_color": "#c9a84c",
+        "seat_style": "recliner" if has_recliners else "standard",
+        "source": None, "verified_at_theater_level": False,
+    }
+
 
 def seed_vizag_theaters(db, Theater, Screen, verbose=True):
     """Idempotent: adds any missing Vizag theatre / screen with real seat layouts, never duplicates."""
@@ -1093,12 +1152,19 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
                 theater.address = data["address"]
 
         for screen_name, screen_type, layout in data["screens"]:
+            _attach_auditorium_visual(layout, data["name"], screen_type)
             existing = Screen.query.filter_by(theater_id=theater.id,
                                               name=screen_name).first()
             if existing:
                 if not existing.layout:
                     existing.layout = layout
                     updated_l += 1
+                else:
+                    current_layout = existing.layout
+                    if current_layout.get("visual") != layout.get("visual"):
+                        current_layout["visual"] = layout["visual"]
+                        existing.layout = current_layout
+                        updated_l += 1
                 continue
             screen = Screen(theater_id=theater.id, name=screen_name,
                             screen_type=screen_type)

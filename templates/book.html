@@ -63,7 +63,7 @@
   </div>
 </div>
 
-<!-- 👥 WATCH TOGETHER SQUAD BANNER (Active when party_code present or created) -->
+<!-- 👥 WATCH TOGETHER SQUAD BANNER -->
 <div id="party-squad-banner" class="glass-card rounded-2xl p-4 border border-purple-500/30 bg-purple-950/20 space-y-3 {% if not party_code %}hidden{% endif %}">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div class="flex items-center gap-3">
@@ -85,7 +85,6 @@
       </button>
     </div>
   </div>
-  <!-- Squad member live status bar -->
   <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-purple-900/40" id="squad-member-roster">
     <span class="text-[11px] text-slate-400 font-semibold">Squad Members:</span>
     <span class="text-xs text-purple-300 font-mono" id="squad-loading">Syncing active friends...</span>
@@ -93,7 +92,7 @@
 </div>
 
 <!-- legend -->
-<div class="flex flex-wrap items-center gap-4 text-[11px] text-slate-400">
+<div id="seat-availability-legend" class="flex flex-wrap items-center gap-4 text-[11px] text-slate-400">
   <span class="flex items-center gap-2"><span class="seat seat-avail inline-block"></span> Available</span>
   <span class="flex items-center gap-2"><span class="seat seat-sel inline-block"></span> Selected</span>
   <span class="flex items-center gap-2"><span class="seat seat-held inline-block"></span> Being booked</span>
@@ -103,7 +102,7 @@
 </div>
 
 {% if dynamic_info and dynamic_info.badge %}
-<div class="glass-card rounded-xl p-3 flex items-center justify-between border border-amber-500/20 bg-amber-500/10">
+<div id="dynamic-pricing-banner" class="glass-card rounded-xl p-3 flex items-center justify-between border border-amber-500/20 bg-amber-500/10">
   <div class="flex items-center gap-2">
     <span class="text-xs font-bold text-amber-400">{{ dynamic_info.badge }}</span>
     <span class="text-[10px] text-slate-400">· Real-time demand engine pricing active</span>
@@ -113,7 +112,7 @@
 {% endif %}
 
 <!-- 🎭 SEAT VIBE ZONE FILTER BAR -->
-<div class="glass-card rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 border border-slate-800 bg-slate-900/60">
+<div id="seat-vibe-filters" class="glass-card rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 border border-slate-800 bg-slate-900/60">
   <div class="flex items-center gap-2">
     <span class="text-xs font-bold text-slate-300">🎭 Seat Vibe Filter:</span>
     <span class="text-[10px] text-slate-500">Highlight zones</span>
@@ -141,8 +140,7 @@
 </div>
 
 <!-- 🎬 2D / 3D THEATER MAP SWITCHER & ✨ SMART SEAT SUGGESTION BAR -->
-<div class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 border border-indigo-500/30 bg-indigo-950/20">
-  <!-- 2D / 3D View Switcher -->
+<div id="seat-map-mode-controls" class="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 border border-indigo-500/30 bg-indigo-950/20">
   <div class="flex items-center gap-2">
     <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
       <span>Map View Mode:</span>
@@ -157,10 +155,10 @@
     </div>
   </div>
 
-  <!-- Smart AI Seat Suggestion Engine -->
+  <!-- Group Seat Recommendation -->
   <div class="flex flex-wrap items-center gap-2">
     <span class="text-xs font-extrabold text-amber-300 flex items-center gap-1">
-      <span>✨ Smart AI Seat Suggestion:</span>
+      <span>✨ Find seats together:</span>
     </span>
     <select id="smart-party-size" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
       <option value="1">1 Person</option>
@@ -170,7 +168,7 @@
       <option value="6">6 People (Party)</option>
     </select>
     <button type="button" onclick="suggestSmartSeats()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition shadow-lg shadow-amber-500/20 flex items-center gap-1.5">
-      <span>✨ Auto-Pick Best Seats</span>
+      <span>Find Best Seats</span>
     </button>
   </div>
 </div>
@@ -183,7 +181,7 @@
     </div>
     <div>
       <p class="text-xs font-bold text-white flex items-center gap-2">
-        <span id="insp-zone-name">Hover or click a seat to inspect POV, Vibe & Sound</span>
+        <span id="insp-zone-name">Hover or click a seat to inspect POV, Vibe, Sound & Exit Way</span>
       </p>
       <div class="flex items-center gap-2 mt-0.5 flex-wrap">
         <span class="text-[11px] text-indigo-300 font-medium" id="insp-badge">Smart Seat POV Inspector</span>
@@ -191,6 +189,8 @@
         <span class="text-[11px] text-emerald-400 font-semibold" id="insp-vibe-badge">🎭 Vibe Tag</span>
         <span class="text-[11px] text-slate-500">·</span>
         <span class="text-[11px] text-purple-400 font-semibold" id="insp-sound-profile">Dolby Atmos Spatial Audio</span>
+        <span class="text-[11px] text-slate-500">·</span>
+        <span class="text-[11px] text-emerald-300 font-bold" id="insp-exit-info">🚪 Exit: --</span>
       </div>
     </div>
   </div>
@@ -211,70 +211,66 @@
 </div>
 
 <!-- 👁️ Seat-specific viewing information -->
-<div id="seat-pov-badge" class="glass-card rounded-xl p-2.5 border border-cyan-500/20 bg-slate-950/80 shadow-lg flex items-center gap-3 text-xs hidden">
-  <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
-  <div class="min-w-0">
-    <p class="font-extrabold text-white" id="pov-badge-title">Row C Seat 8 — Prime center</p>
-    <p class="text-[10px] text-slate-400" id="pov-badge-detail">12.5m · 38° FOV · 96% Dolby Atmos</p>
+<div id="seat-pov-badge" class="glass-card rounded-xl p-2.5 border border-cyan-500/20 bg-slate-950/80 shadow-lg flex flex-wrap items-center justify-between gap-3 text-xs hidden">
+  <div class="flex items-center gap-3 min-w-0">
+    <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
+    <div class="min-w-0">
+      <p class="font-extrabold text-white" id="pov-badge-title">Row C Seat 8 — Prime center</p>
+      <p class="text-[10px] text-slate-400" id="pov-badge-detail">12.5m · 38° FOV · 96% Dolby Atmos</p>
+    </div>
+  </div>
+  <!-- Quick Inline Arrow & Exit Controls -->
+  <div class="flex items-center gap-1.5">
+    <span class="text-[10px] text-slate-400 mr-1 hidden sm:inline">Move Seat:</span>
+    <button type="button" onclick="stepVrSeat(0, -1)" title="Move to Left Side Seat" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">◀</button>
+    <button type="button" onclick="stepVrSeat(1, 0)" title="Move 1 Row Closer to Screen" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">▲</button>
+    <button type="button" onclick="stepVrSeat(-1, 0)" title="Move 1 Row Back" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">▼</button>
+    <button type="button" onclick="stepVrSeat(0, 1)" title="Move to Right Side Seat" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">▶</button>
+    <button type="button" onclick="lookAtNearestExit()" class="ml-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-[11px] flex items-center gap-1 transition">
+      <span>🏃‍♂️ Exit Way</span>
+    </button>
   </div>
 </div>
 
 <!-- 🎥 AR SEAT PREVIEW PANEL -->
-<div id="ar-preview-panel" class="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-slate-950/80 shadow-2xl">
-  <div class="flex items-center justify-between mb-3">
+<div id="ar-preview-panel" class="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-slate-950/80 shadow-2xl hidden">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
     <div class="flex items-center gap-2">
       <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
       <div>
-        <p class="text-xs font-extrabold text-white">VR Cinema Preview</p>
-        <p class="text-[10px] text-slate-400" id="ar-preview-subtitle">Hover or click any seat to preview the auditorium view</p>
+        <p class="text-xs font-extrabold text-white">3D theater preview</p>
+        <p class="text-[10px] text-slate-400" id="ar-preview-subtitle">Choose a seat to see its view in the real theater layout</p>
       </div>
     </div>
     <div class="flex items-center gap-2">
       <button type="button" onclick="open3dArModal()" class="px-2.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-[10px] font-bold text-cyan-200 flex items-center gap-1 transition">
-        <i class="fa-solid fa-expand text-[9px]"></i><span>Fullscreen VR</span>
+        <i class="fa-solid fa-expand text-[9px]"></i><span>Open full preview</span>
       </button>
-      <span class="px-2.5 py-1 rounded-full border border-amber-500/25 bg-amber-500/10 text-[9px] font-bold uppercase tracking-wider text-amber-200">Interactive 3D</span>
+      <span class="px-2.5 py-1 rounded-full border border-amber-500/25 bg-amber-500/10 text-[9px] font-bold uppercase tracking-wider text-amber-200">Live theater</span>
     </div>
   </div>
 
-  <!-- Shared theatre view renderer used by the seat preview and expanded 3D view. -->
-  <div id="ar-theater-wrapper" class="relative w-full h-[280px] sm:h-[360px] rounded-xl overflow-hidden bg-[#08090d] select-none border border-white/10 shadow-inner group">
-    <canvas id="seatPovCanvas" class="absolute inset-0 block h-full w-full cursor-grab active:cursor-grabbing" aria-label="Perspective view from the selected cinema seat"></canvas>
-    <div class="absolute left-2 top-2 flex gap-1.5 z-10">
-      <button type="button" onclick="setPovFormat('wide')" id="pov-format-wide" class="rounded-lg border border-amber-300/50 bg-black/65 px-2 py-1 text-[10px] font-bold text-amber-100">16:9 Wide</button>
-      <button type="button" onclick="setPovFormat('scope')" id="pov-format-scope" class="rounded-lg border border-white/10 bg-black/55 px-2 py-1 text-[10px] font-semibold text-slate-300">2.39:1 Scope</button>
-      <button type="button" onclick="setPovFormat('imax')" id="pov-format-imax" class="rounded-lg border border-white/10 bg-black/55 px-2 py-1 text-[10px] font-semibold text-slate-300">Curved Giant</button>
+  <!-- The booking page and fullscreen preview now share the same real 3D auditorium. -->
+  <div id="ar-theater-wrapper" class="relative w-full h-[300px] sm:h-[400px] rounded-2xl overflow-hidden bg-[#08090d] select-none border border-white/10 shadow-2xl group">
+    <iframe id="vr-inline-frame" title="Live 3D theater seat preview" data-src="{{ url_for('vr_seat_preview', showtime_id=showtime.id, embed=1) }}" class="absolute inset-0 h-full w-full border-0 bg-[#07090e]" allow="fullscreen; autoplay"></iframe>
+    <div id="inline-camera-controls" class="absolute z-20 top-3 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-1.5 rounded-2xl border border-white/10 bg-slate-950/85 p-1.5 shadow-xl backdrop-blur-md">
+      <button type="button" data-preset="overview" onclick="setInlineCamera('overview')" class="inline-camera-btn active border border-cyan-400/40 bg-cyan-500/20 px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-white">Overview</button>
+      <button type="button" data-preset="stage" onclick="setInlineCamera('stage')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">From stage</button>
+      <button type="button" data-preset="balcony" onclick="setInlineCamera('balcony')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">Balcony</button>
+      <button type="button" data-preset="birdseye" onclick="setInlineCamera('birdseye')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">Bird’s eye</button>
+      <button type="button" id="inline-tour-btn" onclick="toggleInlineTour()" class="px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-amber-300">Auto tour</button>
     </div>
-    <div class="absolute right-2 top-2 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-2 py-1 text-[10px] text-slate-300">
-      <label class="flex items-center gap-1 cursor-pointer"><input id="pov-crowd-toggle" type="checkbox" checked onchange="setPovCrowd(this.checked)" class="accent-amber-300"> Crowd</label>
-      <button type="button" onclick="cyclePovLighting()" id="pov-light-btn" class="text-amber-200 hover:text-white font-semibold">🎬 Dark</button>
+    <div class="absolute left-3 bottom-3 z-10 rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-[10px] text-slate-200 backdrop-blur-md pointer-events-none">
+      <span class="font-bold text-amber-200">Live theater view</span>
+      <span class="ml-2 text-slate-400">Click an available seat in the room to select it</span>
     </div>
-    <div class="absolute bottom-2 left-2 z-10 flex items-center gap-2 rounded-lg bg-black/75 backdrop-blur px-2.5 py-1 text-[10px] text-white/85 border border-white/10">
-      <span class="text-slate-400">Recline:</span>
-      <button type="button" onclick="setPovRecline(0)" id="pov-recline-0" class="font-bold text-amber-200">Upright</button>
-      <button type="button" onclick="setPovRecline(1)" id="pov-recline-1" class="text-slate-400">Relaxed</button>
-      <button type="button" onclick="setPovRecline(2)" id="pov-recline-2" class="text-slate-400">VIP</button>
-      <span class="text-white/30">|</span>
-      <button type="button" onclick="resetVrView()" class="text-slate-300 hover:text-amber-200">⌖ Center</button>
-    </div>
-    <div class="absolute bottom-2 right-2 z-10 flex items-center gap-1.5">
-      <button type="button" onclick="openTrailerWithSeatPOV()" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-[10px] font-bold text-amber-200 flex items-center gap-1 transition">
-        <i class="fa-solid fa-play text-[8px]"></i><span>Trailer POV</span>
-      </button>
-      <button type="button" onclick="open3dArModal()" class="px-2.5 py-1 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/40 text-[10px] font-bold text-cyan-200 flex items-center gap-1 transition">
-        <i class="fa-solid fa-vr-cardboard text-[9px]"></i><span>VR Room</span>
-      </button>
-    </div>
-    <div id="ar-empty-state" class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-center pointer-events-none transition-opacity">
-      <span class="text-3xl mb-1.5 opacity-80 text-amber-300">🥽</span>
-      <p class="text-xs font-bold text-white">Hover over or select any seat to inspect its view</p>
-      <p class="mt-1 text-[10px] text-slate-400 max-w-xs">Simulates real distance to screen, neck tilt, acoustics, and viewing angle</p>
-    </div>
+    <canvas id="seatPovCanvas" class="hidden" aria-hidden="true"></canvas>
+    <div id="ar-empty-state" class="hidden"></div>
   </div>
 
-  <div id="ar-info-strip" class="hidden mt-3 grid grid-cols-4 gap-2">
+  <div id="ar-info-strip" class="hidden mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
     <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
-      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Seat Row</p>
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Active Seat</p>
       <p class="text-xs font-black text-amber-300" id="ar-info-zone">--</p>
     </div>
     <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
@@ -287,7 +283,11 @@
     </div>
     <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
       <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Dolby Atmos</p>
-      <p class="text-xs font-black text-emerald-400" id="ar-info-sound">--</p>
+      <p class="text-xs font-black text-sky-400" id="ar-info-sound">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-emerald-500/30">
+      <p class="text-[9px] uppercase tracking-wider text-emerald-400 mb-0.5">Nearest Exit Way</p>
+      <p class="text-xs font-black text-emerald-300" id="ar-info-exit">--</p>
     </div>
   </div>
 </div>
@@ -297,6 +297,13 @@
 
   <div id="seating-viewport" class="glass-card rounded-2xl p-4 sm:p-6 rowscroll transition-all duration-700">
     <div id="seating-grid-container" class="min-w-max mx-auto space-y-1 transition-all duration-700 origin-bottom">
+      <!-- Top Rear Exit Indicators on 2D Seat Map -->
+      <div class="flex items-center justify-between px-2 pb-2 text-[10px] font-bold text-emerald-400">
+        <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 3 (Rear Left)</span>
+        <span class="text-slate-500 uppercase tracking-widest text-[9px]">Rear Concourse Walkway</span>
+        <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 4 (Rear Right)</span>
+      </div>
+
       {% for cls in grid %}
         <div class="pt-4 pb-1 flex items-center gap-3">
           <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300">{{ cls.name }}</span>
@@ -322,6 +329,7 @@
                         data-seat-number="{{ cell.num }}"
                         data-price="{{ cell.price }}"
                         data-class="{{ cell.cls }}"
+                        data-class-code="{{ cell.code }}"
                         data-score="{{ cell.pov.score if cell.pov else '80' }}"
                         data-pov-name="{{ cell.pov.zone_name if cell.pov else 'Standard Seat' }}"
                         data-pov-badge="{{ cell.pov.comfort_badge if cell.pov else '' }}"
@@ -353,7 +361,12 @@
         {% endfor %}
       {% endfor %}
 
-      <div class="pt-8 pb-2">
+      <!-- Front Exit Indicators & Screen Bar -->
+      <div class="pt-6 pb-2">
+        <div class="flex items-center justify-between px-2 mb-3 text-[10px] font-bold text-emerald-400">
+          <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 1 (Front Left)</span>
+          <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 2 (Front Right)</span>
+        </div>
         <div class="h-2 bg-gradient-to-r from-[#C9A84C]/10 via-[#C9A84C] to-[#C9A84C]/10 rounded-full screen-glow w-2/3 mx-auto"></div>
         <p class="text-[10px] tracking-[0.3em] text-center text-slate-500 uppercase mt-2">Cinema screen · all eyes this way</p>
       </div>
@@ -384,6 +397,7 @@
   const selected = new Map();
   let activePovSeat = null;
   let arTrailerMode = false;
+  let showExitPathHighlight = false;
   const povView = { yaw: 0, pitch: 0, format: 'wide', crowd: true, dim: true, recline: 0, dragging: false, x: 0, y: 0 };
   const input = document.getElementById('selected_seats_input');
   const display = document.getElementById('selected-display');
@@ -396,9 +410,49 @@
   let myAvatarColor = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
   const cinemaLayout = {{ screen.layout|tojson }};
 
+  // Compute nearest exit info for any seat button
+  function computeExitInfo(elem) {
+    const layoutRows = (cinemaLayout.classes || []).flatMap(cls => cls.rows || []);
+    const totalRows = Math.max(1, layoutRows.length);
+    const seatId = elem?.dataset?.seat || '';
+    const rowLabel = elem?.dataset?.seatRow || seatId.replace(/\d+$/, '') || (layoutRows[0]?.label || 'A');
+    const seatNumber = parseInt(elem?.dataset?.seatNumber || seatId.replace(/^\D+/, '') || '1', 10);
+
+    let rIdx = layoutRows.findIndex(r => r.label === rowLabel);
+    if (rIdx === -1) rIdx = Math.floor(totalRows / 2);
+
+    const rowObj = layoutRows[rIdx] || { count: 14, start: 1 };
+    const rowCount = Math.max(1, Number(rowObj.count || 14));
+    const rowStart = Number(rowObj.start || 1);
+    const colIdx = Math.max(0, seatNumber - rowStart);
+    const colProgress = Math.max(0, Math.min(1, colIdx / Math.max(1, rowCount - 1)));
+    const rowProgress = totalRows > 1 ? (rIdx / (totalRows - 1)) : 0.5;
+
+    const isLeft = colProgress <= 0.5;
+    const isFront = rowProgress >= 0.45;
+    const exitName = isFront
+      ? (isLeft ? 'Exit 1 (Front Left)' : 'Exit 2 (Front Right)')
+      : (isLeft ? 'Exit 3 (Rear Left)' : 'Exit 4 (Rear Right)');
+
+    // Realistic walking distance in meters along row + aisle
+    const seatsToWall = isLeft ? (colIdx + 1) : (rowCount - colIdx);
+    const rowsToDoor = isFront ? (totalRows - 1 - rIdx) : rIdx;
+    const distMeters = Math.max(2.2, (seatsToWall * 0.62 + rowsToDoor * 1.15)).toFixed(1);
+
+    return {
+      exitName,
+      distMeters,
+      isLeft,
+      isFront,
+      label: `${exitName} · ${distMeters}m`
+    };
+  }
+
   function updateInspector(elem) {
     if (!elem || !elem.dataset.seat) return;
     activePovSeat = elem;
+    const exitInfo = computeExitInfo(elem);
+
     document.getElementById('insp-seat-id').textContent = elem.dataset.seat;
     document.getElementById('insp-zone-name').textContent = elem.dataset.povName || 'Standard Seat';
     document.getElementById('insp-badge').textContent = elem.dataset.povBadge || 'Standard View';
@@ -407,6 +461,12 @@
     document.getElementById('insp-dist').textContent = elem.dataset.povDist || '50%';
     document.getElementById('insp-sound-score').textContent = elem.dataset.soundScore || '85%';
     document.getElementById('insp-sound-profile').textContent = (elem.dataset.soundBadge || '🔊 Dolby Atmos') + ' · ' + (elem.dataset.soundProfile || 'Spatial Audio');
+    const exitEl = document.getElementById('insp-exit-info');
+    if (exitEl) exitEl.textContent = `🚪 ${exitInfo.label}`;
+
+    // Highlight active POV seat with a cyan outline so user sees where arrows moved
+    document.querySelectorAll('.seat-btn').forEach(b => b.classList.remove('ring-2', 'ring-cyan-400'));
+    elem.classList.add('ring-2', 'ring-cyan-400');
   }
 
   function filterVibe(vibeCode, btnElem) {
@@ -419,7 +479,6 @@
       const v = b.dataset.vibeCode;
       if (vibeCode === 'ALL' || v === vibeCode) {
         b.style.opacity = '1.0';
-        b.classList.remove('ring-1', 'ring-slate-700');
       } else {
         b.style.opacity = '0.25';
       }
@@ -438,8 +497,50 @@
     selected.forEach(s => { counts[s.cls] = (counts[s.cls] || 0) + 1; });
     classLine.textContent = Object.entries(counts).map(([c, n]) => `${n} × ${c}`).join('  ·  ');
 
-    // Trigger party sync instantly on seat selection change
+    updateImmersiveBookingPanel();
+
     if (activePartyCode) syncParty();
+  }
+
+  // Build the booking view from this screen's saved layout and live seat states.
+  // The 3D preview and the regular seat map use the same seat IDs and selection state.
+  function updateImmersiveBookingPanel() {
+    const panel = document.getElementById('immersive-seat-sidebar');
+    if (!panel) return;
+    const classesRoot = panel.querySelector('[data-seat-classes]');
+    if (classesRoot) {
+      classesRoot.replaceChildren();
+      (cinemaLayout.classes || []).forEach((cls, index) => {
+        const seats = [...document.querySelectorAll('.seat-btn')].filter(seat =>
+          seat.dataset.classCode === cls.code || seat.dataset.class === cls.name
+        );
+        const available = seats.filter(seat => !seat.disabled && !seat.classList.contains('seat-sel')).length;
+        const color = ['#f6bd45','#9a77ff','#20cda5','#438cff'][index % 4];
+        const card = document.createElement('div');
+        card.className = 'immersive-class-card';
+        card.innerHTML = `<span class="immersive-class-swatch" style="--class-color:${color}"></span><div class="min-w-0 flex-1"><strong></strong><small></small></div><div class="text-right"><b></b><small></small></div>`;
+        card.querySelector('strong').textContent = cls.name || cls.code || 'Seats';
+        card.querySelector('small').textContent = cls.description || 'Choose seats in the auditorium';
+        card.querySelector('b').textContent = `₹${Math.round(Number(seats[0]?.dataset.price ?? cls.price ?? 0))}`;
+        card.querySelectorAll('small')[1].textContent = `${available} left`;
+        classesRoot.appendChild(card);
+      });
+    }
+    const selectedNames = [...selected.keys()];
+    const seatsOut = panel.querySelector('[data-selected-seats]');
+    if (seatsOut) seatsOut.textContent = selectedNames.length ? selectedNames.join(' · ') : 'Tap any available seat in the hall';
+    const countOut = panel.querySelector('[data-selected-count]');
+    if (countOut) countOut.textContent = String(selectedNames.length);
+    const totalOut = panel.querySelector('[data-selected-total]');
+    if (totalOut) totalOut.textContent = priceOut.textContent;
+    const checkout = panel.querySelector('[data-immersive-checkout]');
+    if (checkout) checkout.disabled = selectedNames.length === 0;
+  }
+
+  function immersiveBestSeats() {
+    const size = document.getElementById('immersive-party-size').value;
+    document.getElementById('smart-party-size').value = size;
+    suggestSmartSeats();
   }
 
   // ---- 👁️ AR / VR SEAT PREVIEW ENGINE ----
@@ -487,6 +588,8 @@
     if (!ctx) return null;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    const nowSec = performance.now() * 0.001;
+
     // 1. Identify Seat Position & Perspective from Layout
     const layoutRows = (cinemaLayout.classes || []).flatMap(cls =>
       (cls.rows || []).map(row => ({ ...row, classCode: cls.code, className: cls.name, price: cls.price }))
@@ -496,7 +599,6 @@
     const seatId = elem?.dataset?.seat || '';
     const rowLabel = elem?.dataset?.seatRow || seatId.replace(/\d+$/, '') || (layoutRows[0]?.label || 'A');
     const seatNumber = parseInt(elem?.dataset?.seatNumber || seatId.replace(/^\D+/, '') || '1', 10);
-    const seatClass = elem?.dataset?.class || 'Standard';
 
     let selectedRowIndex = layoutRows.findIndex(r => r.label === rowLabel);
     if (selectedRowIndex === -1) {
@@ -505,8 +607,6 @@
         : Math.floor(totalRows / 2);
     }
 
-    // In layoutRows: index 0 is at top/back of theater, index totalRows - 1 is at bottom/screen
-    // rowProgress: 0.0 (back row) -> 1.0 (front row right in front of screen)
     const rowProgress = totalRows > 1
       ? Math.max(0, Math.min(1, selectedRowIndex / (totalRows - 1)))
       : 0.5;
@@ -515,21 +615,16 @@
     const rowCount = Math.max(1, Number(rowObj?.count || 14));
     const rowStart = Number(rowObj?.start || 1);
     const colIdx = Math.max(0, seatNumber - rowStart);
-    // colProgress: 0.0 (far left) -> 0.5 (center) -> 1.0 (far right)
     const colProgress = Math.max(0, Math.min(1, colIdx / Math.max(1, rowCount - 1)));
-    const sideFactor = (colProgress - 0.5) * 2; // -1.0 to +1.0
+    const sideFactor = (colProgress - 0.5) * 2; // -1.0 (left) to +1.0 (right)
 
-    // Only render rows in front of this seat (between this seat and the screen)
     const visibleRows = layoutRows.slice(selectedRowIndex + 1);
-
-    // Upward neck tilt angle: front rows require looking up (+38° to +48°); back rows are ~14°
     const neckAngle = 14 + (rowProgress * 28);
     const userPitch = povView.pitch - (povView.recline * 0.12);
     const verticalAim = Math.max(-1.2, Math.min(1.2, ((neckAngle - 18) / 14) + userPitch));
     const normalizedYaw = Math.max(-1.2, Math.min(1.2, (sideFactor * 0.42) + povView.yaw));
     const cameraShift = -normalizedYaw * w * 0.28;
 
-    // Lighting color modes
     const isShowtime = povView.lighting === 'movie' || (!povView.lighting && povView.dim);
     const isHouse = povView.lighting === 'house';
 
@@ -543,7 +638,7 @@
       roomGrad.addColorStop(0, '#090a10');
       roomGrad.addColorStop(0.5, '#06070c');
       roomGrad.addColorStop(1, '#030406');
-    } else { // preshow
+    } else {
       roomGrad.addColorStop(0, '#13151f');
       roomGrad.addColorStop(0.5, '#0f0e16');
       roomGrad.addColorStop(1, '#08080d');
@@ -555,13 +650,14 @@
     const vanishX = w * 0.5 + cameraShift * 0.85;
     const vanishY = h * (0.43 + verticalAim * 0.08);
 
-    // Ambient Screen Projection Glow / Light Wash
+    // Live pulsing screen glow
+    const pulseBoost = 0.04 * Math.sin(nowSec * 2.2);
     const glowRadius = w * (0.55 + rowProgress * 0.25);
     const glowX = vanishX;
     const glowY = vanishY - h * 0.04;
     const screenAtmosphere = ctx.createRadialGradient(glowX, glowY, 10, glowX, glowY, glowRadius);
     if (isShowtime) {
-      screenAtmosphere.addColorStop(0, 'rgba(125, 175, 255, 0.24)');
+      screenAtmosphere.addColorStop(0, `rgba(125, 175, 255, ${0.24 + pulseBoost})`);
       screenAtmosphere.addColorStop(0.3, 'rgba(70, 110, 210, 0.12)');
       screenAtmosphere.addColorStop(0.65, 'rgba(30, 45, 90, 0.04)');
       screenAtmosphere.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -577,7 +673,7 @@
     ctx.fillStyle = screenAtmosphere;
     ctx.fillRect(0, 0, w, h);
 
-    // Projector Dust Beam cutting through cinema haze
+    // Projector Dust Beam
     if (isShowtime) {
       ctx.save();
       const beamGrad = ctx.createLinearGradient(w * 0.5, 0, glowX, glowY);
@@ -608,7 +704,6 @@
     ctx.fillStyle = ceilGrad;
     ctx.fill();
 
-    // Ceiling acoustic louver fins
     ctx.strokeStyle = isHouse ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.035)';
     ctx.lineWidth = 1;
     for (let c = 1; c <= 6; c++) {
@@ -620,8 +715,7 @@
       ctx.stroke();
     }
 
-    // 5. Side Walls with Acoustic Panels & Sconces
-    // Left Wall
+    // 5. Side Walls
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(vanishX - w * 0.38, vanishY - h * 0.14);
@@ -634,7 +728,6 @@
     ctx.fillStyle = leftGrad;
     ctx.fill();
 
-    // Right Wall
     ctx.beginPath();
     ctx.moveTo(w, 0);
     ctx.lineTo(vanishX + w * 0.38, vanishY - h * 0.14);
@@ -647,14 +740,12 @@
     ctx.fillStyle = rightGrad;
     ctx.fill();
 
-    // Wall Sconces & Dolby Atmos Speakers
     function drawWallFixtures(isLeft) {
       for (let i = 1; i <= 3; i++) {
         const t = i / 3.8;
         const wx = isLeft ? (vanishX - w * 0.38) * t : w - (w - (vanishX + w * 0.38)) * t;
         const wy = vanishY - h * 0.05 + (t * h * 0.18);
 
-        // Warm Sconce Lighting
         if (!isShowtime || isHouse) {
           ctx.save();
           const sconceGlow = ctx.createRadialGradient(wx, wy, 1, wx, wy, 35 * t);
@@ -668,7 +759,6 @@
           ctx.restore();
         }
 
-        // Atmos Surround Speaker Housing
         ctx.fillStyle = '#0a0b0e';
         ctx.strokeStyle = 'rgba(255,255,255,0.1)';
         ctx.lineWidth = 1;
@@ -677,7 +767,6 @@
         ctx.fillRect(wx - spkW / 2, wy - spkH / 2, spkW, spkH);
         ctx.strokeRect(wx - spkW / 2, wy - spkH / 2, spkW, spkH);
 
-        // Blue Dolby Atmos LED
         ctx.fillStyle = '#38bdf8';
         ctx.beginPath();
         ctx.arc(wx, wy, Math.max(1, 1.5 * t), 0, Math.PI * 2);
@@ -687,17 +776,9 @@
     drawWallFixtures(true);
     drawWallFixtures(false);
 
-    // Emergency Exit Sign
-    const exitX = Math.max(14, vanishX - w * 0.36);
-    const exitY = Math.min(h * 0.65, vanishY + h * 0.22);
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
-    ctx.fillRect(exitX - 10, exitY - 6, 22, 12);
-    ctx.fillStyle = '#6ee7b7';
-    ctx.font = 'bold 7px sans-serif';
-    ctx.fillText('EXIT', exitX - 8, exitY + 3);
-
     // 6. Floor & Stage Proscenium
     const floorTop = vanishY + h * 0.08;
+    const floorAvailableDepth = Math.max(1, h - floorTop);
     ctx.beginPath();
     ctx.moveTo(vanishX - w * 0.38, floorTop);
     ctx.lineTo(vanishX + w * 0.38, floorTop);
@@ -711,6 +792,76 @@
     ctx.fillStyle = carpetGrad;
     ctx.fill();
 
+    // 6B. ILLUMINATED 3D EXIT WAY DOORS (LEFT & RIGHT) + GREEN FLOOR EGRESS STRIPS
+    const leftExitX = Math.max(18, vanishX - w * 0.36);
+    const rightExitX = Math.min(w - 18, vanishX + w * 0.36);
+    const exitDoorBottomY = floorTop + h * 0.06;
+    const exitDoorW = Math.max(18, w * 0.032);
+    const exitDoorH = Math.max(32, h * 0.11);
+
+    function drawExitDoorAssembly(doorCenterX, labelText, isNearest) {
+      ctx.save();
+      const doorTopY = exitDoorBottomY - exitDoorH;
+
+      // Emerald ambient glow around exit door
+      const exitGlow = ctx.createRadialGradient(doorCenterX, doorTopY, 2, doorCenterX, doorTopY + exitDoorH * 0.4, exitDoorW * (isNearest ? 3.2 : 2.0));
+      exitGlow.addColorStop(0, isNearest ? 'rgba(16, 185, 129, 0.55)' : 'rgba(16, 185, 129, 0.28)');
+      exitGlow.addColorStop(1, 'rgba(16, 185, 129, 0)');
+      ctx.fillStyle = exitGlow;
+      ctx.beginPath();
+      ctx.arc(doorCenterX, doorTopY + exitDoorH * 0.3, exitDoorW * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Acoustic Exit Door Frame
+      ctx.fillStyle = '#07120e';
+      ctx.strokeStyle = isNearest ? '#10b981' : 'rgba(16, 185, 129, 0.45)';
+      ctx.lineWidth = isNearest ? 2 : 1;
+      ctx.beginPath();
+      traceRoundedRect(ctx, doorCenterX - exitDoorW / 2, doorTopY, exitDoorW, exitDoorH, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      // Illuminated Push-Bar Handle
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(doorCenterX - exitDoorW * 0.35, doorTopY + exitDoorH * 0.52, exitDoorW * 0.7, 2.5);
+
+      // Overhead Glowing Green EXIT Signboard
+      const signW = Math.max(34, exitDoorW * 1.45);
+      const signH = 13;
+      const signY = doorTopY - signH - 4;
+      ctx.fillStyle = '#064e3b';
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      traceRoundedRect(ctx, doorCenterX - signW / 2, signY, signW, signH, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ecfdf5';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`🏃 ${labelText}`, doorCenterX, signY + 9.5);
+      ctx.restore();
+    }
+
+    const nearestIsLeft = sideFactor <= 0;
+    drawExitDoorAssembly(leftExitX, 'EXIT 1', nearestIsLeft);
+    drawExitDoorAssembly(rightExitX, 'EXIT 2', !nearestIsLeft);
+
+    // Draw Glowing Green Floor Egress Route from User's Seat to Nearest Exit
+    const targetExitX = nearestIsLeft ? leftExitX : rightExitX;
+    ctx.save();
+    ctx.strokeStyle = showExitPathHighlight ? 'rgba(16, 185, 129, 0.95)' : 'rgba(16, 185, 129, 0.38)';
+    ctx.lineWidth = showExitPathHighlight ? 4 : 2;
+    ctx.setLineDash([6, 4]);
+    ctx.lineDashOffset = -nowSec * 18;
+    ctx.beginPath();
+    ctx.moveTo(w * 0.5, h - 18); // From user seat feet
+    ctx.lineTo(targetExitX, h - 28); // Along row to side aisle
+    ctx.lineTo(targetExitX, exitDoorBottomY); // Down side aisle to Exit Door
+    ctx.stroke();
+    ctx.restore();
+
     // Stage Front Subwoofer Base
     const stageH = Math.max(8, h * 0.05);
     const stageTop = floorTop - stageH;
@@ -719,16 +870,39 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.strokeRect(vanishX - w * 0.36, stageTop, w * 0.72, stageH);
 
-    // 7. REAL 3D SCREEN PERSPECTIVE & DISTANCE SCALING
-    // Distance scaling:
-    // Front row (rowProgress = 1.0) -> screen occupies 84%-90% of screen width, towers upward
-    // Middle row (rowProgress = 0.5) -> screen occupies 62% of width (optimal reference)
-    // Back row (rowProgress = 0.0) -> screen occupies 44% of width, eye level
-    const distScale = 0.44 + (rowProgress * 0.44); // 0.44 to 0.88
-    let screenWidth = w * distScale;
+    // Floor Reflection
+    const reflW = w * (0.35 + rowProgress * 0.3);
+    const reflH = Math.max(14, floorAvailableDepth * 0.28);
+    const reflGrad = ctx.createLinearGradient(vanishX, floorTop, vanishX, floorTop + reflH);
+    if (isShowtime) {
+      reflGrad.addColorStop(0, 'rgba(125, 175, 255, 0.16)');
+      reflGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else {
+      reflGrad.addColorStop(0, 'rgba(245, 185, 110, 0.12)');
+      reflGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    }
+    ctx.fillStyle = reflGrad;
+    ctx.beginPath();
+    ctx.ellipse(vanishX, floorTop + reflH * 0.45, reflW * 0.5, reflH * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Aspect ratio:
-    let screenAspect = 1.85; // 16:9 ~ 1.85:1
+    // 7. REAL 3D SCREEN PERSPECTIVE & DISTANCE SCALING
+    const distScale = 0.44 + (rowProgress * 0.44);
+    const screenConfig = cinemaLayout.screen || {};
+    const screenWidthMeters = Number(screenConfig.width_m) > 0 ? Number(screenConfig.width_m) : 18;
+    const seatDistanceMeters = 18 - (rowProgress * 11.5);
+    const referenceViewAngle = Math.atan(18 / (2 * 12));
+    const actualViewAngle = Math.atan(screenWidthMeters / (2 * seatDistanceMeters));
+    const physicalSizeScale = Math.max(0.65, Math.min(1.35, actualViewAngle / referenceViewAngle));
+    let screenWidth = w * distScale * physicalSizeScale;
+
+    // Use the real screen geometry saved with this screen's seating layout.
+    // The format buttons remain useful as projection previews, while "wide"
+    // follows the auditorium's configured physical width and height.
+    const configuredAspect = Number(screenConfig.width_m) > 0 && Number(screenConfig.height_m) > 0
+      ? Number(screenConfig.width_m) / Number(screenConfig.height_m)
+      : Number(screenConfig.aspect_ratio) > 0 ? Number(screenConfig.aspect_ratio) : 1.85;
+    let screenAspect = configuredAspect;
     if (povView.format === 'scope') screenAspect = 2.39;
     else if (povView.format === 'imax') screenAspect = 1.43;
 
@@ -738,12 +912,10 @@
       screenWidth = screenHeight * screenAspect;
     }
 
-    // Vertical elevation: front row towers above user
     const screenElevation = (1 - rowProgress) * (h * 0.06) - (rowProgress * h * 0.04);
     const screenCenterY = vanishY - screenHeight * 0.48 + screenElevation;
     const screenCenterX = vanishX - (sideFactor * w * 0.07);
 
-    // 3D Keystoning (Trapezoidal projection when sitting off-center)
     const kFactor = Math.abs(sideFactor) * 0.18;
     const leftHeightFactor = sideFactor < 0 ? (1 + kFactor) : (1 - kFactor);
     const rightHeightFactor = sideFactor > 0 ? (1 + kFactor) : (1 - kFactor);
@@ -755,16 +927,15 @@
     const botLeftY = screenCenterY + (screenHeight * 0.5 * leftHeightFactor);
     const topRightY = screenCenterY - (screenHeight * 0.5 * rightHeightFactor);
     const botRightY = screenCenterY + (screenHeight * 0.5 * rightHeightFactor);
-
-    // Curved Screen Bowing
-    const curveBows = Math.max(3, screenWidth * 0.022);
+    const curveRatio = Math.max(0, Math.min(0.6,
+      Number.isFinite(Number(screenConfig.curve)) ? Number(screenConfig.curve) : 0.22));
+    const curveBows = Math.max(3, screenWidth * curveRatio * 0.08);
 
     // 8. RENDER CURVED CINEMA SCREEN
     ctx.save();
     ctx.shadowColor = isShowtime ? 'rgba(96, 165, 250, 0.45)' : 'rgba(251, 191, 36, 0.25)';
     ctx.shadowBlur = Math.max(6, screenWidth * 0.04);
 
-    // Black Velvet Frame
     ctx.fillStyle = '#050608';
     ctx.beginPath();
     ctx.moveTo(sLeft - 4, topLeftY - 4);
@@ -775,7 +946,6 @@
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Silver Screen Surface
     ctx.beginPath();
     ctx.moveTo(sLeft, topLeftY);
     ctx.quadraticCurveTo(screenCenterX, topLeftY + curveBows, sRight, topRightY);
@@ -790,35 +960,38 @@
     ctx.fillStyle = screenFillGrad;
     ctx.fill();
 
-    // Clip to screen surface for content
     ctx.save();
     ctx.clip();
 
-    // SCREEN PROJECTION CONTENT
     if (forTrailer) {
       ctx.fillStyle = '#000000';
       ctx.fillRect(sLeft, Math.min(topLeftY, topRightY), screenWidth, screenHeight * 1.5);
     } else {
-      // Draw Movie Poster if available
       if (posterImg && posterImg.complete && posterImg.naturalWidth > 0) {
-        ctx.globalAlpha = 0.42;
+        ctx.globalAlpha = 0.45;
         ctx.drawImage(posterImg, sLeft, topLeftY, screenWidth, Math.max(botLeftY, botRightY) - Math.min(topLeftY, topRightY));
         ctx.globalAlpha = 1.0;
       }
 
-      // Screen Dark Overlay
+      // Real-time animated light sweep across screen
+      const sweepX = sLeft + ((nowSec * 0.22) % 1.4 - 0.2) * screenWidth;
+      const sweepGrad = ctx.createLinearGradient(sweepX - 60, topLeftY, sweepX + 60, botRightY);
+      sweepGrad.addColorStop(0, 'rgba(255,255,255,0)');
+      sweepGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.14)');
+      sweepGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sweepGrad;
+      ctx.fillRect(sLeft, Math.min(topLeftY, topRightY), screenWidth, screenHeight * 1.5);
+
       const overlay = ctx.createLinearGradient(sLeft, topLeftY, sLeft, Math.max(botLeftY, botRightY));
-      overlay.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
-      overlay.addColorStop(0.6, 'rgba(10, 15, 25, 0.7)');
-      overlay.addColorStop(1, 'rgba(4, 6, 10, 0.95)');
+      overlay.addColorStop(0, 'rgba(8, 12, 20, 0.5)');
+      overlay.addColorStop(0.6, 'rgba(10, 15, 25, 0.68)');
+      overlay.addColorStop(1, 'rgba(4, 6, 10, 0.92)');
       ctx.fillStyle = overlay;
       ctx.fillRect(sLeft, Math.min(topLeftY, topRightY), screenWidth, screenHeight * 1.5);
 
-      // Movie Details & Title on Screen
       const titleY = screenCenterY - screenHeight * 0.08;
       ctx.textAlign = 'center';
 
-      // Header Tag
       ctx.fillStyle = 'rgba(201, 168, 76, 0.25)';
       const pillW = Math.max(120, screenWidth * 0.45);
       const pillH = Math.max(16, screenHeight * 0.1);
@@ -833,7 +1006,6 @@
       ctx.font = `bold ${Math.max(8, Math.round(screenHeight * 0.048))}px sans-serif`;
       ctx.fillText(`NOW SHOWING · ${cinemaLayout.screen_label || 'DOLBY CINEMA 4K'}`, screenCenterX, titleY - 17);
 
-      // Main Movie Title
       ctx.fillStyle = '#ffffff';
       ctx.shadowColor = 'rgba(0,0,0,0.85)';
       ctx.shadowBlur = 6;
@@ -841,12 +1013,10 @@
       ctx.fillText(movieTitleStr, screenCenterX, titleY + 4);
       ctx.shadowBlur = 0;
 
-      // Meta: Language, Certificate, Runtime, Rating
       ctx.fillStyle = '#cbd5e1';
       ctx.font = `600 ${Math.max(8, Math.round(screenHeight * 0.046))}px sans-serif`;
       ctx.fillText(`${movieLanguageStr} · ${movieCertStr} · ${movieDurationStr} min · ⭐ ${movieRatingStr}/10`, screenCenterX, titleY + screenHeight * 0.1);
 
-      // Play Trailer Call-to-Action Badge
       const ctaY = titleY + screenHeight * 0.24;
       const ctaW = Math.max(140, screenWidth * 0.5);
       const ctaH = Math.max(22, screenHeight * 0.14);
@@ -863,11 +1033,10 @@
       ctx.fillText(`▶  PLAY TRAILER IN VR POV`, screenCenterX, ctaY + ctaH * 0.68);
     }
 
-    ctx.restore(); // clip
-    ctx.restore(); // shadow
+    ctx.restore();
+    ctx.restore();
 
-    // 9. RENDER ROWS OF SEATS IN FRONT (Auditorium Depth)
-    const floorAvailableDepth = h - floorTop;
+    // 9. RENDER ROWS OF SEATS IN FRONT
     const maxRowUnits = Math.max(1, ...layoutRows.map(r =>
       Number(r.count || 0) * Math.max(1, Number(r.seat_span || 1)) + (r.aisles_after || []).length * 0.6 + Number(r.offset || 0)
     ));
@@ -898,8 +1067,6 @@
           const sId = `${row.label}${num}`;
           if (!blocked.has(sId)) {
             drawCinemaChair(ctx, x + spacing * seatSpan / 2, rowY, seatW, seatH, depth);
-
-            // Subtle Audience Silhouettes
             const seed = (num * 37 + r * 19) % 10;
             if (seed < 4 && !forTrailer) {
               drawAudienceHead(ctx, x + spacing * seatSpan / 2, rowY - seatH * 0.5, seatW * 0.55, seatH * 0.85);
@@ -907,8 +1074,7 @@
           }
           x += spacing * seatSpan;
           if (aisleAfter.has(num)) {
-            // Aisle Runner LED Step Lights
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.55)';
             ctx.fillRect(x + 2, rowY + 1, Math.max(2, spacing * 0.3), 1.5);
             x += spacing * 0.6;
           }
@@ -929,7 +1095,6 @@
       traceRoundedRect(ctx, cx - sw * 0.44, seatTop, sw * 0.88, sh * 0.72, sw * 0.18);
       ctx.fill();
 
-      // Headrest contour
       ctx.strokeStyle = 'rgba(255,255,255,0.18)';
       ctx.lineWidth = Math.max(0.4, sw * 0.02);
       ctx.beginPath();
@@ -937,7 +1102,6 @@
       ctx.quadraticCurveTo(cx, seatTop + sh * 0.03, cx + sw * 0.3, seatTop + sh * 0.1);
       ctx.stroke();
 
-      // Cushion Base
       const cushionGrad = ctx.createLinearGradient(0, seatTop + sh * 0.45, 0, seatTop + sh * 0.9);
       cushionGrad.addColorStop(0, `rgb(${redTone + 10}, 22, 30)`);
       cushionGrad.addColorStop(1, `rgb(${redTone - 15}, 12, 18)`);
@@ -988,12 +1152,10 @@
       ctx.closePath();
       ctx.fill();
 
-      // Stitching line
       ctx.strokeStyle = 'rgba(201, 168, 76, 0.4)';
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Cupholder with CineWave drink cup on right armrest
       if (!isLeft) {
         const cupX = w - armrestW * 0.52;
         const cupY = armrestY + 36;
@@ -1006,7 +1168,6 @@
         ctx.fill();
         ctx.stroke();
 
-        // CineWave Red Cup
         ctx.fillStyle = '#e11d48';
         ctx.beginPath();
         ctx.moveTo(cupX - 10, cupY);
@@ -1016,13 +1177,11 @@
         ctx.closePath();
         ctx.fill();
 
-        // Cup Lid
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.ellipse(cupX, cupY - 26, 7.5, 3.5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Straw
         ctx.strokeStyle = '#f59e0b';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -1031,7 +1190,6 @@
         ctx.stroke();
       }
 
-      // Seat Badge Plaque on Left Armrest
       if (isLeft) {
         const badgeX = armrestW * 0.18;
         const badgeY = armrestY + 45;
@@ -1070,11 +1228,7 @@
       screenWidth: Math.round(screenWidth),
       sideAngle: sideFactor * 25,
       sideFactor: sideFactor,
-      rowProgress: rowProgress,
-      clipLeft: sideFactor < 0 ? 0 : Math.round(kFactor * 50),
-      clipRight: sideFactor > 0 ? 100 : Math.round(100 - kFactor * 50),
-      clipBottomRight: sideFactor > 0 ? 100 : Math.round(100 - kFactor * 50),
-      clipBottomLeft: sideFactor < 0 ? 0 : Math.round(kFactor * 50)
+      rowProgress: rowProgress
     };
   }
 
@@ -1086,10 +1240,11 @@
     const distStr = elem.dataset.povDist || '50%';
     const angleStr = elem.dataset.povAngle || '16°';
     const soundBadge = elem.dataset.soundBadge || '🔊 85% Spatial Audio';
+    const exitInfo = computeExitInfo(elem);
 
-    document.getElementById('ar-preview-subtitle').textContent = `Row ${rowLabel} · Seat ${seatNumber} (${elem.dataset.class || 'Standard'})`;
-    document.getElementById('pov-badge-title').textContent = `Row ${rowLabel} · Seat ${seatNumber}`;
-    document.getElementById('pov-badge-detail').textContent = `${distStr} distance · ${angleStr} neck tilt · ${soundBadge}`;
+    document.getElementById('ar-preview-subtitle').textContent = `Row ${rowLabel} · Seat ${seatNumber} (${elem.dataset.class || 'Standard'}) · 🚪 ${exitInfo.label}`;
+    document.getElementById('pov-badge-title').textContent = `Row ${rowLabel} · Seat ${seatNumber} (${elem.dataset.class || 'Standard'})`;
+    document.getElementById('pov-badge-detail').textContent = `${distStr} distance · ${angleStr} neck tilt · ${soundBadge} · 🚪 ${exitInfo.label}`;
     document.getElementById('seat-pov-badge').classList.remove('hidden');
 
     const infoStrip = document.getElementById('ar-info-strip');
@@ -1100,14 +1255,15 @@
       document.getElementById('ar-info-angle').textContent = `${angleStr} tilt`;
       const sndEl = document.getElementById('ar-info-sound');
       if (sndEl) sndEl.textContent = soundBadge.replace(/^[^\w]+/, '');
+      const extEl = document.getElementById('ar-info-exit');
+      if (extEl) extEl.textContent = `${exitInfo.distMeters}m (${exitInfo.isLeft ? 'Left' : 'Right'})`;
     }
     document.getElementById('ar-empty-state').classList.add('hidden');
-    drawCinemaView(document.getElementById('seatPovCanvas'), elem);
+    postVRPreviewState();
   }
 
   function refreshPovViews() {
-    drawCinemaView(document.getElementById('seatPovCanvas'), activePovSeat);
-    if (!document.getElementById('arSeatModal').classList.contains('hidden')) draw3dArScreen();
+    draw3dArScreen();
   }
 
   function setPovFormat(format) {
@@ -1144,16 +1300,10 @@
   function setPovLighting(mode) {
     povView.lighting = mode;
     const btn = document.getElementById('pov-light-btn');
+    const modalBtn = document.getElementById('vr-lighting-btn');
     const label = mode === 'movie' ? '🎬 Dark' : (mode === 'preshow' ? '🍿 Preshow' : '💡 House');
     if (btn) btn.textContent = label;
-    ['movie', 'preshow', 'house'].forEach(m => {
-      const b = document.getElementById(`vr-light-${m}`);
-      if (b) {
-        b.classList.toggle('border-amber-300/50', m === mode);
-        b.classList.toggle('text-amber-100', m === mode);
-        b.classList.toggle('text-slate-400', m !== mode);
-      }
-    });
+    if (modalBtn) modalBtn.textContent = label;
     refreshPovViews();
   }
 
@@ -1180,22 +1330,72 @@
   function resetVrView() {
     povView.yaw = 0;
     povView.pitch = 0;
+    showExitPathHighlight = false;
     refreshPovViews();
   }
 
-  function navVrSeat(direction) {
-    const allSeats = [...document.querySelectorAll('.seat-btn')];
-    if (!allSeats.length) return;
-    const currentIdx = allSeats.findIndex(b => b === activePovSeat || b.dataset.seat === activePovSeat?.dataset?.seat);
-    let nextIdx = currentIdx + direction;
-    if (nextIdx < 0) nextIdx = allSeats.length - 1;
-    if (nextIdx >= allSeats.length) nextIdx = 0;
-    const nextSeat = allSeats[nextIdx];
+  // Pan VR camera to look directly at the nearest illuminated Exit Door
+  function lookAtNearestExit() {
+    if (!activePovSeat) {
+      activePovSeat = document.querySelector('.seat-btn.seat-sel') || document.querySelector('.seat-btn.seat-avail');
+    }
+    if (!activePovSeat) return;
+    const exitInfo = computeExitInfo(activePovSeat);
+    showExitPathHighlight = true;
+    povView.yaw = exitInfo.isLeft ? -0.58 : 0.58;
+    povView.pitch = 0.08;
+    updateInspector(activePovSeat);
+    showSeatARPreview(activePovSeat);
+    refreshPovViews();
+  }
+
+  // ---- 4-DIRECTION SEAT HOPPING (◀ LEFT, ▶ RIGHT, ▲ FRONT ROW, ▼ BACK ROW) ----
+  function stepVrSeat(dRow, dCol) {
+    const current = activePovSeat || document.querySelector('.seat-btn.seat-sel') || document.querySelector('.seat-btn.seat-avail');
+    if (!current) return;
+
+    const layoutRows = (cinemaLayout.classes || []).flatMap(cls => cls.rows || []);
+    const curRowLabel = current.dataset.seatRow;
+    const curSeatNum = parseInt(current.dataset.seatNumber || '1', 10);
+    const curRowIdx = layoutRows.findIndex(r => r.label === curRowLabel);
+
+    let nextSeat = null;
+
+    if (dCol !== 0) {
+      // Move left or right within the same row (skips blocked gaps automatically)
+      const rowSeats = [...document.querySelectorAll(`.seat-btn[data-seat-row="${curRowLabel}"]`)];
+      const idxInRow = rowSeats.findIndex(b => b === current);
+      if (idxInRow !== -1) {
+        const targetIdx = idxInRow + dCol;
+        if (targetIdx >= 0 && targetIdx < rowSeats.length) {
+          nextSeat = rowSeats[targetIdx];
+        }
+      }
+    } else if (dRow !== 0 && curRowIdx !== -1) {
+      // Note: layoutRows[0] is back row, layoutRows[last] is front row near screen
+      const nextRowIdx = Math.max(0, Math.min(layoutRows.length - 1, curRowIdx + dRow));
+      const targetRowLabel = layoutRows[nextRowIdx].label;
+      const rowSeats = [...document.querySelectorAll(`.seat-btn[data-seat-row="${targetRowLabel}"]`)];
+      if (rowSeats.length) {
+        nextSeat = rowSeats.reduce((prev, curr) =>
+          Math.abs(parseInt(curr.dataset.seatNumber) - curSeatNum) < Math.abs(parseInt(prev.dataset.seatNumber) - curSeatNum) ? curr : prev
+        );
+      }
+    }
+
     if (nextSeat) {
+      povView.yaw = 0;
       updateInspector(nextSeat);
       showSeatARPreview(nextSeat);
-      draw3dArScreen();
+      if (!document.getElementById('arSeatModal').classList.contains('hidden')) {
+        draw3dArScreen();
+      }
     }
+  }
+
+  // Keep backward compatibility with navVrSeat
+  function navVrSeat(direction) {
+    stepVrSeat(0, direction);
   }
 
   function jumpVrSweetspot() {
@@ -1211,6 +1411,7 @@
       }
     });
     if (bestSeat) {
+      resetVrView();
       updateInspector(bestSeat);
       showSeatARPreview(bestSeat);
       draw3dArScreen();
@@ -1218,25 +1419,8 @@
   }
 
   function toggleVrSeatSelection() {
-    if (!activePovSeat) return;
-    activePovSeat.click();
-    updateVrReserveButton();
-    renderVRCinemaSeatMap(activePovSeat);
-  }
-
-  function updateVrReserveButton() {
-    const btn = document.getElementById('vr-reserve-btn');
-    if (!btn || !activePovSeat) return;
-    const seatId = activePovSeat.dataset.seat;
-    const isSelected = selected.has(seatId);
-    const price = activePovSeat.dataset.price;
-    if (isSelected) {
-      btn.innerHTML = `<i class="fa-solid fa-check-circle text-emerald-300"></i><span>Seat ${seatId} Selected (₹${price}) · Click to Remove</span>`;
-      btn.className = "w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3 py-2.5 transition flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/40";
-    } else {
-      btn.innerHTML = `<i class="fa-solid fa-plus-circle text-amber-900"></i><span>Reserve Seat ${seatId} (₹${price})</span>`;
-      btn.className = "w-full rounded-xl bg-amber-300 hover:bg-amber-200 text-[#1a1408] font-extrabold text-xs px-3 py-2.5 transition flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/40";
-    }
+    if (!activePovSeat || activePovSeat.disabled) return;
+    toggleSeatSelection(activePovSeat);
   }
 
   // Mobile Device Orientation Gyroscope Look
@@ -1295,11 +1479,9 @@
     canvas.dataset.povDragReady = 'true';
     canvas.style.touchAction = 'none';
 
-    // Click on canvas directly checks if user clicked on the "PLAY TRAILER IN VR" badge on screen
     canvas.addEventListener('click', event => {
       const rect = canvas.getBoundingClientRect();
       const clickY = event.clientY - rect.top;
-      // If clicked near center of canvas where the Play Trailer button is drawn
       if (clickY > rect.height * 0.35 && clickY < rect.height * 0.65) {
         if (!arTrailerMode) openTrailerWithSeatPOV();
       }
@@ -1323,27 +1505,46 @@
     canvas.addEventListener('lostpointercapture', stop);
   }
   attachPovDrag(document.getElementById('seatPovCanvas'));
-  attachPovDrag(document.getElementById('arCanvas'));
+
+  function toggleSeatSelection(seatButton) {
+    if (!seatButton || seatButton.disabled || !seatButton.dataset.seat) return false;
+    updateInspector(seatButton);
+    showSeatARPreview(seatButton);
+
+    const id = seatButton.dataset.seat;
+    if (selected.has(id)) {
+      selected.delete(id);
+      seatButton.classList.remove('seat-sel');
+      seatButton.classList.add('seat-avail');
+    } else {
+      if (selected.size >= MAX_SEATS) {
+        alert('You can select up to ' + MAX_SEATS + ' seats in one booking.');
+        return false;
+      }
+      selected.set(id, { price: parseFloat(seatButton.dataset.price), cls: seatButton.dataset.class });
+      seatButton.classList.remove('seat-avail');
+      seatButton.classList.add('seat-sel');
+    }
+
+    paint();
+    renderVRCinemaSeatMap(seatButton);
+    draw3dArScreen();
+    return true;
+  }
 
   document.querySelectorAll('.seat-btn').forEach(b => {
-    b.addEventListener('mouseenter', () => { updateInspector(b); showSeatARPreview(b); if (!document.getElementById('arSeatModal').classList.contains('hidden')) draw3dArScreen(); });
-    b.addEventListener('click', () => {
-      updateInspector(b); showSeatARPreview(b);
-      const id = b.dataset.seat;
-      if (selected.has(id)) {
-        selected.delete(id);
-        b.classList.remove('seat-sel');
-        b.classList.add('seat-avail');
-      } else {
-        if (selected.size >= MAX_SEATS) {
-          alert('You can select up to ' + MAX_SEATS + ' seats in one booking.');
-          return;
-        }
-        selected.set(id, { price: parseFloat(b.dataset.price), cls: b.dataset.class });
-        b.classList.remove('seat-avail');
-        b.classList.add('seat-sel');
+    b.addEventListener('mouseenter', () => {
+      try {
+        updateInspector(b);
+        showSeatARPreview(b);
+        draw3dArScreen();
+      } catch (err) {
+        console.warn('Seat hover preview error:', err);
       }
-      paint();
+    });
+    b.addEventListener('click', () => {
+      try { toggleSeatSelection(b); }
+      catch (err) { console.warn('Seat selection error:', err); }
     });
   });
 
@@ -1358,7 +1559,6 @@
           document.getElementById('squad-room-code').textContent = activePartyCode;
           document.getElementById('party-btn-badge').textContent = 'Code: ' + activePartyCode;
           document.getElementById('party-squad-banner').classList.remove('hidden');
-          // Add party parameter to URL without reloading page
           const url = new URL(window.location);
           url.searchParams.set('party', activePartyCode);
           window.history.pushState({}, '', url);
@@ -1392,7 +1592,6 @@
       });
       const data = await res.json();
 
-      // Render Squad Member Roster Badges
       const roster = document.getElementById('squad-member-roster');
       if (roster && data.members) {
         let html = '<span class="text-[11px] text-slate-400 font-semibold">Squad Members:</span>';
@@ -1408,7 +1607,6 @@
         roster.innerHTML = html;
       }
 
-      // Highlight Squad Members' seats on seat map
       document.querySelectorAll('.seat-btn').forEach(b => {
         const id = b.dataset.seat;
         if (data.squad_seats && data.squad_seats[id] && !selected.has(id)) {
@@ -1424,13 +1622,11 @@
     } catch(e) {}
   }
 
-  // Poll Party Session every 2 seconds if party room is active
   if (activePartyCode) {
     syncParty();
     setInterval(syncParty, 2000);
   }
 
-  // live availability: grey out seats other people take while you are choosing
   setInterval(async () => {
     try {
       const res = await fetch('{{ url_for("seat_availability", showtime_id=showtime.id) }}');
@@ -1444,10 +1640,9 @@
           b.classList.add(data.booked.includes(id) ? 'seat-booked' : 'seat-held');
         }
       });
-    } catch (e) { /* offline is fine, server re-checks on submit */ }
+    } catch (e) {}
   }, 10000);
 
-  // ---- Live seats-left counter in header ----
   setInterval(async () => {
     try {
       const res = await fetch('/api/showtime/{{ showtime.id }}/live-info');
@@ -1457,28 +1652,69 @@
     } catch(e) {}
   }, 15000);
 
-  // ---- 🎬 2D / 3D THEATER PERSPECTIVE SWITCHER ----
   function toggleTheaterView(mode) {
     const viewport = document.getElementById('seating-viewport');
+    const previewPanel = document.getElementById('ar-preview-panel');
+    const theaterWrapper = document.getElementById('ar-theater-wrapper');
     const btn2d = document.getElementById('btn-view-2d');
     const btn3d = document.getElementById('btn-view-3d');
 
     if (mode === '3d') {
       btn3d.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white shadow";
       btn2d.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
-      viewport.classList.add('is-3d');
+      viewport.classList.add('hidden');
+      previewPanel.classList.remove('hidden');
+      theaterWrapper.classList.add('theater-expanded');
       btn3d.setAttribute('aria-pressed', 'true');
       btn2d.setAttribute('aria-pressed', 'false');
+      setInlineCamera('overview');
     } else {
       btn2d.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white shadow";
       btn3d.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
-      viewport.classList.remove('is-3d');
+      viewport.classList.remove('hidden');
+      previewPanel.classList.add('hidden');
+      theaterWrapper.classList.remove('theater-expanded');
       btn3d.setAttribute('aria-pressed', 'false');
       btn2d.setAttribute('aria-pressed', 'true');
     }
   }
 
-  // ---- ✨ SMART AI SEAT SUGGESTION ENGINE ----
+  let inlineTourTimer = null;
+  let inlineTourStep = 0;
+  const inlineTourPresets = ['overview', 'stage', 'balcony', 'birdseye'];
+  function setInlineCamera(preset) {
+    const frame = document.getElementById('vr-inline-frame');
+    if (!frame?.contentWindow || !frame.dataset.loaded) return;
+    frame.contentWindow.postMessage({ type: 'cinewave:camera-preset', preset }, window.location.origin);
+    document.querySelectorAll('.inline-camera-btn').forEach(button => {
+      const active = button.dataset.preset === preset;
+      button.classList.toggle('active', active);
+      button.classList.toggle('text-white', active);
+      button.classList.toggle('text-slate-400', !active);
+      button.classList.toggle('bg-cyan-500/20', active);
+      button.classList.toggle('border', active);
+      button.classList.toggle('border-cyan-400/40', active);
+    });
+  }
+  function toggleInlineTour() {
+    const button = document.getElementById('inline-tour-btn');
+    if (inlineTourTimer) {
+      clearInterval(inlineTourTimer);
+      inlineTourTimer = null;
+      button.textContent = 'Auto tour';
+      button.classList.remove('bg-amber-400/20');
+      return;
+    }
+    inlineTourStep = 0;
+    setInlineCamera(inlineTourPresets[inlineTourStep]);
+    button.textContent = 'Stop tour';
+    button.classList.add('bg-amber-400/20');
+    inlineTourTimer = setInterval(() => {
+      inlineTourStep = (inlineTourStep + 1) % inlineTourPresets.length;
+      setInlineCamera(inlineTourPresets[inlineTourStep]);
+    }, 4500);
+  }
+
   function suggestSmartSeats() {
     const pSize = parseInt(document.getElementById('smart-party-size').value || '2');
     const rows = document.querySelectorAll('#seating-grid-container .flex.items-center.justify-center');
@@ -1489,7 +1725,6 @@
       const seatsInRow = [...row.querySelectorAll('.seat-avail')];
       for (let i = 0; i <= seatsInRow.length - pSize; i++) {
         const candidateBlock = seatsInRow.slice(i, i + pSize);
-        // Ensure candidates are contiguous seat numbers
         let isContiguous = true;
         for (let k = 0; k < candidateBlock.length - 1; k++) {
           const num1 = parseInt(candidateBlock[k].textContent || '0');
@@ -1511,7 +1746,6 @@
     });
 
     if (bestBlock && bestBlock.length === pSize) {
-      // Clear existing selections
       document.querySelectorAll('.seat-sel').forEach(b => {
         const id = b.dataset.seat;
         selected.delete(id);
@@ -1519,63 +1753,27 @@
         b.classList.add('seat-avail');
       });
 
-      // Select recommended block
       bestBlock.forEach(b => {
         const id = b.dataset.seat;
         selected.set(id, { price: parseFloat(b.dataset.price), cls: b.dataset.class });
         b.classList.remove('seat-avail');
         b.classList.add('seat-sel');
-        // Flash animation effect
         b.classList.add('animate-bounce');
         setTimeout(() => b.classList.remove('animate-bounce'), 1000);
       });
 
       paint();
       updateInspector(bestBlock[0]);
-      alert(`✨ Smart AI found the top ${pSize} contiguous seats (Score: ${Math.round(maxBlockScore)}/100)!`);
+      showSeatARPreview(bestBlock[0]);
+      alert(`✨ Found the top ${pSize} adjacent seats (Score: ${Math.round(maxBlockScore)}/100)!`);
     } else {
       alert(`Could not find ${pSize} contiguous available seats in a single row. Try a smaller group size.`);
     }
   }
 
-  // ---- 🎬 TRAILER MODAL CONTROLS ----
-  // Shared by the standard trailer modal and the trailer displayed on the 3D cinema screen.
   const trailerKey = {{ movie.trailer_video_key|tojson }};
   const uploadedTrailerUrl = {{ (url_for('static', filename=movie.trailer_video_path) if movie.trailer_video_path else '')|tojson }};
 
-  function openTrailerModal() {
-    const modal = document.getElementById('trailerModal');
-    const iframe = document.getElementById('trailer-iframe');
-    const video = document.getElementById('trailer-video');
-    if (uploadedTrailerUrl && video) {
-      iframe.src = '';
-      iframe.classList.add('hidden');
-      video.src = uploadedTrailerUrl;
-      video.classList.remove('hidden');
-      video.play().catch(() => {});
-      modal.classList.remove('hidden');
-      return;
-    }
-    if (video) video.classList.add('hidden');
-    iframe.classList.remove('hidden');
-    let videoUrl;
-    if (trailerKey) {
-      videoUrl = `https://www.youtube.com/embed/${trailerKey}?autoplay=1&controls=1`;
-      iframe.src = videoUrl;
-    } else {
-      iframe.src = '';
-    }
-    const statusEl = document.getElementById('trailer-status');
-    if (statusEl) {
-      statusEl.textContent = trailerKey ? 'Playing trailer' : 'No trailer added by admin';
-      statusEl.className = trailerKey ? 'text-amber-300' : 'text-amber-300';
-    }
-    modal.classList.remove('hidden');
-  }
-
-  // ---- TRAILER + SEAT POV COMBINED PREVIEW ----
-  // On the seat page, the Trailer button now plays the trailer AND mirrors
-  // the same screen you will see from the seat you are hovering/selected.
   function openTrailerWithSeatPOV() {
     open3dArModal(true);
   }
@@ -1589,7 +1787,6 @@
     modal.classList.add('hidden');
   }
 
-  // ---- 👓 3D / AR FIRST-PERSON SEAT VIEW SIMULATOR ----
   function open3dArModal(showTrailer = false) {
     const modal = document.getElementById('arSeatModal');
     arTrailerMode = showTrailer;
@@ -1597,24 +1794,64 @@
       ? activePovSeat
       : document.querySelector('.seat-btn.seat-sel[data-seat]') || document.querySelector('.seat-btn.seat-avail[data-seat]');
     modal.classList.remove('hidden');
-    attachPovDrag(document.getElementById('arCanvas'));
-    draw3dArScreen();
+    const frame = document.getElementById('vr-preview-frame');
+    if (!frame.dataset.loaded) {
+      frame.onload = () => {
+        frame.dataset.loaded = 'true';
+        postVRPreviewState(true, frame);
+      };
+      frame.src = frame.dataset.src;
+    } else {
+      postVRPreviewState(true, frame);
+    }
   }
 
   function close3dArModal() {
     const modal = document.getElementById('arSeatModal');
     modal.classList.add('hidden');
     arTrailerMode = false;
-    // Stop trailer playback
-    const arIframe = document.getElementById('ar-trailer-iframe');
-    if (arIframe) { arIframe.src = ''; arIframe.classList.add('hidden'); }
-    const arVideo = document.getElementById('ar-trailer-video');
-    if (arVideo) { arVideo.pause(); arVideo.removeAttribute('src'); arVideo.load(); arVideo.classList.add('hidden'); }
-    const videoWindow = document.getElementById('ar-screen-video-window');
-    if (videoWindow) videoWindow.classList.add('hidden');
-    const badge = document.getElementById('ar-trailer-badge');
-    if (badge) badge.classList.add('hidden');
+    const frame = document.getElementById('vr-preview-frame');
+    if (frame) {
+      frame.onload = null;
+      frame.src = 'about:blank';
+      frame.dataset.loaded = '';
+    }
   }
+
+  function postVRPreviewState(isInitial = false, onlyFrame = null) {
+    const frames = onlyFrame ? [onlyFrame] : [
+      document.getElementById('vr-inline-frame'),
+      document.getElementById('vr-preview-frame')
+    ];
+    frames.forEach(frame => {
+      if (!frame?.contentWindow || !frame.dataset.loaded) return;
+      frame.contentWindow.postMessage({
+        type: isInitial ? 'cinewave:init' : 'cinewave:selection-state',
+        selectedSeats: [...selected.keys()],
+        // Keep the initial camera in the full-room view. Later seat changes
+        // still move the camera to the seat the customer is inspecting.
+        activeSeat: isInitial ? '' : (activePovSeat?.dataset?.seat || '')
+      }, window.location.origin);
+    });
+  }
+
+  window.addEventListener('message', event => {
+    const frames = [document.getElementById('vr-inline-frame'), document.getElementById('vr-preview-frame')];
+    const fromPreview = frames.some(frame => frame && event.source === frame.contentWindow);
+    if (!fromPreview || event.origin !== window.location.origin) return;
+    if (event.data?.type === 'cinewave:toggle-seat') {
+      const seatButton = document.querySelector(`.seat-btn[data-seat="${event.data.seatId}"]`);
+      if (seatButton && !seatButton.disabled) toggleSeatSelection(seatButton);
+      postVRPreviewState();
+    } else if (event.data?.type === 'cinewave:checkout') {
+      if (!selected.size) {
+        alert('Choose at least one available seat first.');
+        return;
+      }
+      close3dArModal();
+      document.getElementById('booking-form').requestSubmit();
+    }
+  });
 
   function renderVRCinemaSeatMap(activeSeat) {
     const root = document.getElementById('vr-seat-map');
@@ -1657,10 +1894,12 @@
           const isBlocked = blocked.has(seatId);
           const isViewed = seatId === activeId;
           const isSelected = selected.has(seatId);
+        const sourceSeat = document.querySelector(`.seat-btn[data-seat="${seatId}"]`);
+        const isUnavailable = !sourceSeat || sourceSeat.disabled;
 
           const marker = document.createElement('button');
           marker.type = 'button';
-          marker.title = `Seat ${seatId} (${cls.name} · ₹${cls.price})`;
+          marker.title = `${isUnavailable ? 'Unavailable · ' : ''}Seat ${seatId} (${cls.name} · ₹${cls.price})`;
           marker.dataset.vrSeatBtn = seatId;
 
           if (isBlocked) {
@@ -1671,16 +1910,22 @@
               marker.className = 'h-[9px] w-[9px] shrink-0 rounded-[2px] bg-amber-300 ring-2 ring-amber-300 shadow-[0_0_8px_#f59e0b] animate-pulse z-10 cursor-pointer';
             } else if (isSelected) {
               marker.className = 'h-[8px] w-[8px] shrink-0 rounded-[2px] bg-emerald-400 ring-1 ring-emerald-300 shadow-[0_0_6px_#10b981] cursor-pointer';
+            } else if (isUnavailable) {
+              marker.className = 'h-[7px] w-[7px] shrink-0 rounded-[2px] bg-rose-950 border border-rose-700/70 opacity-70 cursor-pointer';
             } else {
               marker.className = 'h-[7px] w-[7px] shrink-0 rounded-[2px] bg-slate-600 hover:bg-amber-200 transition-colors cursor-pointer';
             }
             marker.onclick = (e) => {
               e.stopPropagation();
-              const seatEl = document.querySelector(`.seat-btn[data-seat="${seatId}"]`);
+              const seatEl = sourceSeat;
               if (seatEl) {
-                updateInspector(seatEl);
-                showSeatARPreview(seatEl);
-                draw3dArScreen();
+                povView.yaw = 0;
+                if (!seatEl.disabled) toggleSeatSelection(seatEl);
+                else {
+                  updateInspector(seatEl);
+                  showSeatARPreview(seatEl);
+                  draw3dArScreen();
+                }
               }
             };
           }
@@ -1700,104 +1945,146 @@
   }
 
   async function enterVRView() {
-    const scene = document.getElementById('ar-canvas-container');
-    if (!scene) return;
+    const frame = document.getElementById('vr-preview-frame');
+    if (!frame) return;
     try {
-      if (scene.requestFullscreen) await scene.requestFullscreen();
-      else scene.classList.add('vr-immersive');
+      if (frame.requestFullscreen) await frame.requestFullscreen();
     } catch (_) {
-      scene.classList.add('vr-immersive');
+      // The preview already fills the viewport when opened.
     }
-    draw3dArScreen();
   }
 
+  // Global keyboard arrow navigation for 4-way seat hopping
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') document.getElementById('ar-canvas-container')?.classList.remove('vr-immersive');
-    if (!document.getElementById('arSeatModal').classList.contains('hidden')) {
-      if (event.key === 'ArrowLeft') navVrSeat(-1);
-      if (event.key === 'ArrowRight') navVrSeat(1);
-      if (event.key === ' ') { event.preventDefault(); toggleVrSeatSelection(); }
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    if (event.key === 'Escape' && !document.getElementById('arSeatModal').classList.contains('hidden')) {
+      close3dArModal();
+      return;
+    }
+    if (event.key === 'ArrowLeft')  { event.preventDefault(); stepVrSeat(0, -1); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); stepVrSeat(0, 1); }
+    if (event.key === 'ArrowUp')    { event.preventDefault(); stepVrSeat(1, 0); }
+    if (event.key === 'ArrowDown')  { event.preventDefault(); stepVrSeat(-1, 0); }
+    if (!document.getElementById('arSeatModal').classList.contains('hidden') && event.key === ' ') {
+      event.preventDefault();
+      toggleVrSeatSelection();
     }
   });
 
   document.addEventListener('fullscreenchange', () => {
-    if (!document.getElementById('arSeatModal').classList.contains('hidden')) draw3dArScreen();
+    if (!document.getElementById('arSeatModal').classList.contains('hidden')) postVRPreviewState();
   });
 
   function draw3dArScreen() {
-    const canvas = document.getElementById('arCanvas');
-    const activeSeat = activePovSeat?.dataset?.seat
-      ? activePovSeat
-      : document.querySelector('.seat-btn.seat-sel[data-seat]') || document.querySelector('.seat-btn.seat-avail[data-seat]');
-    const hasTrailer = arTrailerMode && Boolean(trailerKey || uploadedTrailerUrl);
-    const scene = drawCinemaView(canvas, activeSeat, hasTrailer);
-    if (!scene) return;
+    postVRPreviewState();
+  }
+  function updateVrReserveButton() {
+    const btn = document.getElementById('vr-reserve-btn');
+    const floatBtn = document.getElementById('vr-float-reserve-btn');
+    const cartSummary = document.getElementById('vr-cart-summary');
+    if (!activePovSeat) return;
+    const seatId = activePovSeat.dataset.seat;
+    const isSelected = selected.has(seatId);
+    const isUnavailable = activePovSeat.disabled;
+    const price = activePovSeat.dataset.price;
 
-    const seatId = activeSeat?.dataset.seat || '';
-    const rowLabel = activeSeat?.dataset.seatRow || seatId.replace(/\d+$/, '');
-    const seatNumber = activeSeat?.dataset.seatNumber || seatId.replace(/^\D+/, '');
-    const seatClass = activeSeat?.dataset.class || 'Standard';
-    const seatPrice = activeSeat?.dataset.price || '250';
-    const seatLabel = seatId ? `Row ${rowLabel} · Seat ${seatNumber}` : 'Select a seat';
+    const labelSelect = `Reserve Seat ${seatId} · ₹${price}`;
+    const labelRemove = `Seat ${seatId} Selected · Remove`;
 
-    // Update Header and Detail Texts
-    document.getElementById('ar-seat-name').textContent = `${seatLabel} (${seatClass})`;
-    document.getElementById('vr-selected-row').textContent = rowLabel ? `Row ${rowLabel}` : 'Select a seat';
-    document.getElementById('vr-selected-seat').textContent = seatNumber ? `Seat ${seatNumber} · ${seatClass} · ₹${seatPrice}` : 'Click any seat marker';
-
-    const distM = (6.5 + (1 - scene.rowProgress) * 11.5).toFixed(1);
-    const fovDeg = Math.round(28 + (scene.rowProgress * 22));
-    const estimatedAngle = parseFloat(activeSeat?.dataset?.povAngle || '18');
-
-    document.getElementById('vr-view-angle').textContent = `FOV: ${fovDeg}° (THX Reference) · ${distM}m to Screen · ${Math.round(estimatedAngle)}° Neck Tilt`;
-
-    // Floating HUD on Top of Canvas
-    const hudSeat = document.getElementById('vr-hud-seat');
-    const hudFov = document.getElementById('vr-hud-fov');
-    const hudSound = document.getElementById('vr-hud-sound');
-    if (hudSeat) hudSeat.textContent = `${seatLabel} · ${seatClass}`;
-    if (hudFov) hudFov.textContent = `🎯 ${fovDeg}° FOV · ${distM}m Distance`;
-    if (hudSound) hudSound.textContent = activeSeat?.dataset?.soundBadge || '🔊 Dolby Atmos 360°';
-
-    renderVRCinemaSeatMap(activeSeat);
-    updateVrReserveButton();
-
-    // 3D Video Window Tracking
-    const videoWindow = document.getElementById('ar-screen-video-window');
-    const arIframe = document.getElementById('ar-trailer-iframe');
-    const arVideo = document.getElementById('ar-trailer-video');
-    const trailerBadge = document.getElementById('ar-trailer-badge');
-
-    if (videoWindow) {
-      videoWindow.style.left = `${scene.left}px`;
-      videoWindow.style.top = `${scene.top}px`;
-      videoWindow.style.width = `${scene.width}px`;
-      videoWindow.style.height = `${scene.height}px`;
-      videoWindow.style.transform = `perspective(1000px) rotateY(${scene.sideFactor * -14}deg) rotateX(${povView.pitch * 8}deg)`;
-      videoWindow.style.transformOrigin = 'center center';
-      videoWindow.classList.toggle('hidden', !hasTrailer);
-    }
-    if (arIframe) {
-      arIframe.classList.toggle('hidden', Boolean(uploadedTrailerUrl) || !trailerKey);
-      if (trailerKey && !uploadedTrailerUrl && !arIframe.src.includes(trailerKey)) {
-        arIframe.src = `https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=1&playsinline=1&rel=0`;
+    if (btn) {
+      if (isUnavailable) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-ban text-rose-300"></i><span>Seat ${seatId} unavailable</span>`;
+        btn.className = "w-full rounded-xl border border-rose-500/20 bg-rose-950/30 px-3 py-3 text-xs font-bold text-rose-200 cursor-not-allowed";
+      } else if (isSelected) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-300"></i><span>${labelRemove}</span>`;
+        btn.className = "w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3 py-3 transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40";
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-plus-circle text-amber-950"></i><span>${labelSelect}</span>`;
+        btn.className = "w-full rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:brightness-110 text-slate-950 font-black text-xs px-3 py-3 transition flex items-center justify-center gap-2 shadow-lg shadow-amber-950/40";
       }
     }
-    if (arVideo) {
-      arVideo.classList.toggle('hidden', !uploadedTrailerUrl);
-      if (uploadedTrailerUrl && arVideo.getAttribute('src') !== uploadedTrailerUrl) {
-        arVideo.src = uploadedTrailerUrl;
-        arVideo.play().catch(() => {});
+
+    if (floatBtn) {
+      if (isSelected) {
+        floatBtn.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-300 animate-ping"></span><span class="font-black text-white">✓ Seat ${seatId} Selected</span>`;
+        floatBtn.className = "h-8 px-3 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-400/50 text-white text-[10px] font-bold transition flex items-center gap-1.5 shadow-xl";
+      } else {
+        floatBtn.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="font-black text-slate-950">+ Select Seat ${seatId} · ₹${price}</span>`;
+        floatBtn.className = "h-8 px-3 rounded-xl bg-gradient-to-r from-amber-300 to-amber-400 hover:from-amber-200 hover:to-amber-300 border border-amber-300/80 text-slate-950 text-[10px] font-bold transition flex items-center gap-1.5 shadow-xl shadow-amber-950/40";
       }
     }
-    if (trailerBadge) trailerBadge.classList.toggle('hidden', !hasTrailer);
+
+    if (cartSummary) {
+      const count = selected.size;
+      const total = [...selected.values()].reduce((a, s) => a + s.price, 0);
+      if (count > 0) {
+        cartSummary.innerHTML = `<div class="flex items-center justify-between text-[11px] font-bold px-1"><span class="text-slate-300">${count} Seat${count > 1 ? 's' : ''} in cart</span><span class="text-amber-300">Total: ₹${total.toFixed(0)}</span></div>`;
+        cartSummary.classList.remove('hidden');
+      } else {
+        cartSummary.classList.add('hidden');
+      }
+    }
   }
 
-  drawCinemaView(document.getElementById('seatPovCanvas'), null);
+  try {
+    const defaultSeat = document.querySelector('.seat-btn.seat-avail');
+    if (defaultSeat) {
+      updateInspector(defaultSeat);
+      showSeatARPreview(defaultSeat);
+    }
+  } catch (err) {
+    console.warn('Initial 3D seat preview error:', err);
+  }
   window.addEventListener('resize', () => {
-    drawCinemaView(document.getElementById('seatPovCanvas'), activePovSeat);
-    if (!document.getElementById('arSeatModal').classList.contains('hidden')) draw3dArScreen();
+    draw3dArScreen();
   });
+
+  const inlineVrFrame = document.getElementById('vr-inline-frame');
+  const immersiveSection = document.createElement('section');
+  immersiveSection.id = 'immersive-booking-layout';
+  immersiveSection.className = 'immersive-booking-layout';
+  immersiveSection.innerHTML = `
+    <div class="immersive-viewer-column"></div>
+    <aside id="immersive-seat-sidebar" class="immersive-seat-sidebar">
+      <p class="immersive-eyebrow">SEAT CLASSES</p>
+      <div data-seat-classes class="space-y-2.5"></div>
+      <div class="immersive-legend"><span><i class="legend-booked"></i>Booked</span><span><i class="legend-picked"></i>Your pick</span></div>
+      <p class="immersive-eyebrow mt-5">QUICK PICK</p>
+      <div class="flex gap-2">
+        <select id="immersive-party-size" aria-label="Number of seats" class="immersive-size-select">
+          <option value="1">1 seat</option><option value="2" selected>2 seats</option><option value="3">3 seats</option><option value="4">4 seats</option><option value="6">6 seats</option>
+        </select>
+        <button type="button" onclick="immersiveBestSeats()" class="immersive-best-button">✦ Best seats</button>
+      </div>
+      <p class="immersive-eyebrow mt-5">YOUR SEATS <span data-selected-count>0</span></p>
+      <div data-selected-seats class="immersive-selected-seats">Tap any available seat in the hall</div>
+      <div class="immersive-checkout-row"><div><small>Tickets total</small><strong data-selected-total>₹0</strong></div><button type="button" data-immersive-checkout onclick="document.getElementById('booking-form').requestSubmit()" disabled>Continue</button></div>
+    </aside>`;
+  const viewerColumn = immersiveSection.querySelector('.immersive-viewer-column');
+  const immersiveViewer = document.getElementById('ar-preview-panel');
+  immersiveViewer?.classList.remove('hidden');
+  if (immersiveViewer) {
+    viewerColumn.appendChild(immersiveViewer);
+    const header = document.querySelector('main .max-w-7xl > .flex.flex-wrap.items-start');
+    if (header?.parentNode) header.insertAdjacentElement('afterend', immersiveSection);
+    else document.querySelector('main')?.prepend(immersiveSection);
+  }
+  ['seat-inspector','seat-pov-badge','ar-info-strip','seat-availability-legend','dynamic-pricing-banner','seat-vibe-filters'].forEach(id => document.getElementById(id)?.classList.add('immersive-secondary-hidden'));
+  document.querySelectorAll('.immersive-secondary-hidden').forEach(el => { el.style.display = 'none'; });
+  document.getElementById('btn-view-3d')?.click();
+  updateImmersiveBookingPanel();
+
+  if (inlineVrFrame) {
+    inlineVrFrame.onload = () => {
+      inlineVrFrame.dataset.loaded = 'true';
+      postVRPreviewState(true, inlineVrFrame);
+      setInlineCamera('overview');
+    };
+    inlineVrFrame.src = inlineVrFrame.dataset.src;
+  }
 </script>
 
 <!-- 🎬 Trailer Video Modal -->
@@ -1821,150 +2108,46 @@
 </div>
 
 <style>
+  .immersive-booking-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,360px); gap:0; margin:18px 0 26px; min-height:600px; border:1px solid rgba(255,255,255,.1); border-radius:20px; overflow:hidden; background:#090a0f; box-shadow:0 24px 70px rgba(0,0,0,.38); }
+  .immersive-viewer-column { min-width:0; min-height:600px; background:#050609; }
+  .immersive-viewer-column #ar-preview-panel { display:block; height:100%; padding:0; border:0; border-radius:0; background:#050609; box-shadow:none; }
+  .immersive-viewer-column #ar-preview-panel > .flex:first-child { position:absolute; z-index:3; margin:14px; padding:0; }
+  .immersive-viewer-column #ar-preview-panel > .flex:first-child > div:first-child,
+  .immersive-viewer-column #ar-preview-panel > .flex:first-child > div:last-child > span { display:none; }
+  .immersive-viewer-column #ar-theater-wrapper { height:100%; min-height:600px; border:0; border-radius:0; }
+  .immersive-viewer-column #inline-camera-controls { top:14px; left:50%; }
+  .immersive-seat-sidebar { position:relative; display:flex; flex-direction:column; padding:25px 20px 18px; min-height:600px; border-left:1px solid rgba(255,255,255,.1); background:#0c0d13; }
+  .immersive-eyebrow { display:flex; align-items:center; justify-content:space-between; margin:0 0 12px; color:#8790a5; font-size:10px; font-weight:800; letter-spacing:.28em; }
+  .immersive-class-card { display:flex; align-items:center; gap:12px; min-height:63px; padding:10px 12px; border:1px solid rgba(255,255,255,.11); border-radius:15px; background:linear-gradient(110deg,rgba(255,255,255,.045),rgba(255,255,255,.012)); }
+  .immersive-class-card strong { display:block; color:#f4f5f8; font-size:13px; line-height:1.2; }
+  .immersive-class-card small { display:block; margin-top:4px; color:#8991a3; font-size:10px; line-height:1.25; }
+  .immersive-class-card b { display:block; color:#f4f5f8; font-size:14px; white-space:nowrap; }
+  .immersive-class-card > div:last-child small { color:#24d6a2; text-align:right; }
+  .immersive-class-swatch { width:5px; height:34px; flex:none; border-radius:8px; background:var(--class-color); box-shadow:0 0 14px color-mix(in srgb,var(--class-color),transparent 65%); }
+  .immersive-legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:13px; color:#9299a9; font-size:10px; }
+  .immersive-legend span { display:flex; align-items:center; gap:6px; }
+  .immersive-legend i { width:9px; height:9px; border-radius:50%; background:#30333e; }
+  .immersive-legend .legend-picked { background:#1ed6ae; }
+  .immersive-size-select { width:100px; border:1px solid rgba(255,255,255,.12); border-radius:24px; padding:9px 11px; background:#12141b; color:#fff; font-size:12px; }
+  .immersive-best-button { flex:1; border:0; border-radius:24px; padding:10px; background:#f7f7f8; color:#111; font-weight:800; font-size:12px; }
+  .immersive-selected-seats { min-height:50px; padding:14px; border:1px dashed rgba(255,255,255,.14); border-radius:14px; color:#9ca5b8; font-size:11px; }
+  .immersive-checkout-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin: auto -20px -18px; padding:18px 20px; border-top:1px solid rgba(255,255,255,.1); }
+  .immersive-checkout-row small { display:block; color:#8991a3; font-size:10px; }
+  .immersive-checkout-row strong { display:block; margin-top:2px; color:#fff; font-size:24px; }
+  .immersive-checkout-row button { border:0; border-radius:13px; padding:12px 20px; background:#f2b936; color:#17120a; font-weight:900; font-size:12px; text-transform:uppercase; letter-spacing:.1em; }
+  .immersive-checkout-row button:disabled { opacity:.4; cursor:not-allowed; }
+  @media (max-width: 900px) { .immersive-booking-layout { grid-template-columns:1fr; } .immersive-viewer-column { min-height:55vh; } .immersive-viewer-column #ar-theater-wrapper { min-height:55vh; } .immersive-seat-sidebar { min-height:0; border-left:0; border-top:1px solid rgba(255,255,255,.1); } .immersive-checkout-row { margin-top:22px; } }
+  @media (max-width: 520px) { .immersive-viewer-column { min-height:390px; } .immersive-viewer-column #ar-theater-wrapper { min-height:390px; } .immersive-seat-sidebar { padding:19px 15px 15px; } .immersive-checkout-row { margin:20px -15px -15px; padding:15px; } }
+  #ar-theater-wrapper.theater-expanded { height: 520px; }
+  @media (min-width: 640px) { #ar-theater-wrapper.theater-expanded { height: 680px; } }
   #ar-canvas-container:fullscreen { width: 100vw; height: 100vh; max-height: none; border: 0; border-radius: 0; }
   #ar-canvas-container:fullscreen #arCanvas,
   #ar-canvas-container.vr-immersive #arCanvas { width: 100%; height: 100%; }
   #ar-canvas-container.vr-immersive { position: fixed; inset: 0; z-index: 100; width: 100vw; height: 100vh; max-height: none; border: 0; border-radius: 0; }
 </style>
 
-<!-- 🥽 ADVANCED VR CINEMA SEAT PREVIEW MODAL -->
-<div id="arSeatModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/92 backdrop-blur-md p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="vr-title">
-  <div class="w-full max-w-6xl max-h-[96vh] lg:h-[94vh] bg-[#090b10] rounded-3xl border border-white/10 overflow-hidden shadow-2xl flex flex-col">
-    <!-- Header -->
-    <header class="px-5 py-3.5 bg-[#10131a] border-b border-white/10 flex items-center justify-between gap-4">
-      <div class="min-w-0">
-        <div class="flex items-center gap-2">
-          <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[9px] font-black uppercase tracking-widest">VR Cinema Simulator</span>
-          <span class="text-xs text-slate-500 font-bold hidden sm:inline">Real-time Layout & Spatial Acoustics</span>
-        </div>
-        <h2 id="vr-title" class="mt-1 text-sm sm:text-base text-white font-black truncate">{{ showtime.theater }} <span class="text-slate-500 font-normal">·</span> {{ screen.name }}</h2>
-        <p class="text-[11px] text-slate-400 truncate">{{ movie.title }} <span class="text-slate-600">·</span> {{ showtime.show_date.strftime('%a, %d %b %Y') }} <span class="text-slate-600">·</span> {{ showtime.show_time }}</p>
-      </div>
-
-      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-        <!-- Prev / Next Seat Quick Steppers -->
-        <div class="flex items-center gap-1 bg-black/40 border border-white/10 rounded-xl p-1">
-          <button type="button" onclick="navVrSeat(-1)" title="Previous Seat" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white flex items-center justify-center text-xs transition">
-            <i class="fa-solid fa-chevron-left"></i>
-          </button>
-          <span id="ar-seat-name" class="px-2 text-xs font-bold text-amber-200 select-none">Select a seat</span>
-          <button type="button" onclick="navVrSeat(1)" title="Next Seat" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white flex items-center justify-center text-xs transition">
-            <i class="fa-solid fa-chevron-right"></i>
-          </button>
-        </div>
-
-        <button type="button" onclick="close3dArModal()" aria-label="Close VR Cinema Preview" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white flex items-center justify-center transition">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-    </header>
-
-    <!-- Main Modal Content -->
-    <div class="p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_310px] lg:grid-rows-[minmax(0,1fr)] gap-4 overflow-y-auto lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-      <!-- 3D Viewport Column -->
-      <div class="flex flex-col gap-2 min-h-0">
-        <div id="ar-canvas-container" class="relative w-full h-[320px] sm:h-[440px] lg:h-full min-h-[300px] overflow-hidden rounded-2xl border border-white/10 bg-[#07080d] shadow-2xl select-none group">
-          <canvas id="arCanvas" width="960" height="540" class="block w-full h-full bg-[#07080d] cursor-grab active:cursor-grabbing" aria-label="Illustrative cinema view from the selected seat"></canvas>
-
-          <!-- Trailer Video Window (Oriented to 3D Quad) -->
-          <div id="ar-screen-video-window" class="absolute hidden overflow-hidden rounded-md shadow-2xl" style="pointer-events:auto;">
-            <iframe id="ar-trailer-iframe" class="absolute inset-0 h-full w-full" title="{{ movie.title }} Trailer" referrerpolicy="strict-origin-when-cross-origin" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-            <video id="ar-trailer-video" class="absolute inset-0 hidden h-full w-full object-cover" controls autoplay muted playsinline></video>
-          </div>
-          <span id="ar-trailer-badge" class="absolute left-3 top-3 hidden rounded-full border border-rose-500/30 bg-rose-950/80 px-3 py-1 text-[9px] font-black tracking-widest text-rose-200 backdrop-blur shadow">● NOW PLAYING IN SEAT POV</span>
-
-          <!-- FLOATING TOP SPATIAL HUD -->
-          <div class="absolute top-2.5 left-2.5 right-2.5 flex flex-wrap items-center justify-between gap-1.5 pointer-events-none">
-            <div class="flex items-center gap-1.5 pointer-events-auto">
-              <span id="vr-hud-seat" class="px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-amber-300/30 text-amber-200 text-[10px] font-black">Row C · Seat 8</span>
-              <span id="vr-hud-fov" class="px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-white/10 text-white text-[10px] font-semibold hidden sm:inline">🎯 38° FOV · 11.2m</span>
-            </div>
-            <div class="flex items-center gap-1.5 pointer-events-auto">
-              <span id="vr-hud-sound" class="px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md border border-sky-400/30 text-sky-200 text-[10px] font-bold">🔊 Dolby Atmos 360°</span>
-            </div>
-          </div>
-
-          <!-- FLOATING BOTTOM CONTROLS TOOLBAR -->
-          <div class="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-            <!-- Left: Recline & Format Controls -->
-            <div class="flex items-center gap-1.5 bg-black/80 backdrop-blur-md border border-white/15 rounded-xl px-2.5 py-1.5 pointer-events-auto shadow-lg">
-              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Recline:</span>
-              <button type="button" onclick="setPovRecline(0)" id="vr-recline-0" class="text-[10px] font-bold text-amber-200 px-1.5 py-0.5 rounded">Upright</button>
-              <button type="button" onclick="setPovRecline(1)" id="vr-recline-1" class="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded">Relaxed</button>
-              <button type="button" onclick="setPovRecline(2)" id="vr-recline-2" class="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded">VIP 140°</button>
-
-              <span class="text-white/20">|</span>
-
-              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">Screen:</span>
-              <button type="button" onclick="setPovFormat('wide')" id="vr-format-wide" class="text-[10px] font-bold text-amber-100 px-1.5 py-0.5 rounded border border-amber-300/40">16:9</button>
-              <button type="button" onclick="setPovFormat('scope')" id="vr-format-scope" class="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded">Scope</button>
-              <button type="button" onclick="setPovFormat('imax')" id="vr-format-imax" class="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded">IMAX</button>
-            </div>
-
-            <!-- Right: Actions -->
-            <div class="flex items-center gap-1.5 pointer-events-auto">
-              <button type="button" onclick="resetVrView()" title="Center Camera Look" class="h-8 px-2.5 rounded-xl bg-black/80 hover:bg-black border border-white/15 text-slate-300 hover:text-white text-[10px] font-bold transition flex items-center gap-1 shadow-lg">
-                <i class="fa-solid fa-arrows-to-dot"></i><span class="hidden sm:inline">Center</span>
-              </button>
-              <button type="button" id="vr-gyro-btn" onclick="toggleVrGyro()" title="Mobile Tilt Gyroscope" class="h-8 px-2.5 rounded-xl bg-black/80 hover:bg-black border border-white/15 text-slate-300 hover:text-cyan-300 text-[10px] font-bold transition flex items-center gap-1 shadow-lg">
-                <i class="fa-solid fa-mobile-screen"></i><span class="hidden sm:inline">Gyro</span>
-              </button>
-              <button type="button" onclick="toggleVrTrailer()" class="h-8 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-[10px] font-bold transition flex items-center gap-1.5 shadow-lg">
-                <i class="fa-solid fa-play text-[8px]"></i><span>Trailer POV</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Side Information & Interactive Mini-Map Column -->
-      <aside class="rounded-2xl border border-white/10 bg-[#10131a] p-3.5 flex flex-col gap-3 lg:min-h-0 lg:overflow-hidden shadow-inner">
-        <!-- Selected Seat Status -->
-        <div class="rounded-xl border border-white/10 bg-black/40 p-3">
-          <p class="text-[9px] uppercase tracking-[.2em] text-amber-300 font-bold">Selected Seat Inspection</p>
-          <div class="mt-2 flex items-center gap-3">
-            <span class="w-9 h-9 rounded-xl border border-amber-300/30 bg-amber-300/10 flex items-center justify-center text-amber-200 text-sm"><i class="fa-solid fa-chair"></i></span>
-            <div class="min-w-0">
-              <p id="vr-selected-row" class="text-sm font-black text-white">Select a seat</p>
-              <p id="vr-selected-seat" class="text-[11px] text-slate-400 truncate">Seat marker follows the saved seat map</p>
-            </div>
-          </div>
-          <p id="vr-view-angle" class="mt-2.5 rounded-lg bg-white/[.04] px-2 py-1.5 text-[10px] font-medium text-amber-100/90 leading-tight">Field of View &amp; neck tilt calculated</p>
-        </div>
-
-        <!-- Interactive VR Seat Mini-Map -->
-        <div class="min-h-0 flex flex-1 flex-col">
-          <div class="flex items-center justify-between mb-1.5">
-            <p class="text-[9px] uppercase tracking-[.2em] text-slate-400 font-bold">Click any seat to fly there</p>
-            <span class="text-[9px] font-bold text-amber-400/90">SCREEN ↑</span>
-          </div>
-          <div id="vr-seat-map" class="relative max-h-36 sm:max-h-56 lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-2.5 space-y-1" role="img" aria-label="Interactive mini seat map"></div>
-
-          <!-- Mini Map Legend -->
-          <div class="mt-2 flex items-center justify-between text-[9px] text-slate-400 px-1">
-            <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-amber-300 animate-pulse"></span> Viewing</span>
-            <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-400"></span> Selected</span>
-            <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-slate-600"></span> Available</span>
-          </div>
-        </div>
-
-        <!-- 1-Click Seat Reservation inside VR Mode -->
-        <div class="mt-auto pt-2 border-t border-white/10 flex flex-col gap-2">
-          <button type="button" id="vr-reserve-btn" onclick="toggleVrSeatSelection()" class="w-full rounded-xl bg-amber-300 hover:bg-amber-200 text-[#1a1408] font-black text-xs px-3 py-2.5 transition flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/40">
-            <i class="fa-solid fa-plus-circle"></i><span>Reserve This Seat</span>
-          </button>
-
-          <div class="grid grid-cols-2 gap-2">
-            <button type="button" onclick="jumpVrSweetspot()" class="rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-[10px] font-bold py-1.5 transition flex items-center justify-center gap-1">
-              <i class="fa-solid fa-star text-amber-400 text-[9px]"></i><span>Sweetspot</span>
-            </button>
-            <button type="button" onclick="enterVRView()" class="rounded-lg bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-200 text-[10px] font-bold py-1.5 transition flex items-center justify-center gap-1">
-              <i class="fa-solid fa-vr-cardboard text-[10px]"></i><span>Fullscreen</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-    </div>
-  </div>
+<!-- Full 3D seat preview powered by the supplied CineVR auditorium simulator -->
+<div id="arSeatModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/95 p-0 backdrop-blur-xl sm:p-2" role="dialog" aria-modal="true" aria-label="3D cinema seat preview">
+  <iframe id="vr-preview-frame" title="Interactive 3D cinema seat preview" data-src="{{ url_for('vr_seat_preview', showtime_id=showtime.id) }}" class="h-full w-full overflow-hidden border-0 bg-[#07090e] sm:rounded-2xl" allow="fullscreen; autoplay"></iframe>
 </div>
 {% endblock %}

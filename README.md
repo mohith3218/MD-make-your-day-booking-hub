@@ -10,9 +10,33 @@ pip install -r requirements.txt
 python app.py           # http://127.0.0.1:5000
 ```
 
-Admin login: `admin` / `admin123`.
+On a fresh database, the app creates an `admin` account and prints its one-time password in the startup console. Set `ADMIN_PASSWORD` before first startup to choose the password yourself. Set `SECRET_KEY` to a long random value to keep sessions valid across restarts. For an HTTPS deployment, also set `SESSION_COOKIE_SECURE=1`. Flask debug mode is off by default; set `FLASK_DEBUG=1` only for local development. Existing databases keep their current admin password; change any old demo password before deployment.
 Your old `vizag_movies.db` keeps working — `auto_migrate()` adds the new columns on startup.
 If you'd rather start clean, delete `instance/vizag_movies.db` and run again.
+
+### Email verification and ticket delivery
+
+New registrations require a verified email address. The app emails a six-digit OTP,
+valid for 10 minutes, and limits each code to five attempts with a 60-second resend
+cooldown. A confirmed payment automatically emails the ticket details and QR image.
+If delivery fails after payment, the booking stays confirmed and the ticket page
+offers a resend action.
+
+Configure an SMTP service before enabling registration. Copy `.env.example` to
+`.env`, then fill in the real settings for your mail provider. The app loads this
+file at startup; restart the server after editing it. For Gmail, use a Google
+App Password rather than your normal account password. Keep `.env` private and
+never commit it:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Use port `587` with `SMTP_USE_SSL=0` for STARTTLS, or an implicit TLS port such as
+`465` with `SMTP_USE_SSL=1`. Existing accounts are preserved as verified during
+database migration; new accounts must complete OTP verification before they can
+sign in.
 
 Verify everything at once:
 
