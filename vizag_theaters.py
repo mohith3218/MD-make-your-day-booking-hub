@@ -1170,6 +1170,57 @@ AUDITORIUM_SCREEN_PROFILES = {
         "confidence": {"appearance": "medium", "geometry": "estimated"},
         "notes": "Historical venue-level photo shows red ribbed side walls, dark lower wall panels, and classic seats. Existing upper/lower balcony divisions remain from the saved seat layout; the photo does not verify them."
     },
+    ("Sarat Theatre", "Main Screen"): {
+        "theater": "Sarat Theatre", "screen": "Main Screen",
+        "reference_status": "verified_reference",
+        "references": [{
+            "source_url": "https://in.bookmyshow.com/buytickets/sarat-theater-a-c-4k-dolby-atmos-vizag/cinema-viza-sttr-MT",
+            "image_url": "https://assets-in.bmscdn.com/moviesmaster/assets/sttr/sarat-seat1_1761032356359.jpg",
+            "view": "front_to_rear_seating", "screen_verified": True,
+            "captured_at": None, "published_at": None,
+            "license": "review_required", "approved_for_use": False,
+            "notes": "Inspected BookMyShow auditorium interior image shows purple tiered seats, a central aisle, tall patterned side-wall panels, a continuous side light band and a dark gridded ceiling. BookMyShow venue address matches this seeded single-screen Sarat Theatre; image date and reuse permission are unconfirmed."
+        }],
+        "architecture": {
+            "levels": 1, "seating_style": "stadium",
+            "wall_style": "vertical_ribbed_acoustic_panels",
+            "left_wall": "vertical_ribbed_acoustic_panels",
+            "right_wall": "vertical_ribbed_acoustic_panels",
+            "seat_color": "#71345f", "wall_color": "#1a1a20",
+            "panel_color": "#62413d", "lighting_style": "linear_warm",
+            "lighting_color": "#d2c5a8", "ceiling_color": "#292a30",
+            "ceiling_style": "grid", "ceiling_panel_color": "#33343b",
+            "floor_color": "#242328", "screen_type": "unverified"
+        },
+        "confidence": {"appearance": "medium", "geometry": "estimated"},
+        "notes": "Appearance values reconstruct the inspected interior photo. Room dimensions, exact screen curvature, and seat-by-seat geometry remain estimated or taken from the saved booking layout."
+    },
+    ("INOX Varun Beach", "Screen 5"): {
+        "theater": "INOX Varun Beach", "screen": "Screen 5",
+        "reference_status": "verified_reference",
+        "references": [{
+            "source_url": "https://www.youtube.com/watch?v=Q9NEzBk8vzA",
+            "image_url": "https://i.ytimg.com/vi/Q9NEzBk8vzA/hq720.jpg",
+            "view": "rear_to_screen", "screen_verified": True,
+            "captured_at": None, "published_at": None,
+            "license": "review_required", "approved_for_use": False,
+            "notes": "Inspected video thumbnail is an auditorium interior and visibly labels Vizag Varun INOX Screen 5. It shows dark branded seats, tiered rows, linear side-wall lighting and a paneled ceiling; video date, currentness and reuse permission are unconfirmed."
+        }],
+        "architecture": {
+            "levels": 1, "seating_style": "standard",
+            "wall_style": "horizontal_bands",
+            "left_wall": "horizontal_bands", "right_wall": "horizontal_bands",
+            "seat_color": "#25262b", "wall_color": "#17191d",
+            "left_wall_color": "#203443", "right_wall_color": "#282622",
+            "panel_color": "#34343a", "left_panel_color": "#315064",
+            "right_panel_color": "#49433b", "lighting_style": "linear_warm",
+            "lighting_color": "#d4c9a8", "ceiling_color": "#292821",
+            "ceiling_style": "grid", "ceiling_panel_color": "#33323a",
+            "floor_color": "#211f20", "screen_type": "unverified"
+        },
+        "confidence": {"appearance": "medium", "geometry": "estimated"},
+        "notes": "The visible Screen 5 label supports the screen match. Measurements, exact screen surface, and physical seat spacing remain estimates based on the saved layout."
+    },
     ("AAA Cinemas", "Screen 7"): {
         "theater": "AAA Cinemas", "screen": "Screen 7",
         "reference_status": "estimated_model",
@@ -1222,7 +1273,55 @@ def _attach_auditorium_screen_profile(layout, theater_name, screen_name):
     """Fill an absent per-screen visual profile without overwriting admin edits."""
     profile = AUDITORIUM_SCREEN_PROFILES.get((theater_name, screen_name))
     if not profile:
-        return False
+        # Keep a distinct, editable record for every seeded screen. Without a
+        # verified interior photograph, preserve the real seat layout and use
+        # conservative styling derived from its own seat classes only.
+        import copy
+        visual = layout.get("visual") if isinstance(layout.get("visual"), dict) else {}
+        # Venue-level photos are not screen-level evidence. Use neutral screen
+        # defaults for generated profiles and rely only on per-screen edits or
+        # a curated screen profile for colors and construction.
+        if visual.get("verified_at_theater_level"):
+            visual = {}
+        classes = layout.get("classes", [])
+        recliner = any("reclin" in str(c.get("name", "")).lower() or
+                       "reclin" in str(c.get("code", "")).lower()
+                       for c in classes)
+        style_index = sum(ord(char) for char in f"{theater_name}/{screen_name}") % 4
+        estimated_styles = [
+            ("acoustic_panels_estimated", "grid_estimated", "warm_sconces_estimated", "#bc9463"),
+            ("vertical_ribbed_estimated", "ribbed_estimated", "low_level_estimated", "#486a85"),
+            ("horizontal_bands_estimated", "plain_estimated", "linear_accents_estimated", "#80614d"),
+            ("geometric_panels_estimated", "grid_estimated", "blue_geometric_estimated", "#4d5f8d"),
+        ]
+        wall_style, ceiling_style, lighting_style, estimated_light = estimated_styles[style_index]
+        architecture = {
+            "levels": len(layout.get("levels") or [None]),
+            "seating_style": "recliner_estimated" if recliner else "stadium_estimated",
+            "wall_style": wall_style,
+            "left_wall": wall_style,
+            "right_wall": wall_style,
+            "seat_color": visual.get("seat_color", "#51252d"),
+            "wall_color": visual.get("wall_color", "#11151d"),
+            "panel_color": visual.get("panel_color", "#1a202b"),
+            "lighting_color": visual.get("lighting_color", estimated_light),
+            "lighting_style": lighting_style,
+            "ceiling_style": ceiling_style,
+            "ceiling_color": visual.get("ceiling_color", "#171a22"),
+            "floor_color": visual.get("floor_color", "#17151a"),
+            "left_panel_spacing_m": 2.7 + style_index * 0.38,
+            "right_panel_spacing_m": 2.9 + style_index * 0.34,
+            "screen_type": (layout.get("screen") or {}).get("surface", "flat_estimated"),
+            "geometry_source": "saved_screen_seat_layout; room dimensions estimated",
+        }
+        profile = {
+            "theater": theater_name, "screen": screen_name,
+            "reference_status": "estimated_model", "references": [],
+            "profile_version": 2,
+            "architecture": architecture,
+            "confidence": {"appearance": "low", "geometry": "seat_layout_only"},
+            "notes": "No verified interior photograph is mapped to this individual screen. The procedural wall, light, ceiling and color choices are visual estimates, not claims about the real venue; saved bookable seat rows remain authoritative.",
+        }
     import copy
     architecture = profile.get("architecture") or {}
     visual = layout.setdefault("visual", {})
@@ -1374,6 +1473,10 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
                         existing_profile = current_layout.get("reference_profile")
                         profile_is_seeded = (not isinstance(existing_profile, dict)
                                              or not existing_profile.get("administrator_edited"))
+                    if profile_is_seeded and existing_profile != known_profile:
+                        import copy
+                        current_layout["reference_profile"] = copy.deepcopy(known_profile)
+                        changed = True
                         current_profile = current_layout.setdefault("reference_profile", {})
                         if isinstance(current_profile, dict):
                             for key, value in known_profile.items():

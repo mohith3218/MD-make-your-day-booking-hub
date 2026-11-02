@@ -1,5 +1,6 @@
 """Focused geometry assertions; these tests do not touch the app database."""
 import unittest
+import copy
 
 import seat_layout as sl
 import vizag_theaters as theaters
@@ -86,6 +87,44 @@ class AuditoriumGeometryTests(unittest.TestCase):
                 with self.subTest(theater=theater["name"], screen=screen_name):
                     self.assertEqual(sl.validate_auditorium_geometry(layout), [])
                     self.assertGreater(sl.count_seats(layout), 0)
+
+    def test_every_screen_gets_an_individual_truthful_visual_profile(self):
+        profile_keys = set()
+        status_counts = {}
+        for theater in theaters.VIZAG_THEATERS:
+            for screen_name, screen_type, source_layout in theater["screens"]:
+                layout = copy.deepcopy(source_layout)
+                theaters._attach_auditorium_visual(layout, theater["name"], screen_type)
+                theaters._attach_auditorium_screen_profile(layout, theater["name"], screen_name)
+                profile = layout["reference_profile"]
+                profile_keys.add((profile["theater"], profile["screen"]))
+                status_counts[profile["reference_status"]] = status_counts.get(profile["reference_status"], 0) + 1
+                if (theater["name"], screen_name) not in theaters.AUDITORIUM_SCREEN_PROFILES:
+                    self.assertEqual(profile["reference_status"], "estimated_model")
+                    self.assertEqual(profile["references"], [])
+
+        self.assertEqual(len(profile_keys), 127)
+        self.assertEqual(status_counts.get("verified_reference"), 3)
+        self.assertEqual(status_counts.get("venue_reference"), 1)
+        self.assertEqual(status_counts.get("estimated_model"), 123)
+
+    def test_screen_photo_profiles_are_interior_only_and_admin_edits_survive(self):
+        for key in [("Sarat Theatre", "Main Screen"), ("INOX Varun Beach", "Screen 5")]:
+            profile = theaters.AUDITORIUM_SCREEN_PROFILES[key]
+            reference = profile["references"][0]
+            self.assertTrue(reference["screen_verified"])
+            self.assertFalse(reference["approved_for_use"])
+            self.assertEqual(reference["license"], "review_required")
+            self.assertIn("interior", reference["notes"].lower())
+
+        layout = {"visual": {}, "reference_profile": {
+            "theater": "INOX Varun Beach", "screen": "Screen 5",
+            "reference_status": "estimated_model", "administrator_edited": True,
+            "architecture": {"seat_color": "#123456"},
+        }}
+        theaters._attach_auditorium_screen_profile(layout, "INOX Varun Beach", "Screen 5")
+        self.assertEqual(layout["reference_profile"]["architecture"]["seat_color"], "#123456")
+        self.assertTrue(layout["reference_profile"]["administrator_edited"])
 
     def test_duplicate_seat_ids_across_price_classes_are_rejected(self):
         layout = {"classes": [

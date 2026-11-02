@@ -38,6 +38,7 @@
             font-family: 'Inter', sans-serif;
             color: #e2e8f0;
         }
+        #canvas-container { touch-action: none; }
 
         .font-display {
             font-family: 'Space Grotesk', sans-serif;
@@ -378,6 +379,10 @@
                 <i class="fa-solid fa-helicopter"></i>
                 <span class="hidden sm:inline">Full theater</span>
             </button>
+            <button id="btn-screen-mode" onclick="setCameraPreset('screen')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs text-slate-200" title="Screen-centered auditorium view"><i class="fa-solid fa-tv"></i></button>
+            <button onclick="setCameraPreset('left')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs text-cyan-200" title="View from the left side wall"><i class="fa-solid fa-arrow-left"></i></button>
+            <button onclick="setCameraPreset('right')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs text-cyan-200" title="View from the right side wall"><i class="fa-solid fa-arrow-right"></i></button>
+            <button onclick="setCameraPreset('reset')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs text-slate-200" title="Reset to the full auditorium overview"><i class="fa-solid fa-rotate-left"></i></button>
             <button id="btn-exit-Top" onclick="lookAtNearestExit()" class="neo-btn px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-emerald-400 border-emerald-500/30" title="Rotate VR Head to Nearest 3D Illuminated Exit Door">
                 <i class="fa-solid fa-person-running"></i>
                 <span>Find exit</span>
@@ -778,6 +783,12 @@
             previewBooted = true;
             try {
                 loadVizagAuditorium('project');
+                // Keep the auditorium readable on phone-sized screens. Both
+                // panels stay available through their compact toggle buttons.
+                if (window.matchMedia('(max-width: 640px)').matches) {
+                    toggleSeatDetailsCollapse();
+                    toggleMinimapCollapse();
+                }
                 camera.position.copy(cameraTargetPos);
                 startAnimationLoop();
             } catch (error) {
@@ -1172,6 +1183,9 @@
         let auditoriumCenterTarget = new THREE.Vector3(0, 5, 0);
         let auditoriumRearWallZ = 11;
         let auditoriumOverviewCamera = new THREE.Vector3(0, 16, -22);
+        let auditoriumLeftCamera = new THREE.Vector3(-12, 8, -8);
+        let auditoriumRightCamera = new THREE.Vector3(12, 8, -8);
+        let auditoriumScreenCamera = new THREE.Vector3(0, 5, -10);
         let auditoriumOverviewFov = 58;
 
         // Shared PBR Materials
@@ -1243,6 +1257,11 @@
             const trimBaseColor = architecture.trim_color || visual.trim_color || '#c9a84c';
             const lightingBaseColor = architecture.lighting_color || trimBaseColor;
             const panelBaseColor = architecture.panel_color || '#121826';
+            const leftWallStyle = architecture.left_wall || architecture.wall_style || 'acoustic_panels';
+            const rightWallStyle = architecture.right_wall || architecture.wall_style || 'acoustic_panels';
+            const ceilingColor = architecture.ceiling_color || wallBaseColor;
+            const floorColor = architecture.floor_color || '#15151a';
+            const ceilingStyle = architecture.ceiling_style || 'acoustic_grid';
             matStdAvail.color.set(seatBaseColor);
             matVipAvail.color.set(trimBaseColor);
             matReclinerAvail.color.set(seatBaseColor);
@@ -1290,6 +1309,10 @@
             // A raised rear camera clears nearby seat backs while keeping the
             // full seating bowl and screen in frame.
             auditoriumOverviewCamera.set(0, Math.max(5, rearRowY + 4, roomHeight * 0.62), auditoriumRearWallZ - Math.max(2, hallDepth * 0.06));
+            const sideCameraX = hallHalfWidth * 0.76;
+            auditoriumLeftCamera.set(-sideCameraX, Math.max(2.6, roomHeight * 0.42), hallCenterZ * 0.72);
+            auditoriumRightCamera.set(sideCameraX, Math.max(2.6, roomHeight * 0.42), hallCenterZ * 0.72);
+            auditoriumScreenCamera.set(0, Math.max(3.0, Math.min(roomHeight * 0.52, rearRowY + 1.4)), auditoriumRearWallZ - Math.max(2, hallDepth * 0.06));
             const viewDistance = auditoriumOverviewCamera.distanceTo(auditoriumCenterTarget);
             const viewAspect = Math.max(0.7, renderer.domElement.clientWidth / Math.max(1, renderer.domElement.clientHeight));
             const verticalFit = roomHeight / Math.max(1, viewDistance);
@@ -1316,6 +1339,35 @@
             screenMesh.position.set(0, screenY, thetaLength ? screenSurfaceZ - radius : screenSurfaceZ);
             auditoriumGroup.add(screenMesh);
 
+            // Front acoustic wall sits behind the projection surface. The
+            // screen remains a separate surface and its artwork stays crisp.
+            const frontWallGeo = thetaLength
+                ? new THREE.CylinderGeometry(radius + 0.35, radius + 0.35, roomHeight, 64, 1, true, thetaStart, thetaLength)
+                : new THREE.BoxGeometry(hallHalfWidth * 2, roomHeight, 0.32);
+            if (thetaLength) frontWallGeo.scale(-1, 1, 1);
+            const frontWall = new THREE.Mesh(
+                frontWallGeo,
+                new THREE.MeshStandardMaterial({ color: wallBaseColor, roughness: 0.94, side: THREE.DoubleSide })
+            );
+            frontWall.position.set(0, roomHeight / 2, thetaLength ? -radius - 0.4 : -0.28);
+            auditoriumGroup.add(frontWall);
+
+            if (!thetaLength) {
+                const frameMat = new THREE.MeshStandardMaterial({ color: trimBaseColor, roughness: 0.62, metalness: 0.18 });
+                const frameDepth = 0.16;
+                const frameParts = [
+                    [screenWidthM + 0.42, 0.16, screenY + screenHeightM / 2 + 0.08, 0],
+                    [screenWidthM + 0.42, 0.16, screenY - screenHeightM / 2 - 0.08, 0],
+                    [0.16, screenHeightM, screenY, -(screenWidthM / 2 + 0.13)],
+                    [0.16, screenHeightM, screenY, screenWidthM / 2 + 0.13],
+                ];
+                frameParts.forEach(([w, h, y, x]) => {
+                    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, h, frameDepth), frameMat);
+                    bar.position.set(x, y, 0.08);
+                    auditoriumGroup.add(bar);
+                });
+            }
+
             // Screen Gold/Cyan Ambient Frame
             if (thetaLength) {
                 const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, screenHeightM + 0.5, 64, 1, true, thetaStart - 0.01, thetaLength + 0.02);
@@ -1327,32 +1379,70 @@
             }
 
             // Front Stage Deck + Subwoofer Array + LED Strip
-            const stageGeo = new THREE.BoxGeometry(hallHalfWidth * 2, 0.9, 5.5);
-            const stageMat = new THREE.MeshStandardMaterial({ color: 0x080b12, roughness: 0.3, metalness: 0.5 });
+            const stageGeo = new THREE.BoxGeometry(hallHalfWidth * 2, 0.22, 1.1);
+            const stageMat = new THREE.MeshStandardMaterial({ color: 0x11131a, roughness: 0.92, metalness: 0.01 });
             const stageMesh = new THREE.Mesh(stageGeo, stageMat);
-            stageMesh.position.set(0, 0.45, screenSurfaceZ + 2.8);
+            stageMesh.position.set(0, 0.11, screenSurfaceZ + 0.58);
             auditoriumGroup.add(stageMesh);
 
-            const stageLedGeo = new THREE.BoxGeometry(hallHalfWidth * 1.85, 0.08, 0.08);
-            const stageLedMat = new THREE.MeshBasicMaterial({ color: trimBaseColor });
+            const stageLedGeo = new THREE.BoxGeometry(hallHalfWidth * 1.85, 0.025, 0.04);
+            const stageLedMat = new THREE.MeshStandardMaterial({
+                color: trimBaseColor, emissive: trimBaseColor, emissiveIntensity: 0.12,
+                roughness: 0.8, metalness: 0.02
+            });
             const stageLed = new THREE.Mesh(stageLedGeo, stageLedMat);
-            stageLed.position.set(0, 0.92, screenSurfaceZ + 5.6);
+            stageLed.position.set(0, 0.24, screenSurfaceZ + 1.12);
             auditoriumGroup.add(stageLed);
 
             // 2. Floor, Acoustic Ribbed Side Walls & Dolby Atmos Speaker Arrays
             const wallMat = new THREE.MeshStandardMaterial({ color: wallBaseColor, roughness: 0.85, metalness: 0.15 });
             const floorGeo = new THREE.PlaneGeometry(hallHalfWidth * 2, hallDepth);
-            const floorMesh = new THREE.Mesh(floorGeo, wallMat);
+            const carpetCanvas = document.createElement('canvas');
+            carpetCanvas.width = carpetCanvas.height = 128;
+            const carpetCtx = carpetCanvas.getContext('2d');
+            carpetCtx.fillStyle = floorColor;
+            carpetCtx.fillRect(0, 0, 128, 128);
+            const carpetRgb = new THREE.Color(floorColor);
+            for (let i = 0; i < 1100; i++) {
+                const shade = Math.random() > 0.5 ? 1.12 : 0.78;
+                carpetCtx.fillStyle = `rgba(${Math.round(carpetRgb.r * 255 * shade)},${Math.round(carpetRgb.g * 255 * shade)},${Math.round(carpetRgb.b * 255 * shade)},0.2)`;
+                carpetCtx.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 2, 1);
+            }
+            const carpetTexture = new THREE.CanvasTexture(carpetCanvas);
+            carpetTexture.wrapS = carpetTexture.wrapT = THREE.RepeatWrapping;
+            carpetTexture.repeat.set(Math.max(1, hallHalfWidth / 2), Math.max(1, hallDepth / 4));
+            const floorMesh = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, map: carpetTexture, roughness: 0.98 }));
             floorMesh.rotation.x = -Math.PI / 2;
             floorMesh.position.set(0, 0, hallCenterZ);
             auditoriumGroup.add(floorMesh);
 
             const ceilingGeo = new THREE.PlaneGeometry(hallHalfWidth * 2, hallDepth);
-            const ceilingMat = new THREE.MeshStandardMaterial({ color: wallBaseColor, roughness: 0.96, side: THREE.DoubleSide });
+            const ceilingMat = new THREE.MeshStandardMaterial({ color: ceilingColor, roughness: 0.96, side: THREE.DoubleSide });
             const ceilingMesh = new THREE.Mesh(ceilingGeo, ceilingMat);
             ceilingMesh.rotation.x = Math.PI / 2;
             ceilingMesh.position.set(0, roomHeight, hallCenterZ);
             auditoriumGroup.add(ceilingMesh);
+
+            const ceilingRibGeo = new THREE.BoxGeometry(hallHalfWidth * 1.94, 0.12, 0.16);
+            const ceilingRibMat = new THREE.MeshStandardMaterial({
+                color: architecture.ceiling_panel_color || panelBaseColor, roughness: 0.92
+            });
+            const ribSpacing = Math.max(2.2, Math.min(5.5, Number(architecture.ceiling_panel_spacing_m) || 3.4));
+            if (!/plain|flat/i.test(String(ceilingStyle))) {
+                for (let z = screenSurfaceZ + 1; z < auditoriumRearWallZ; z += ribSpacing) {
+                    const ceilingRib = new THREE.Mesh(ceilingRibGeo, ceilingRibMat);
+                    ceilingRib.position.set(0, roomHeight - 0.16, z);
+                    auditoriumGroup.add(ceilingRib);
+                }
+                if (/grid|cross/i.test(String(ceilingStyle))) {
+                    const ceilingCrossGeo = new THREE.BoxGeometry(0.12, 0.1, hallDepth - 1);
+                    [-0.34, 0.34].forEach(offset => {
+                        const crossRib = new THREE.Mesh(ceilingCrossGeo, ceilingRibMat);
+                        crossRib.position.set(offset * hallHalfWidth * 2, roomHeight - 0.18, hallCenterZ);
+                        auditoriumGroup.add(crossRib);
+                    });
+                }
+            }
 
             // Elevated levels receive one structural deck and simple continuous
             // guard rails, keeping object count independent of seat count.
@@ -1396,24 +1486,57 @@
             for (let side of [-1, 1]) {
                 const wallX = side * hallHalfWidth;
                 const sideWallGeo = new THREE.BoxGeometry(0.35, roomHeight, hallDepth);
-                const sideWall = new THREE.Mesh(sideWallGeo, wallMat);
+                const sideWallMaterial = new THREE.MeshStandardMaterial({
+                    color: side < 0 ? (architecture.left_wall_color || wallBaseColor) : (architecture.right_wall_color || wallBaseColor),
+                    roughness: 0.88
+                });
+                const sideWall = new THREE.Mesh(sideWallGeo, sideWallMaterial);
                 sideWall.position.set(wallX, roomHeight / 2, hallCenterZ);
                 auditoriumGroup.add(sideWall);
 
-                for (let z = screenSurfaceZ + 1; z <= auditoriumRearWallZ - 3; z += Math.max(3.5, hallDepth / 12)) {
+                const wallStyle = side < 0 ? leftWallStyle : rightWallStyle;
+                const panelSpacing = Number((side < 0 ? architecture.left_panel_spacing_m : architecture.right_panel_spacing_m)
+                    || architecture.panel_spacing_m || Math.max(3.5, hallDepth / 12));
+                for (let z = screenSurfaceZ + 1; z <= auditoriumRearWallZ - 3; z += panelSpacing) {
                     const panelHeight = Math.min(10, roomHeight * 0.66);
                     const panelY = roomHeight * 0.53;
-                    const panelGeo = new THREE.BoxGeometry(0.35, panelHeight, 2.8);
-                    const panelMat = new THREE.MeshStandardMaterial({ color: panelBaseColor, roughness: 0.9 });
+                    const panelDepth = Math.max(0.35, Math.min(3.2, panelSpacing * 0.72));
+                    const styleText = String(wallStyle);
+                    const ribbed = /rib|vertical/i.test(styleText);
+                    const horizontal = /horizontal|linear/i.test(styleText);
+                    const panelGeo = new THREE.BoxGeometry(
+                        ribbed ? 0.5 : 0.22,
+                        horizontal ? Math.max(0.35, panelHeight * 0.28) : panelHeight,
+                        ribbed ? 0.34 : panelDepth
+                    );
+                    const panelMat = new THREE.MeshStandardMaterial({
+                        color: side < 0 ? (architecture.left_panel_color || panelBaseColor) : (architecture.right_panel_color || panelBaseColor),
+                        roughness: 0.92
+                    });
                     const panel = new THREE.Mesh(panelGeo, panelMat);
-                    panel.position.set(wallX - side * 0.25, panelY, z);
+                    panel.position.set(wallX - side * 0.25,
+                        horizontal ? panelY + Math.sin(z * 0.24) * panelHeight * 0.22 : panelY,
+                        z);
                     auditoriumGroup.add(panel);
 
+                    if (/geometric|angled|blue/i.test(styleText)) {
+                        const accentGeo = new THREE.BoxGeometry(0.1, 0.1, Math.min(2.4, panelDepth * 0.8));
+                        const accent = new THREE.Mesh(accentGeo, new THREE.MeshBasicMaterial({ color: lightingBaseColor }));
+                        accent.position.set(wallX - side * 0.43, panelY - panelHeight * 0.28, z);
+                        accent.rotation.x = (z % 2 ? 1 : -1) * 0.18;
+                        auditoriumGroup.add(accent);
+                    }
+
                     // Wall Sconce Neon Bar
-                    const sconceGeo = new THREE.BoxGeometry(0.1, Math.min(4.2, roomHeight * 0.38), 0.1);
+                    const lightingStyle = String(architecture.lighting_style || 'accent');
+                    const sconceGeo = /linear|geometric|blue/i.test(lightingStyle)
+                        ? new THREE.BoxGeometry(0.08, 0.08, Math.min(2.8, panelSpacing * 0.8))
+                        : new THREE.BoxGeometry(0.1, Math.min(2.8, roomHeight * 0.26), 0.1);
                     const sconceMat = new THREE.MeshBasicMaterial({ color: lightingBaseColor });
                     const sconce = new THREE.Mesh(sconceGeo, sconceMat);
-                    sconce.position.set(wallX - side * 0.42, roomHeight * 0.56, z + 1.65);
+                    sconce.position.set(wallX - side * 0.42,
+                        /linear|geometric|blue/i.test(lightingStyle) ? roomHeight * 0.48 : roomHeight * 0.56,
+                        z + (sconceGeo.parameters.depth || 1.65) / 2);
                     auditoriumGroup.add(sconce);
 
                     // 3D Dolby Atmos Wall Surround Speaker + Blue LED
@@ -1623,7 +1746,10 @@
                         id: seatId, row: rowLetter, rowIndex: rIdx, num: sNum,
                         isOccupied, isVIP, isRecliner, tier, price,
                         worldPos: seatGroup.position.clone(),
-                        eyePos: seatGroup.localToWorld(new THREE.Vector3(0, 1.35, -0.58)),
+                        // Keep a consistent adult seated eye height (~1.14 m
+                        // above the row base) across standard and recliner
+                        // seat scales, clearing the next row's headrest.
+                        eyePos: seatGroup.localToWorld(new THREE.Vector3(0, 1.14 / seatGroup.scale.y, -0.62)),
                         group: seatGroup,
                         instanceParts: [
                             part(cushionInstances, upholsteryStart, [0, 0.43, 0], [0.5 * seatWidth, 0.17 * seatHeight, 0.47 * seatDepth]),
@@ -1946,7 +2072,30 @@
 
         function setCameraPreset(preset) {
             if (preset === 'overview') return setCameraMode('overview');
+            if (preset === 'reset') return setCameraMode('overview');
             if (preset === 'seat') return setCameraMode('seat');
+            if (preset === 'screen') {
+                cameraMode = preset;
+                updateCameraModeButtons();
+                camera.fov = 60;
+                camera.updateProjectionMatrix();
+                cameraTargetPos.copy(auditoriumScreenCamera);
+                desiredLookAtTarget.copy(screenCenterTarget);
+                targetYawOffset = 0;
+                targetPitchOffset = 0;
+                return;
+            }
+            if (preset === 'left' || preset === 'right') {
+                cameraMode = preset;
+                updateCameraModeButtons();
+                camera.fov = 58;
+                camera.updateProjectionMatrix();
+                cameraTargetPos.copy(preset === 'left' ? auditoriumLeftCamera : auditoriumRightCamera);
+                desiredLookAtTarget.copy(screenCenterTarget);
+                targetYawOffset = 0;
+                targetPitchOffset = 0;
+                return;
+            }
             if (preset === 'balcony') {
                 const balconyRows = (currentAudi.geometry?.rows || []).filter(row => ['balcony', 'mezzanine'].includes(String(row.levelType || '').toLowerCase()));
                 if (!balconyRows.length) return setCameraMode('overview');
@@ -1975,6 +2124,7 @@
         function updateCameraModeButtons() {
             document.getElementById('btn-pov-mode').classList.toggle('active', cameraMode === 'seat');
             document.getElementById('btn-overview-mode').classList.toggle('active', cameraMode === 'overview');
+            document.getElementById('btn-screen-mode').classList.toggle('active', cameraMode === 'screen');
         }
 
         /********************************************************************
@@ -2228,6 +2378,15 @@
         let dragDistance = 0;
         let prevPointer = { x: 0, y: 0 };
         const tooltipEl = document.getElementById('seat-tooltip');
+        const activePointers = new Map();
+        let pinchDistance = 0;
+        function zoomCamera(factor) {
+            const focus = desiredLookAtTarget;
+            const offset = cameraTargetPos.clone().sub(focus);
+            const distance = Math.max(0.1, offset.length());
+            offset.multiplyScalar(THREE.MathUtils.clamp(distance * factor, 1.4, Math.max(24, auditoriumRearWallZ * 1.7)) / distance);
+            cameraTargetPos.copy(focus).add(offset);
+        }
 
         // Resolve the first seat mesh hit into a seat id (deduplicates the 5 seat meshes).
         function seatIdFromHit(hit) {
@@ -2250,6 +2409,14 @@
         }
 
         container.addEventListener('pointerdown', (e) => {
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (e.pointerType === 'touch' && activePointers.size >= 2) {
+                const points = [...activePointers.values()];
+                pinchDistance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+                isDragging = false;
+                dragDistance = Infinity;
+                return;
+            }
             isDragging = true;
             dragDistance = 0;
             prevPointer = { x: e.clientX, y: e.clientY };
@@ -2257,9 +2424,25 @@
             pointer.lastY = e.clientY;
         });
 
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            zoomCamera(e.deltaY > 0 ? 1.1 : 0.9);
+        }, { passive: false });
+
         window.addEventListener('pointermove', (e) => {
             pointer.lastX = e.clientX;
             pointer.lastY = e.clientY;
+
+            if (e.pointerType === 'touch' && activePointers.has(e.pointerId)) {
+                activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                if (activePointers.size >= 2) {
+                    const points = [...activePointers.values()];
+                    const nextDistance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+                    if (pinchDistance > 0 && nextDistance > 0) zoomCamera(pinchDistance / nextDistance);
+                    pinchDistance = nextDistance;
+                    return;
+                }
+            }
 
             if (isDragging) {
                 const dx = e.clientX - prevPointer.x;
@@ -2543,6 +2726,8 @@
         }
 
         window.addEventListener('pointerup', (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size < 2) pinchDistance = 0;
             if (!isDragging) return;
             isDragging = false;
 
