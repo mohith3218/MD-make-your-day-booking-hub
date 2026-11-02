@@ -1253,7 +1253,18 @@
             const stadiumSlope = Number(config.stadiumSlope || 0.18);
             const farthestRowZ = Math.max(8, ...rowPositions.map(p => Number(p.z || 0)));
             const rearRowY = Math.max(0.35, ...rowPositions.map(p => Number(p.y || 0)));
-            const roomHeight = Math.max(Number(physicalRoom.height || 8), physicalScreen.bottom + physicalScreen.height + 2, rearRowY + 4);
+            // Older app workers and pre-geometry layout payloads may not send
+            // `geometry` yet. Never let undefined screen values poison all
+            // wall dimensions and camera coordinates with NaN.
+            const screenWidthM = Number.isFinite(Number(physicalScreen.width)) && Number(physicalScreen.width) > 0
+                ? Number(physicalScreen.width) : Math.max(6, Number(config.screenWidth) || 12);
+            const screenHeightM = Number.isFinite(Number(physicalScreen.height)) && Number(physicalScreen.height) > 0
+                ? Number(physicalScreen.height) : Math.max(3, Number(config.screenHeight) || screenWidthM / 1.85);
+            const screenBottomM = Number.isFinite(Number(physicalScreen.bottom)) && physicalScreen.bottom !== null && physicalScreen.bottom !== ''
+                ? Math.max(0, Number(physicalScreen.bottom)) : 1;
+            const roomHeightM = Number.isFinite(Number(physicalRoom.height)) && Number(physicalRoom.height) > 0
+                ? Number(physicalRoom.height) : 0;
+            const roomHeight = Math.max(roomHeightM, screenBottomM + screenHeightM + 2, rearRowY + 4, 6);
 
             // 1. Giant Curved Cinema Screen
             const configuredCurve = Number(physicalScreen.curve ?? ((physicalScreen.surface === 'flat' || physicalScreen.surface === 'led') ? 0 : (config.screenCurve ?? 0.3)));
@@ -1263,7 +1274,7 @@
             // CylinderGeometry uses x = r·sin(theta), z = r·cos(theta).
             const thetaStart = -thetaLength / 2;
             const screenSurfaceZ = 0;
-            const screenY = Number(physicalScreen.bottom || 1) + Number(physicalScreen.height || config.screenHeight) / 2;
+            const screenY = screenBottomM + screenHeightM / 2;
             auditoriumRearWallZ = Math.max(Number(physicalRoom.depth || farthestRowZ + 8), farthestRowZ + 5);
             const hallDepth = auditoriumRearWallZ + 4;
             const hallCenterZ = (screenSurfaceZ + auditoriumRearWallZ) / 2;
@@ -1280,14 +1291,15 @@
             const viewAspect = Math.max(0.7, renderer.domElement.clientWidth / Math.max(1, renderer.domElement.clientHeight));
             const verticalFit = roomHeight / Math.max(1, viewDistance);
             const horizontalFit = (hallHalfWidth * 2) / Math.max(1, viewDistance * viewAspect);
-            auditoriumOverviewFov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.max(verticalFit, horizontalFit) * 0.62)), 30, 78);
+            const fittedFov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.max(verticalFit, horizontalFit) * 0.62));
+            auditoriumOverviewFov = Number.isFinite(fittedFov) ? THREE.MathUtils.clamp(fittedFov, 30, 78) : 58;
             camera.far = Math.max(160, hallDepth + radius * 2 + 60);
             camera.updateProjectionMatrix();
             currentLookAtTarget.copy(screenCenterTarget);
             desiredLookAtTarget.copy(screenCenterTarget);
             const screenGeo = thetaLength
-                ? new THREE.CylinderGeometry(radius, radius, physicalScreen.height || config.screenHeight, 64, 1, true, thetaStart, thetaLength)
-                : new THREE.PlaneGeometry(physicalScreen.width || config.screenWidth, physicalScreen.height || config.screenHeight);
+                ? new THREE.CylinderGeometry(radius, radius, screenHeightM, 64, 1, true, thetaStart, thetaLength)
+                : new THREE.PlaneGeometry(screenWidthM, screenHeightM);
             if (thetaLength) screenGeo.scale(-1, 1, 1);
 
             const uvAttr = screenGeo.attributes.uv;
@@ -1303,7 +1315,7 @@
 
             // Screen Gold/Cyan Ambient Frame
             if (thetaLength) {
-                const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, (physicalScreen.height || config.screenHeight) + 0.5, 64, 1, true, thetaStart - 0.01, thetaLength + 0.02);
+                const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, screenHeightM + 0.5, 64, 1, true, thetaStart - 0.01, thetaLength + 0.02);
                 frameGeo.scale(-1, 1, 1);
                 const frameMat = new THREE.MeshBasicMaterial({ color: trimBaseColor, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
                 const frameMesh = new THREE.Mesh(frameGeo, frameMat);
