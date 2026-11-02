@@ -84,7 +84,7 @@ def auditorium_geometry(layout: dict, row_defs: list[dict], fallback_aspect: flo
         idx = per_level_index.get(level_id, 0)
         per_level_index[level_id] = idx + 1
         spacing = float(level.get("row_spacing_m") or default_spacing)
-        riser = float(level.get("riser_height_m") or .18)
+        riser = float(level.get("riser_height_m") or screen.get("riser_height_m") or .18)
         is_balcony = str(level.get("type") or "").lower() in {"balcony", "mezzanine"}
         base = float(level.get("base_elevation_m", 4.0 if is_balcony else 0) or 0)
         front = float(level.get("front_distance_m") or (balcony_front if is_balcony else 7.0))

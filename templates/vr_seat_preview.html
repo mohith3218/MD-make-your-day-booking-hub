@@ -355,7 +355,7 @@
                     </div>
                     <p id="active-movie-title" class="mt-1 max-w-[48vw] truncate text-xs font-bold text-white" title="{{ movie.title }}">{{ movie.title }}</p>
                     <p id="active-theater-sub" class="text-[10px] text-slate-400">{{ showtime.theater }} · {{ showtime.screen.name }} · {{ showtime.show_date.strftime('%a, %d %b') }} {{ showtime.show_time }}</p>
-                    <p class="text-[9px] text-slate-500">Seats follow the saved screen layout · room scale is estimated</p>
+                    <p class="text-[9px] text-slate-500">Seats follow the saved layout · {{ preview.reference_status_label }}</p>
                 </div>
             </div>
 
@@ -616,7 +616,7 @@
             <div class="relative mt-2.5 mb-1">
                 <div class="flex items-center justify-between text-[9px] font-bold text-emerald-400 mb-1 px-1">
                     <span onclick="lookAtSpecificExit('EXIT_FL')" class="cursor-pointer hover:underline flex items-center gap-1"><i class="fa-solid fa-door-open"></i> EXIT 1 (FL)</span>
-                    <span class="text-[8px] uppercase tracking-[0.22em] text-cyan-300/90 font-bold">Curved Cinema Screen</span>
+                    <span id="minimap-screen-label" class="text-[8px] uppercase tracking-[0.22em] text-cyan-300/90 font-bold">{{ preview.screen_label }}</span>
                     <span onclick="lookAtSpecificExit('EXIT_FR')" class="cursor-pointer hover:underline flex items-center gap-1">EXIT 2 (FR) <i class="fa-solid fa-door-open"></i></span>
                 </div>
                 <div class="w-4/5 mx-auto h-2.5 rounded-b-full border-b-2 border-cyan-400 shadow-[0_5px_14px_rgba(0,240,255,0.5)] bg-gradient-to-t from-cyan-400/25 to-transparent"></div>
@@ -1237,9 +1237,12 @@
 
             const rows = config.rows;
             const visual = config.visual || {};
-            const seatBaseColor = visual.seat_color || '#51252d';
-            const wallBaseColor = visual.wall_color || '#11151d';
-            const trimBaseColor = visual.trim_color || '#c9a84c';
+            const architecture = (config.referenceProfile || {}).architecture || {};
+            const seatBaseColor = architecture.seat_color || visual.seat_color || '#51252d';
+            const wallBaseColor = architecture.wall_color || visual.wall_color || '#11151d';
+            const trimBaseColor = architecture.trim_color || visual.trim_color || '#c9a84c';
+            const lightingBaseColor = architecture.lighting_color || trimBaseColor;
+            const panelBaseColor = architecture.panel_color || '#121826';
             matStdAvail.color.set(seatBaseColor);
             matVipAvail.color.set(trimBaseColor);
             matReclinerAvail.color.set(seatBaseColor);
@@ -1344,6 +1347,13 @@
             floorMesh.position.set(0, 0, hallCenterZ);
             auditoriumGroup.add(floorMesh);
 
+            const ceilingGeo = new THREE.PlaneGeometry(hallHalfWidth * 2, hallDepth);
+            const ceilingMat = new THREE.MeshStandardMaterial({ color: wallBaseColor, roughness: 0.96, side: THREE.DoubleSide });
+            const ceilingMesh = new THREE.Mesh(ceilingGeo, ceilingMat);
+            ceilingMesh.rotation.x = Math.PI / 2;
+            ceilingMesh.position.set(0, roomHeight, hallCenterZ);
+            auditoriumGroup.add(ceilingMesh);
+
             // Elevated levels receive one structural deck and simple continuous
             // guard rails, keeping object count independent of seat count.
             const levelRows = new Map();
@@ -1394,14 +1404,14 @@
                     const panelHeight = Math.min(10, roomHeight * 0.66);
                     const panelY = roomHeight * 0.53;
                     const panelGeo = new THREE.BoxGeometry(0.35, panelHeight, 2.8);
-                    const panelMat = new THREE.MeshStandardMaterial({ color: 0x121826, roughness: 0.9 });
+                    const panelMat = new THREE.MeshStandardMaterial({ color: panelBaseColor, roughness: 0.9 });
                     const panel = new THREE.Mesh(panelGeo, panelMat);
                     panel.position.set(wallX - side * 0.25, panelY, z);
                     auditoriumGroup.add(panel);
 
                     // Wall Sconce Neon Bar
                     const sconceGeo = new THREE.BoxGeometry(0.1, Math.min(4.2, roomHeight * 0.38), 0.1);
-                    const sconceMat = new THREE.MeshBasicMaterial({ color: z < 0 ? 0x00f0ff : 0xC9A84C });
+                    const sconceMat = new THREE.MeshBasicMaterial({ color: lightingBaseColor });
                     const sconce = new THREE.Mesh(sconceGeo, sconceMat);
                     sconce.position.set(wallX - side * 0.42, roomHeight * 0.56, z + 1.65);
                     auditoriumGroup.add(sconce);

@@ -7,6 +7,7 @@
     <a href="{{ url_for('screens') }}" class="text-xs text-slate-400 hover:text-white">← Theatres &amp; screens</a>
     <h1 class="text-2xl font-black text-white mt-1 break-words">{{ screen.theater.name }} · {{ screen.name }}</h1>
     <p class="text-[11px] text-slate-400">{{ screen.screen_type }} · {{ screen.total_seats }} seats · {{ screen.classes_summary or 'no classes' }}</p>
+    <a href="{{ url_for('edit_auditorium_reference', screen_id=screen.id) }}" class="inline-flex mt-2 px-3 py-2 rounded-lg border border-cyan-800 text-xs text-cyan-200 hover:bg-cyan-950/50">Photo reference &amp; 3D comparison</a>
   </div>
 </div>
 

@@ -1102,6 +1102,97 @@ AUDITORIUM_VISUAL_REFERENCES = {
     },
 }
 
+# Per-screen evidence lives with the static layout/profile, never with bookings
+# or seat availability. Remote photographs are references for administrators;
+# they are not downloaded, served as production textures, or fetched by booking
+# requests. `approved_for_use` is deliberately false until an administrator
+# verifies currentness and image permissions.
+AUDITORIUM_SCREEN_PROFILES = {
+    ("Sri Melody", "Main Screen"): {
+        "theater": "Sri Melody", "screen": "Main Screen",
+        "reference_status": "verified_reference",
+        "references": [{
+            "source_url": "https://x.com/rahool360/status/1946268195947724868",
+            "image_url": "https://pbs.twimg.com/media/GwKImW2WUAEEHbp.jpg",
+            "view": "side_to_rear_seating", "screen_verified": True,
+            "captured_at": None, "published_at": "2025-07-18",
+            "license": "review_required", "approved_for_use": False,
+            "notes": "Visitor post identifies Sri Melody, Vizag; inspected photo shows the auditorium interior. The venue is documented as single-screen, matching this Main Screen profile; currentness still needs administrator review."
+        }, {
+            "source_url": "https://x.com/siddhu_viva/status/1917967279054311734",
+            "image_url": "https://pbs.twimg.com/media/Gp3vVJ7bQAA6uLX.jpg",
+            "view": "rear_to_screen", "screen_verified": True,
+            "captured_at": None, "published_at": "2025-05-01",
+            "license": "review_required", "approved_for_use": False,
+            "notes": "CineMinds post about Melody Theatre's Barco HDR installation; inspected auditorium interior with screen visible. The venue is documented as single-screen, matching this Main Screen profile; currentness still needs administrator review."
+        }],
+        "technical_sources": [{
+            "source_url": "https://timesofindia.indiatimes.com/entertainment/theatre/vizag/melody-theater-jagdamba-junction/2344",
+            "kind": "single_screen_venue_listing",
+            "notes": "Times of India venue listing states Sri Melody has one screen; supports matching the venue-level auditorium photos to the project's Main Screen."
+        }, {
+            "source_url": "https://www.qubecinema.com/node/194",
+            "kind": "operator_technology_and_screen_context",
+            "notes": "Qube identifies Melody Cinema, Vizag, its stadium seating, baffle wall, and screen/AV installation. Its linked photo is rejected separately because it shows the exterior."
+        }],
+        "rejected_references": [{
+            "source_url": "https://www.qubecinema.com/sites/default/files/Melody-Cinema---Vizag.jpg",
+            "reason": "Inspected image is an exterior building photo, not an auditorium interior."
+        }],
+        "architecture": {
+            "levels": 1, "seating_style": "stadium",
+            "wall_style": "dark_acoustic_panels",
+            "seat_color": "#243d68", "lighting_style": "blue_geometric_accents",
+            "lighting_color": "#174bff", "wall_color": "#20212a",
+            "screen_type": "flat"
+        },
+        "confidence": {"appearance": "medium", "geometry": "estimated"},
+        "notes": "Two inspected interior views support the dark walls, blue accent lighting, tiered seating, and visible speaker positions. Single-screen listings establish the photo-to-screen match; room dimensions and currentness remain for review."
+    },
+    ("Jagadamba Theatre", "70MM Main"): {
+        "theater": "Jagadamba Theatre", "screen": "70MM Main",
+        "reference_status": "venue_reference",
+        "references": [{
+            "source_url": "https://x.com/Thyview/status/1452617243959836674",
+            "image_url": "https://pbs.twimg.com/media/FCi7rnDUcAEA4nk.jpg",
+            "view": "rear_to_screen", "screen_verified": False,
+            "captured_at": None, "published_at": "2021-10-25",
+            "license": "review_required", "approved_for_use": False,
+            "notes": "Image is an auditorium interior captioned Jagadamba Theater Auditorium. Historical 2021 view; present-day interior and balcony/screen match unverified."
+        }],
+        "architecture": {
+            "levels": 3, "seating_style": "traditional", "wall_style": "red_ribbed_upper_panels",
+            "seat_color": "#394457", "wall_color": "#65251c",
+            "panel_color": "#3c2c26", "lighting_style": "warm_ceiling_lights",
+            "lighting_color": "#e3a548",
+            "screen_type": "curved"
+        },
+        "confidence": {"appearance": "medium", "geometry": "estimated"},
+        "notes": "Historical venue-level photo shows red ribbed side walls, dark lower wall panels, and classic seats. Existing upper/lower balcony divisions remain from the saved seat layout; the photo does not verify them."
+    },
+    ("AAA Cinemas", "Screen 7"): {
+        "theater": "AAA Cinemas", "screen": "Screen 7",
+        "reference_status": "estimated_model",
+        "references": [],
+        "technical_sources": [{
+            "source_url": "https://www.linkedin.com/posts/asiancinemas_a-new-aaa-joins-the-asian-cinemas-family-activity-7494655804206411776-dV9k",
+            "kind": "operator_screen_specification",
+            "screen_verified": True,
+            "notes": "Official operator post verifies Screen 7 and 71 × 29.6 ft LED screen, but is not treated as an auditorium photograph."
+        }],
+        "architecture": {
+            "levels": 1, "seating_style": "steep_stadium_estimated",
+            "wall_style": "dark_estimated", "seat_color": "#27334a",
+            "wall_color": "#10141b", "panel_color": "#171c25",
+            "lighting_color": "#526b87", "lighting_style": "low_level_estimated",
+            "screen_type": "flat_led", "estimated_row_spacing_m": 1.05,
+            "estimated_riser_height_m": 0.25
+        },
+        "confidence": {"appearance": "low", "geometry": "estimated"},
+        "notes": "Only the flat LED screen dimensions and screen identity are published; room finish and the steeper row pitch are conservative estimates."
+    }
+}
+
 
 def _attach_auditorium_visual(layout, theater_name, screen_type):
     """Attach evidence-based room styling while retaining screen seat geometry."""
@@ -1127,14 +1218,53 @@ def _attach_auditorium_visual(layout, theater_name, screen_type):
     }
 
 
+def _attach_auditorium_screen_profile(layout, theater_name, screen_name):
+    """Fill an absent per-screen visual profile without overwriting admin edits."""
+    profile = AUDITORIUM_SCREEN_PROFILES.get((theater_name, screen_name))
+    if not profile:
+        return False
+    import copy
+    architecture = profile.get("architecture") or {}
+    visual = layout.setdefault("visual", {})
+    if isinstance(visual, dict) and visual.get("source") is None:
+        for key in ("seat_color", "wall_color", "panel_color", "lighting_color"):
+            if architecture.get(key):
+                visual[key] = architecture[key]
+    if (theater_name, screen_name) == ("AAA Cinemas", "Screen 7"):
+        screen = layout.setdefault("screen", {})
+        if isinstance(screen, dict):
+            screen.setdefault("row_spacing_m", architecture.get("estimated_row_spacing_m", 1.05))
+            screen.setdefault("riser_height_m", architecture.get("estimated_riser_height_m", 0.25))
+    if "reference_profile" not in layout:
+        layout["reference_profile"] = copy.deepcopy(profile)
+        return True
+    # Upgrade older seeds with newly researched evidence while preserving
+    # administrator changes and approval decisions on existing records.
+    existing = layout["reference_profile"]
+    if not isinstance(existing, dict):
+        layout["reference_profile"] = copy.deepcopy(profile)
+        return True
+    if not existing.get("administrator_edited"):
+        if existing != profile:
+            layout["reference_profile"] = copy.deepcopy(profile)
+            return True
+        return False
+    changed = False
+    for key, value in profile.items():
+        if key not in existing:
+            existing[key] = copy.deepcopy(value)
+            changed = True
+    return changed
+
+
 def _attach_known_screen_geometry(layout, theater_name, screen_name):
     """Add only published screen measurements; all unmeasured room data stays estimated."""
     screen_label = str(layout.get("screen_label", "")).upper()
     if theater_name == "AAA Cinemas" and screen_name == "Screen 7" and "Q-LUXON" in screen_label:
         published = {
-            "width_m": 70 * 0.3048, "height_m": 30 * 0.3048,
-            "aspect_ratio": 70 / 30, "surface": "flat", "curve": 0,
-            "source": "https://thirdeyecinemas.com/aaa-cinemas-vizag-introduces-indias-first-led-projection-q-luxon-screen/",
+            "width_m": 71 * 0.3048, "height_m": 29.6 * 0.3048,
+            "aspect_ratio": 71 / 29.6, "surface": "led", "curve": 0,
+            "source": "https://www.linkedin.com/posts/asiancinemas_a-new-aaa-joins-the-asian-cinemas-family-activity-7494655804206411776-dV9k",
         }
     elif theater_name == "Sri Melody":
         published = {
@@ -1212,6 +1342,12 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
         for screen_name, screen_type, layout in data["screens"]:
             _attach_auditorium_visual(layout, data["name"], screen_type)
             _attach_known_screen_geometry(layout, data["name"], screen_name)
+            _attach_auditorium_screen_profile(layout, data["name"], screen_name)
+            reference_profile = layout.get("reference_profile") or {}
+            profile_architecture = reference_profile.get("architecture") or {}
+            for source_key, visual_key in (("seat_color", "seat_color"),):
+                if profile_architecture.get(source_key):
+                    layout.setdefault("visual", {}).setdefault(visual_key, profile_architecture[source_key])
             existing = Screen.query.filter_by(theater_id=theater.id,
                                               name=screen_name).first()
             if existing:
@@ -1222,8 +1358,37 @@ def seed_vizag_theaters(db, Theater, Screen, verbose=True):
                     current_layout = existing.layout
                     changed = False
                     if current_layout.get("visual") != layout.get("visual"):
-                        current_layout["visual"] = layout["visual"]
-                        changed = True
+                        current_visual = current_layout.setdefault("visual", {})
+                        if not isinstance(current_visual, dict):
+                            current_layout["visual"] = layout["visual"]
+                            changed = True
+                        else:
+                            for key, value in layout["visual"].items():
+                                if key not in current_visual:
+                                    current_visual[key] = value
+                                    changed = True
+                    # Merge research metadata by missing fields only; an
+                    # administrator's corrections and approvals take priority.
+                    known_profile = layout.get("reference_profile")
+                    if isinstance(known_profile, dict):
+                        existing_profile = current_layout.get("reference_profile")
+                        profile_is_seeded = (not isinstance(existing_profile, dict)
+                                             or not existing_profile.get("administrator_edited"))
+                        current_profile = current_layout.setdefault("reference_profile", {})
+                        if isinstance(current_profile, dict):
+                            for key, value in known_profile.items():
+                                if key not in current_profile:
+                                    import copy
+                                    current_profile[key] = copy.deepcopy(value)
+                                    changed = True
+                            current_visual = current_layout.get("visual")
+                            profile_architecture = current_profile.get("architecture") or {}
+                            if (profile_is_seeded and isinstance(current_visual, dict)
+                                    and current_visual.get("source") is None):
+                                for key in ("seat_color", "wall_color", "panel_color", "lighting_color"):
+                                    if profile_architecture.get(key) and current_visual.get(key) != profile_architecture[key]:
+                                        current_visual[key] = profile_architecture[key]
+                                        changed = True
                     # Geometry metadata is merged by missing keys only; seat
                     # rows, IDs, prices, and any admin-entered dimensions survive.
                     known_screen = layout.get("screen")

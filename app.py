@@ -34,6 +34,7 @@ import re
 import secrets
 import smtplib
 import ssl
+from types import SimpleNamespace
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
@@ -44,11 +45,13 @@ import requests
 from flask import (
     Flask,
     abort,
+    current_app,
     flash,
     jsonify,
     redirect,
     render_template,
     request,
+    send_from_directory,
     session,
     url_for,
 )
@@ -1350,8 +1353,23 @@ def book(showtime_id):
 @login_required
 def vr_seat_preview(showtime_id):
     """Render the immersive seat preview from this show's real screen layout."""
-    purge_expired_holds()
-    showtime = Showtime.query.get_or_404(showtime_id)
+    admin_screen_id = request.args.get('admin_screen', type=int)
+    if admin_screen_id is not None:
+        guard = admin_required()
+        if guard:
+            return guard
+        screen_for_preview = Screen.query.get_or_404(admin_screen_id)
+        showtime = SimpleNamespace(
+            screen=screen_for_preview, layout=screen_for_preview.layout or {},
+            theater=screen_for_preview.theater.name,
+            movie=SimpleNamespace(title='Auditorium profile comparison'),
+            show_date=date.today(), show_time='Admin preview',
+            price_overrides={}, dynamic_pricing_info={'factor': 1},
+            booked_seat_ids=lambda: set(), held_seat_ids=lambda: set(),
+        )
+    else:
+        purge_expired_holds()
+        showtime = Showtime.query.get_or_404(showtime_id)
     if not showtime.screen:
         abort(404)
 
@@ -1413,6 +1431,15 @@ def vr_seat_preview(showtime_id):
     except (TypeError, ValueError):
         height = width / aspect
     geometry = sl.auditorium_geometry(layout, row_defs, fallback_aspect)
+    reference_profile = layout.get('reference_profile') or {}
+    reference_status = reference_profile.get('reference_status', 'estimated_model')
+    reference_status_label = {
+        'verified_reference': 'screen-identified photo reference · currentness/permission review pending',
+        'venue_reference': 'venue reference · screen match unverified',
+        'estimated_model': 'estimated auditorium appearance',
+    }.get(reference_status, 'administrator-defined appearance profile')
+    surface = str(geometry.get('screen', {}).get('surface', '')).lower()
+    screen_label = 'Flat LED screen' if surface == 'led' else ('Flat screen' if surface == 'flat' else 'Curved cinema screen')
     all_seat_ids = [seat_id for row in row_defs for seat_id in row['seats']]
     available_ids = [seat_id for row in row_defs for seat_id, state in row['seats'].items() if state == 'available']
     middle_row = row_defs[len(row_defs) // 2]
@@ -1428,6 +1455,15 @@ def vr_seat_preview(showtime_id):
         'cols': max_seat, 'aislesAfter': [], 'vipRows': [], 'reclinerRows': [],
         'screenWidth': width, 'screenHeight': height,
         'geometry': geometry,
+        # Only visual parameters and confidence are sent to customer pages.
+        # Photo URLs remain in the administrator reference workflow and are
+        # never requested by the ordinary preview renderer.
+        'referenceProfile': {
+            'architecture': reference_profile.get('architecture') or {},
+            'confidence': reference_profile.get('confidence') or {},
+        },
+        'reference_status_label': reference_status_label,
+        'screen_label': screen_label,
         'visual': layout.get('visual') or {
             'seat_color': '#51252d', 'wall_color': '#11151d',
             'trim_color': '#c9a84c', 'seat_style': 'standard',
@@ -2743,6 +2779,81 @@ def edit_layout(screen_id):
                                'room': (screen.layout or {}).get('room', {}),
                                'levels': (screen.layout or {}).get('levels', []),
                            }, indent=2))
+
+
+@app.route('/admin/screen/<int:screen_id>/auditorium-reference', methods=['GET', 'POST'])
+@login_required
+def edit_auditorium_reference(screen_id):
+    """Review per-screen interior-photo evidence and editable visual metadata."""
+    guard = admin_required()
+    if guard:
+        return guard
+    screen = Screen.query.get_or_404(screen_id)
+    layout = screen.layout or {}
+    profile = layout.get('reference_profile') or {
+        'theater': screen.theater.name, 'screen': screen.name,
+        'reference_status': 'estimated_model', 'references': [],
+        'architecture': {}, 'confidence': {'appearance': 'low', 'geometry': 'estimated'},
+    }
+
+    if request.method == 'POST':
+        try:
+            profile = json.loads(request.form.get('profile_json', '{}'))
+            if not isinstance(profile, dict) or not isinstance(profile.get('references', []), list):
+                raise ValueError('Profile must be an object with a references array.')
+            profile['theater'] = screen.theater.name
+            profile['screen'] = screen.name
+            profile['administrator_edited'] = True
+        except (json.JSONDecodeError, ValueError) as error:
+            flash(f'Reference profile was not saved: {error}')
+            return redirect(url_for('edit_auditorium_reference', screen_id=screen.id))
+
+        image_file = request.files.get('reference_image')
+        if image_file and image_file.filename:
+            extension = os.path.splitext(secure_filename(image_file.filename))[1].lower()
+            if extension not in {'.jpg', '.jpeg', '.png', '.webp'}:
+                flash('Upload a JPG, PNG, or WebP auditorium photo.')
+                return redirect(url_for('edit_auditorium_reference', screen_id=screen.id))
+            image_file.stream.seek(0, os.SEEK_END)
+            image_size = image_file.stream.tell()
+            image_file.stream.seek(0)
+            if image_size > 10 * 1024 * 1024:
+                flash('Reference photos must be 10 MB or smaller.')
+                return redirect(url_for('edit_auditorium_reference', screen_id=screen.id))
+            filename = secrets.token_hex(16) + extension
+            private_dir = os.path.join(current_app.instance_path, 'auditorium_references')
+            os.makedirs(private_dir, exist_ok=True)
+            image_file.save(os.path.join(private_dir, filename))
+            profile.setdefault('references', []).append({
+                'source_url': '', 'image_url': url_for('admin_auditorium_reference_file', filename=filename),
+                'view': 'unknown', 'screen_verified': False, 'captured_at': None,
+                'license': 'administrator_uploaded_review_required', 'approved_for_use': False,
+                'notes': 'Administrator upload; confirm venue, screen, date, and permissions before approval.'
+            })
+
+        layout['reference_profile'] = profile
+        screen.layout = layout
+        db.session.commit()
+        flash('Auditorium reference profile saved.')
+        return redirect(url_for('edit_auditorium_reference', screen_id=screen.id))
+
+    preview_url = url_for('vr_seat_preview', showtime_id=0, admin_screen=screen.id, embed=1)
+    return render_template('admin_auditorium_reference.html', screen=screen,
+                           profile_json=json.dumps(profile, indent=2),
+                           preview_url=preview_url)
+
+
+@app.route('/admin/auditorium-reference-file/<filename>')
+@login_required
+def admin_auditorium_reference_file(filename):
+    guard = admin_required()
+    if guard:
+        return guard
+    # Only random filenames generated by the upload handler are accepted.
+    if not re.fullmatch(r'[a-f0-9]{32}\.(?:jpg|jpeg|png|webp)', filename):
+        abort(404)
+    return send_from_directory(os.path.join(current_app.instance_path, 'auditorium_references'),
+                               filename, max_age=0)
 
 
 @app.route('/admin/add_showtime', methods=['GET', 'POST'])

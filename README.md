@@ -132,6 +132,14 @@ If you're on an older database, the seeder renames the four theatres that change
 instead of duplicating them, and adds the 15 new cinemas on next startup — or hit
 **Admin → Reseed Vizag theatres**.
 
+### Auditorium photo references
+
+Each researched screen can store a `reference_profile` alongside its static layout: interior-photo URLs, view direction, screen-match and approval state, visible architecture, and confidence. This metadata is separate from bookings and live seat availability. The customer preview receives only visual parameters; it does not fetch reference photos.
+
+Open **Admin → Theatres & Screens → Edit layout → Photo reference & 3D comparison** to compare reference interiors with the screen's interactive preview, edit the profile, mark a match/permission review, or upload an authorized auditorium photo. Uploaded references stay in the private instance folder and require administrator review. Reference images are not production textures.
+
+The initial Visakhapatnam profiles include an identified Main Screen reference for Sri Melody (the venue is documented as single-screen), a historical venue-level reference for Jagadamba, and an estimated room profile for AAA Screen 7. The Melody photo's present-day match still needs administrator review. AAA Screen 7 has its operator-published 71 × 29.6 ft LED dimensions, but no photograph is assigned to it without a reliable Screen 7 match. Unsupported venue photos are rejected explicitly.
+
 ## 4. Payment flow
 
 ```
