@@ -8,6 +8,8 @@ import json
 import os
 import re
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 if hasattr(sys.stdout, 'reconfigure'):
@@ -15,6 +17,10 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 os.environ.pop('RAZORPAY_KEY_ID', None)
 os.environ.setdefault('ADMIN_PASSWORD', 'admin123')
+# Keep this destructive integration test isolated from the app's local or
+# deployment database, even when DATABASE_URL is present in the shell.
+os.environ['DATABASE_URL'] = 'sqlite:///test_flow.db'
+os.environ['APP_ENV'] = 'testing'
 
 import app as A
 
@@ -116,6 +122,29 @@ def main():
                 follow_redirects=True)
     assert 'just taken' in r.get_data(as_text=True)
     print("3. seat lock OK - second user blocked from A2 with a clear message")
+
+    # ---- 3b. simultaneous requests race for the same seat ----------------
+    barrier = threading.Barrier(2)
+    def try_concurrent_hold(client):
+        barrier.wait(timeout=5)
+        return client.post(f'/book/{show_id}', data={'selected_seats': 'D1'},
+                           follow_redirects=False)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        simultaneous = list(pool.map(try_concurrent_hold, (c1, c2)))
+    winners = [response for response in simultaneous
+               if '/checkout/' in response.headers.get('Location', '')]
+    with A.app.app_context():
+        d1_holds = A.SeatHold.query.filter_by(showtime_id=show_id, seat_id='D1').all()
+        d1_bookings = [b for b in A.Booking.query.filter_by(showtime_id=show_id)
+                       if 'D1' in b.seat_list]
+        assert len(winners) == 1 and len(d1_holds) == 1 and len(d1_bookings) == 1
+        d1_reference = d1_bookings[0].reference
+        winner_user_id = d1_bookings[0].user_id
+        client_by_user = {A.User.query.filter_by(username=name).one().id: client
+                          for name, client in (('mohith', c1), ('rahul', c2))}
+        winner_client = client_by_user[winner_user_id]
+    winner_client.post(f'/booking/{d1_reference}/cancel')
+    print("3b. concurrent reservation OK - exactly one customer holds D1")
 
     # ---- 4. wallet payment ------------------------------------------------
     r = c1.post(f'/pay/wallet/{ref1}', follow_redirects=False)
@@ -220,6 +249,24 @@ def main():
         assert A.BookedSeat.query.filter_by(booking_id=live_booking.id).count() == 0
         A.release_booking(live_booking, 'CANCELLED')
     print("9b. live payment protected - sandbox route cannot capture a Razorpay order")
+
+    previous_env = os.environ.get('APP_ENV')
+    os.environ['APP_ENV'] = 'production'
+    try:
+        assert not A.payments.mock_payments_enabled()
+        assert not A.payments.verify_signature('order_mock_fake', 'pay_fake',
+                                                A.payments.mock_signature('order_mock_fake', 'pay_fake'))
+        try:
+            A.payments.create_order(100, 'production-guard')
+            raise AssertionError('Production unexpectedly created a mock payment order')
+        except A.payments.PaymentGatewayError:
+            pass
+    finally:
+        if previous_env is None:
+            os.environ.pop('APP_ENV', None)
+        else:
+            os.environ['APP_ENV'] = previous_env
+    print("9c. production payment guard OK - mock order and signature rejected")
 
     # ---- 10. hold expiry -------------------------------------------------
     r = c1.post(f'/book/{show_id}', data={'selected_seats': 'F1'}, follow_redirects=False)

@@ -100,16 +100,19 @@ def load_local_dotenv():
 load_local_dotenv()
 
 app = Flask(__name__)
-# Use a fresh key when one is not configured. Deployments should set SECRET_KEY
-# so sessions remain valid across restarts and app workers.
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+APP_ENV = os.environ.get('APP_ENV', 'development').strip().lower()
+app.config['APP_ENV'] = APP_ENV
+# Production must use a stable operator-managed key; development keeps a local fallback.
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or (
+    None if APP_ENV == 'production' else secrets.token_hex(32))
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///vizag_movies.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '').strip().lower() in {'1', 'true', 'yes'}
-app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024
+app.config['SESSION_COOKIE_SECURE'] = APP_ENV == 'production' or os.environ.get('SESSION_COOKIE_SECURE', '').strip().lower() in {'1', 'true', 'yes'}
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['STARTUP_ID'] = secrets.token_urlsafe(10)
 app.config['SMTP_HOST'] = os.environ.get('SMTP_HOST', '').strip()
 app.config['SMTP_PORT'] = int(os.environ.get('SMTP_PORT', '587'))
@@ -119,7 +122,7 @@ app.config['SMTP_FROM_EMAIL'] = os.environ.get('SMTP_FROM_EMAIL', app.config['SM
 app.config['SMTP_USE_SSL'] = os.environ.get('SMTP_USE_SSL', '').strip().lower() in {'1', 'true', 'yes'}
 
 # TMDb API Key
-TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "329d5f23baebf5312db6f28ab506ce9e")
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "").strip()
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 
@@ -133,6 +136,42 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+
+def validate_production_config():
+    """Fail closed when production is missing settings required for secure operation."""
+    if app.config['APP_ENV'] != 'production':
+        return
+    required = {
+        'SECRET_KEY': app.config.get('SECRET_KEY'),
+        'DATABASE_URL': os.environ.get('DATABASE_URL'),
+        'RAZORPAY_KEY_ID': os.environ.get('RAZORPAY_KEY_ID'),
+        'RAZORPAY_KEY_SECRET': os.environ.get('RAZORPAY_KEY_SECRET'),
+        'RAZORPAY_WEBHOOK_SECRET': os.environ.get('RAZORPAY_WEBHOOK_SECRET'),
+    }
+    missing = [name for name, value in required.items() if not value]
+    if app.config.get('SECRET_KEY') and len(app.config['SECRET_KEY']) < 32:
+        missing.append('SECRET_KEY (at least 32 characters)')
+    if missing:
+        raise RuntimeError('Production configuration is incomplete: ' + ', '.join(missing))
+    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:'):
+        raise RuntimeError('Production requires PostgreSQL; SQLite is supported for development and tests only.')
+
+
+@app.before_request
+def enforce_production_configuration():
+    validate_production_config()
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    if app.config['APP_ENV'] == 'production':
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
 
 
 # ====================== MODELS ======================
@@ -493,14 +532,11 @@ class Showtime(db.Model):
 
     def held_seat_ids(self, exclude_token=None):
         now = datetime.utcnow()
-        held = set()
-        q = SeatLock.query.filter(SeatLock.showtime_id == self.id,
-                                  SeatLock.expires_at > now)
-        for lk in q.all():
-            if exclude_token and lk.token == exclude_token:
-                continue
-            held.update(lk.seat_list)
-        return held
+        q = SeatHold.query.filter(SeatHold.showtime_id == self.id,
+                                  SeatHold.expires_at > now)
+        if exclude_token:
+            q = q.filter(SeatHold.token != exclude_token)
+        return {hold.seat_id for hold in q.all()}
 
     @property
     def seats_left(self):
@@ -621,6 +657,9 @@ class Booking(db.Model):
     payment = db.relationship('Payment', backref='booking', uselist=False,
                               cascade='all, delete-orphan')
 
+    __table_args__ = (db.Index('ix_booking_user_status_booked', 'user_id', 'status', 'booked_at'),
+                      db.Index('ix_booking_showtime_status', 'showtime_id', 'status'))
+
     @property
     def per_person_amount(self):
         count = max(1, len(self.seat_list))
@@ -677,9 +716,26 @@ class SeatLock(db.Model):
     expires_at = db.Column(db.DateTime,
                            default=lambda: datetime.utcnow() + timedelta(minutes=SEAT_LOCK_MINUTES))
 
+    __table_args__ = (db.Index('ix_seat_lock_showtime_expiry', 'showtime_id', 'expires_at'),)
+
     @property
     def seat_list(self):
         return [s for s in (self.seats or '').split(',') if s]
+
+
+class SeatHold(db.Model):
+    """Normalized temporary reservation for one seat, guarded by a unique key."""
+    id = db.Column(db.Integer, primary_key=True)
+    showtime_id = db.Column(db.Integer, db.ForeignKey('showtime.id'), nullable=False)
+    seat_id = db.Column(db.String(10), nullable=False)
+    token = db.Column(db.String(40), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('showtime_id', 'seat_id', name='uq_seat_hold_showtime_seat'),
+        db.Index('ix_seat_hold_expiry', 'expires_at'),
+        db.Index('ix_seat_hold_token', 'token'),
+    )
 
 
 class Payment(db.Model):
@@ -696,6 +752,8 @@ class Payment(db.Model):
     error_message = db.Column(db.String(300), nullable=True)
     raw_response = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.Index('ix_payment_order_id', 'order_id'),)
 
 
 class SplitContribution(db.Model):
@@ -966,6 +1024,8 @@ def purge_expired_holds():
     """Release stale locks and expire unpaid bookings. Cheap, safe to call often."""
     now = datetime.utcnow()
     stale = SeatLock.query.filter(SeatLock.expires_at <= now).all()
+    removed_holds = SeatHold.query.filter(SeatHold.expires_at <= now).delete(
+        synchronize_session=False)
     for lk in stale:
         db.session.delete(lk)
 
@@ -973,7 +1033,7 @@ def purge_expired_holds():
                                 Booking.expires_at <= now).all()
     for b in dead:
         b.status = 'EXPIRED'
-    if stale or dead:
+    if stale or dead or removed_holds:
         db.session.commit()
 
 
@@ -998,6 +1058,7 @@ def price_seats(showtime, seat_ids):
 def release_booking(booking, status='CANCELLED'):
     """Free the held seats for a booking that will not be paid."""
     if booking.lock_token:
+        SeatHold.query.filter_by(token=booking.lock_token).delete(synchronize_session=False)
         lock = SeatLock.query.filter_by(token=booking.lock_token).first()
         if lock:
             db.session.delete(lock)
@@ -1029,11 +1090,22 @@ def commit_seats(booking):
 def finalise_paid_booking(booking, payment):
     """Commit seats, mark paid, drop the lock. Returns (ok, message)."""
     try:
+        if booking.status == 'PENDING':
+            claimed = Booking.query.filter_by(id=booking.id, status='PENDING').update(
+                {Booking.status: 'PROCESSING'}, synchronize_session=False)
+            if claimed != 1:
+                db.session.rollback()
+                db.session.refresh(booking)
+                if booking.status == 'PAID':
+                    return True, 'Payment was already confirmed.'
+                return False, 'This booking is already being processed.'
+            booking.status = 'PROCESSING'
         commit_seats(booking)
         booking.status = 'PAID'
         booking.paid_at = datetime.utcnow()
         payment.status = 'CAPTURED'
         if booking.lock_token:
+            SeatHold.query.filter_by(token=booking.lock_token).delete(synchronize_session=False)
             lock = SeatLock.query.filter_by(token=booking.lock_token).first()
             if lock:
                 db.session.delete(lock)
@@ -1079,6 +1151,7 @@ def finalise_paid_booking(booking, payment):
                 if contribution.status == 'PAID':
                     contribution.status = 'REFUNDED'
             if booking.lock_token:
+                SeatHold.query.filter_by(token=booking.lock_token).delete(synchronize_session=False)
                 lock = SeatLock.query.filter_by(token=booking.lock_token).first()
                 if lock:
                     db.session.delete(lock)
@@ -1149,6 +1222,7 @@ def login():
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
+            session.clear()
             login_user(user)
             get_wallet(user)
             return redirect(safe_local_redirect(request.args.get('next')) or url_for('home'))
@@ -1317,6 +1391,9 @@ def book(showtime_id):
                         seats=",".join(seats_list))
         db.session.add(lock)
         db.session.flush()
+        db.session.add_all(SeatHold(showtime_id=showtime.id, seat_id=seat_id,
+                                    token=lock.token, expires_at=lock.expires_at)
+                           for seat_id in seats_list)
 
         booking = Booking(user_id=current_user.id, showtime_id=showtime.id,
                           seats=",".join(seats_list),
@@ -1328,7 +1405,13 @@ def book(showtime_id):
                           status='PENDING', lock_token=lock.token,
                           expires_at=lock.expires_at)
         db.session.add(booking)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # The unique (showtime, seat) hold key is the race-safe authority.
+            db.session.rollback()
+            flash("One or more seats were just held by another customer. Please choose again.")
+            return redirect(url_for('book', showtime_id=showtime_id))
 
         return redirect(url_for('checkout', reference=booking.reference))
 
@@ -1788,6 +1871,8 @@ def start_split_payment(token):
     lock = SeatLock.query.filter_by(token=booking.lock_token).first() if booking.lock_token else None
     if lock:
         lock.expires_at = booking.expires_at
+        SeatHold.query.filter_by(token=booking.lock_token).update(
+            {SeatHold.expires_at: booking.expires_at}, synchronize_session=False)
     db.session.commit()
     return render_template('split_pay_mock.html', booking=booking,
                            movie=booking.showtime.movie,
@@ -1854,6 +1939,8 @@ def simulate_split_payment(token, contribution_id):
     lock = SeatLock.query.filter_by(token=booking.lock_token).first() if booking.lock_token else None
     if lock:
         lock.expires_at = booking.expires_at
+        SeatHold.query.filter_by(token=booking.lock_token).update(
+            {SeatHold.expires_at: booking.expires_at}, synchronize_session=False)
     db.session.commit()
     flash(f'Your share is in. {paid_count} of {len(booking.seat_list)} shares paid.')
     return redirect(url_for('split_pay', token=token))
@@ -1913,8 +2000,20 @@ def pay_with_wallet(reference):
         flash("This booking can no longer be paid.")
         return redirect(url_for('dashboard'))
 
+    claimed = Booking.query.filter_by(id=booking.id, status='PENDING').update(
+        {Booking.status: 'PROCESSING'}, synchronize_session=False)
+    if claimed != 1:
+        db.session.rollback()
+        db.session.refresh(booking)
+        if booking.status == 'PAID':
+            return redirect(url_for('ticket', reference=reference))
+        flash('This payment is already being processed. Please refresh shortly.')
+        return redirect(url_for('dashboard'))
+    booking.status = 'PROCESSING'
+
     wallet = get_wallet(current_user)
     if wallet.balance < booking.total_amount:
+        db.session.rollback()
         flash("Not enough wallet balance. Recharge or pay by UPI / card.")
         return redirect(url_for('checkout', reference=reference))
 
@@ -2019,6 +2118,15 @@ def payment_callback():
         flash("Payment could not be verified. Nothing was charged.")
         return redirect(url_for('book', showtime_id=booking.showtime_id))
 
+    if payment.gateway == 'razorpay' and not payments.fetch_captured_payment(
+            order_id, payment_id, int(round(payment.amount * 100))):
+        payment.status = 'FAILED'
+        payment.error_message = 'Gateway payment details did not match the order'
+        db.session.commit()
+        release_booking(booking, 'FAILED')
+        flash("Payment could not be confirmed by the gateway. Please contact support if charged.")
+        return redirect(url_for('book', showtime_id=booking.showtime_id))
+
     if booking.status == 'PAID':                     # double submit guard
         return redirect(url_for('ticket', reference=reference))
     if booking.is_expired:
@@ -2040,6 +2148,8 @@ def payment_callback():
 @login_required
 def simulate(reference):
     """Sandbox 'Pay Now' / 'Simulate failure' buttons on the mock gateway page."""
+    if not payments.mock_payments_enabled():
+        abort(404)
     booking = _load_pending(reference)
     payment = booking.payment
     if (not payment or not payment.order_id or payment.gateway != 'mock'
@@ -2081,10 +2191,16 @@ def payment_webhook():
         return jsonify({'status': 'invalid signature'}), 400
 
     event = request.get_json(silent=True) or {}
+    if event.get('event') != 'payment.captured':
+        return jsonify({'status': 'ignored'}), 200
     entity = (event.get('payload', {}).get('payment', {}).get('entity', {}))
     order_id = entity.get('order_id')
     payment = Payment.query.filter_by(order_id=order_id).first()
-    if payment and payment.booking.status == 'PENDING':
+    if (payment and payment.gateway == 'razorpay'
+            and payment.booking.status == 'PENDING'
+            and entity.get('status') == 'captured'
+            and entity.get('currency') == payment.currency == 'INR'
+            and int(entity.get('amount', -1)) == int(round(payment.amount * 100))):
         payment.payment_id = entity.get('id')
         payment.method = entity.get('method', payment.method)
         finalise_paid_booking(payment.booking, payment)
@@ -3210,6 +3326,11 @@ def auto_migrate():
     vizag_movies.db keeps working instead of throwing OperationalError.
     """
     insp = inspect(db.engine)
+    # These indexes are safe to add to existing installations and speed up the
+    # booking history, pending-booking and expired-hold paths.
+    for index in (Booking.__table__.indexes | SeatLock.__table__.indexes
+                  | SeatHold.__table__.indexes | Payment.__table__.indexes):
+        index.create(bind=db.engine, checkfirst=True)
     wanted = {
         'user': [('phone', 'VARCHAR(15)'), ('points', 'INTEGER DEFAULT 100'),
                  ('email_verified', 'BOOLEAN DEFAULT 1'),
@@ -3247,6 +3368,17 @@ def auto_migrate():
             if col not in existing:
                 db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {coltype}'))
                 print(f"  migrated: {table}.{col}")
+    db.session.commit()
+
+    # Backfill active legacy CSV locks into normalized per-seat holds. If old
+    # overlapping locks exist, the first hold wins and the unique key preserves safety.
+    for lock in SeatLock.query.filter(SeatLock.expires_at > datetime.utcnow()).all():
+        for seat_id in lock.seat_list:
+            exists = SeatHold.query.filter_by(showtime_id=lock.showtime_id,
+                                              seat_id=seat_id).first()
+            if not exists:
+                db.session.add(SeatHold(showtime_id=lock.showtime_id, seat_id=seat_id,
+                                        token=lock.token, expires_at=lock.expires_at))
     db.session.commit()
 
     # backfill references + status for pre-existing bookings
