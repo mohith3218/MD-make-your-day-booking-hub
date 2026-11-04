@@ -473,7 +473,7 @@
         <div class="grid grid-cols-2 gap-2 mb-2.5">
             <div class="neo-inset rounded-xl p-2.5">
                 <div class="text-[10px] text-slate-400 flex items-center justify-between">
-                    <span>Estimated screen distance</span>
+                    <span>Seat to screen centre</span>
                     <i class="fa-solid fa-ruler-horizontal text-cyan-400"></i>
                 </div>
                 <div id="metric-distance" class="font-display font-bold text-sm text-white mt-0.5">—</div>
@@ -482,7 +482,7 @@
 
             <div class="neo-inset rounded-xl p-2.5">
                 <div class="text-[10px] text-slate-400 flex items-center justify-between">
-                    <span>Estimated screen angle</span>
+                    <span>Viewing angle to screen</span>
                     <i class="fa-solid fa-compass-drafting text-amber-400"></i>
                 </div>
                 <div id="metric-angle" class="font-display font-bold text-sm text-white mt-0.5">—</div>
@@ -491,13 +491,11 @@
 
             <div class="neo-inset rounded-xl p-2.5">
                 <div class="text-[10px] text-slate-400 flex items-center justify-between">
-                    <span>Relative seat score</span>
-                    <i class="fa-solid fa-wave-square text-purple-400"></i>
+                    <span>Geometry basis</span>
+                    <i class="fa-solid fa-ruler-combined text-purple-400"></i>
                 </div>
                 <div id="metric-audio" class="font-display font-bold text-sm text-white mt-0.5">—</div>
-                <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
-                    <div id="metric-audio-bar" class="h-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all duration-300" style="width: 0%"></div>
-                </div>
+                <div id="metric-geometry-desc" class="text-[10px] text-slate-400 mt-1">Room dimensions</div>
             </div>
 
             <!-- Nearest Exit Way Telemetry Card -->
@@ -1187,6 +1185,23 @@
         let auditoriumRightCamera = new THREE.Vector3(12, 8, -8);
         let auditoriumScreenCamera = new THREE.Vector3(0, 5, -10);
         let auditoriumOverviewFov = 58;
+        let auditoriumHalfWidth = 12;
+        let auditoriumRoomHeight = 9;
+        let auditoriumDepth = 30;
+        let overviewHorizontalSlope = 0;
+        let overviewVerticalSlope = 0;
+
+        function applyOverviewFieldOfView() {
+            const aspect = Math.max(0.5, container.clientWidth / Math.max(1, container.clientHeight));
+            const requiredSlope = Math.max(overviewVerticalSlope, overviewHorizontalSlope / aspect);
+            const fittedFov = THREE.MathUtils.radToDeg(2 * Math.atan(requiredSlope * 1.08));
+            auditoriumOverviewFov = Number.isFinite(fittedFov)
+                ? THREE.MathUtils.clamp(fittedFov, 32, 78) : 58;
+            if (cameraMode === 'overview') {
+                camera.fov = auditoriumOverviewFov;
+                camera.updateProjectionMatrix();
+            }
+        }
 
         // Shared PBR Materials
         // Soft upholstery palette: velvet, brass, and deep jade; selection and
@@ -1287,6 +1302,8 @@
             const roomHeightM = Number.isFinite(Number(physicalRoom.height)) && Number(physicalRoom.height) > 0
                 ? Number(physicalRoom.height) : 0;
             const roomHeight = Math.max(roomHeightM, screenBottomM + screenHeightM + 2, rearRowY + 4, 6);
+            auditoriumHalfWidth = hallHalfWidth;
+            auditoriumRoomHeight = roomHeight;
 
             // 1. Giant Curved Cinema Screen
             const configuredCurve = Number(physicalScreen.curve ?? ((physicalScreen.surface === 'flat' || physicalScreen.surface === 'led') ? 0 : (config.screenCurve ?? 0.3)));
@@ -1299,26 +1316,47 @@
             const screenY = screenBottomM + screenHeightM / 2;
             auditoriumRearWallZ = Math.max(Number(physicalRoom.depth || farthestRowZ + 8), farthestRowZ + 5);
             const hallDepth = auditoriumRearWallZ + 4;
+            auditoriumDepth = hallDepth;
             const hallCenterZ = (screenSurfaceZ + auditoriumRearWallZ) / 2;
             // Keep the seated sightline above nearby seat backs so the screen
             // and the room remain visible in the first-person preview.
-            screenCenterTarget.set(0, screenY + Math.min(1.0, config.screenHeight * 0.16), screenSurfaceZ);
+            screenCenterTarget.set(0, screenY, screenSurfaceZ);
             auditoriumCenterTarget.set(0, Math.max(5, rearRowY * 0.48 + 4), hallCenterZ);
-            // Keep the overview camera inside the auditorium, in the rear
-            // concourse, so the projection booth wall cannot block the view.
-            // A raised rear camera clears nearby seat backs while keeping the
-            // full seating bowl and screen in frame.
-            auditoriumOverviewCamera.set(0, Math.max(5, rearRowY + 4, roomHeight * 0.62), auditoriumRearWallZ - Math.max(2, hallDepth * 0.06));
+            // Place the opening camera in the elevated rear seating aisle and
+            // fit its frustum to the actual room, screen and seating envelope.
+            const rearAisleGap = Math.max(4.5, Math.min(hallHalfWidth * 0.55, hallDepth * 0.16));
+            auditoriumOverviewCamera.set(0,
+                Math.min(roomHeight - 0.65, Math.max(rearRowY + 2.25, roomHeight * 0.72)),
+                Math.min(auditoriumRearWallZ - 0.6, farthestRowZ + rearAisleGap));
             const sideCameraX = hallHalfWidth * 0.76;
             auditoriumLeftCamera.set(-sideCameraX, Math.max(2.6, roomHeight * 0.42), hallCenterZ * 0.72);
             auditoriumRightCamera.set(sideCameraX, Math.max(2.6, roomHeight * 0.42), hallCenterZ * 0.72);
             auditoriumScreenCamera.set(0, Math.max(3.0, Math.min(roomHeight * 0.52, rearRowY + 1.4)), auditoriumRearWallZ - Math.max(2, hallDepth * 0.06));
-            const viewDistance = auditoriumOverviewCamera.distanceTo(auditoriumCenterTarget);
-            const viewAspect = Math.max(0.7, renderer.domElement.clientWidth / Math.max(1, renderer.domElement.clientHeight));
-            const verticalFit = roomHeight / Math.max(1, viewDistance);
-            const horizontalFit = (hallHalfWidth * 2) / Math.max(1, viewDistance * viewAspect);
-            const fittedFov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.max(verticalFit, horizontalFit) * 0.62));
-            auditoriumOverviewFov = Number.isFinite(fittedFov) ? THREE.MathUtils.clamp(fittedFov, 30, 78) : 58;
+            const overviewTarget = new THREE.Vector3(0, screenY + roomHeight * 0.2, hallCenterZ * 0.34);
+            const forward = overviewTarget.clone().sub(auditoriumOverviewCamera).normalize();
+            const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+            const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+            const overviewBounds = [];
+            [-hallHalfWidth * 0.94, hallHalfWidth * 0.94].forEach(x => {
+                [0.05, roomHeight * 0.92].forEach(y => {
+                    [screenSurfaceZ, farthestRowZ].forEach(z => overviewBounds.push(new THREE.Vector3(x, y, z)));
+                });
+            });
+            [-screenWidthM / 2, screenWidthM / 2].forEach(x => {
+                [screenBottomM, screenBottomM + screenHeightM].forEach(y =>
+                    overviewBounds.push(new THREE.Vector3(x, y, screenSurfaceZ)));
+            });
+            overviewHorizontalSlope = 0;
+            overviewVerticalSlope = 0;
+            overviewBounds.forEach(point => {
+                const relative = point.clone().sub(auditoriumOverviewCamera);
+                const depth = relative.dot(forward);
+                if (depth <= 0.25) return;
+                overviewHorizontalSlope = Math.max(overviewHorizontalSlope, Math.abs(relative.dot(right)) / depth);
+                overviewVerticalSlope = Math.max(overviewVerticalSlope, Math.abs(relative.dot(up)) / depth);
+            });
+            auditoriumCenterTarget.copy(overviewTarget);
+            applyOverviewFieldOfView();
             camera.far = Math.max(160, hallDepth + radius * 2 + 60);
             camera.updateProjectionMatrix();
             currentLookAtTarget.copy(screenCenterTarget);
@@ -1746,10 +1784,13 @@
                         id: seatId, row: rowLetter, rowIndex: rIdx, num: sNum,
                         isOccupied, isVIP, isRecliner, tier, price,
                         worldPos: seatGroup.position.clone(),
-                        // Keep a consistent adult seated eye height (~1.14 m
+                        // Keep a consistent adult seated eye height (~1.16 m
                         // above the row base) across standard and recliner
                         // seat scales, clearing the next row's headrest.
-                        eyePos: seatGroup.localToWorld(new THREE.Vector3(0, 1.14 / seatGroup.scale.y, -0.62)),
+                        // Keep the viewpoint above the seat pan and slightly
+                        // forward of the backrest, without placing it in the
+                        // next row's seating envelope.
+                        eyePos: seatGroup.localToWorld(new THREE.Vector3(0, 1.16 / seatGroup.scale.y, -0.24)),
                         group: seatGroup,
                         instanceParts: [
                             part(cushionInstances, upholsteryStart, [0, 0.43, 0], [0.5 * seatWidth, 0.17 * seatHeight, 0.47 * seatDepth]),
@@ -1944,7 +1985,8 @@
             updateCameraModeButtons();
             cameraTargetPos.copy(seat.eyePos);
 
-            // Face the screen center by default when hopping to a new seat
+            // Derive the sightline from this seat's world-space eye point to
+            // the actual screen centre so corner seats retain their angle.
             desiredLookAtTarget.copy(screenCenterTarget);
             targetYawOffset = 0;
             targetPitchOffset = reclineLevel * 0.12;
@@ -2053,10 +2095,7 @@
                 camera.fov = auditoriumOverviewFov;
                 camera.updateProjectionMatrix();
                 cameraTargetPos.copy(auditoriumOverviewCamera);
-                // Keep the first wide view aimed down the hall at the screen,
-                // rather than at the room center (which can make the screen
-                // feel behind the viewer in long or unusually shaped halls).
-                desiredLookAtTarget.copy(screenCenterTarget);
+                desiredLookAtTarget.copy(auditoriumCenterTarget);
                 targetYawOffset = 0;
                 targetPitchOffset = 0;
             } else {
@@ -2215,51 +2254,42 @@
             });
         }
 
-        function updateSeatTelemetryUI(seat) {
-            const distMeters = seat.eyePos.distanceTo(screenCenterTarget);
-            const dx = seat.eyePos.x - screenCenterTarget.x;
-            const dy = screenCenterTarget.y - seat.eyePos.y;
-            const dz = Math.abs(seat.eyePos.z - screenCenterTarget.z);
+        function getSeatViewMetrics(seat) {
+            const toScreen = screenCenterTarget.clone().sub(seat.eyePos);
+            const distance = toScreen.length();
+            const horizontalDistance = Math.hypot(toScreen.x, toScreen.z);
+            const horizontalAngle = Math.atan2(-toScreen.x, -toScreen.z) * 180 / Math.PI;
+            const verticalAngle = Math.atan2(toScreen.y, horizontalDistance) * 180 / Math.PI;
+            return { distance, horizontalAngle, verticalAngle };
+        }
 
-            const vertAngleDeg = Math.round(Math.abs(Math.atan2(dy, dz) * (180 / Math.PI)));
-            const horizAngleDeg = Math.round(Math.abs(Math.atan2(dx, dz) * (180 / Math.PI)));
-
-            const radialPenalty = Math.hypot(dx / 9, (seat.rowIndex - currentAudi.rows.length * 0.5) / 4);
-            const audioScore = Math.max(76, Math.min(99, Math.round(100 - radialPenalty * 13)));
-
-            document.getElementById('metric-seat-title').textContent = `Row ${seat.row} • Seat ${seat.num}`;
+        function renderSeatViewMetrics(seat, stateLabel = 'selected view') {
+            const metrics = getSeatViewMetrics(seat);
+            const geometryEstimated = Boolean(currentAudi.geometry?.estimated);
+            document.getElementById('metric-seat-title').textContent = `Row ${seat.row} · Seat ${seat.num}`;
             document.getElementById('metric-seat-price').textContent = `₹${seat.price}`;
             document.getElementById('metric-seat-price-value').textContent = `₹${seat.price}`;
             document.getElementById('metric-tier-badge').textContent = seat.tier;
-
             document.getElementById('metric-seat-subtitle').textContent =
-                seat.isRecliner ? 'Recliner · your view' : (seat.isVIP ? 'VIP · your view' : 'Standard · your view');
-            document.getElementById('metric-tier-badge').textContent = seat.isVIP ? 'VIP' : (seat.isRecliner ? 'RECLINER' : 'SEAT');
+                `${currentAudi.name} · ${currentAudi.screenLabel || 'Cinema screen'} · ${seat.tier} · ${stateLabel}`;
+            document.getElementById('metric-distance').textContent = `${metrics.distance.toFixed(1)} m`;
+            document.getElementById('metric-distance-desc').textContent = geometryEstimated
+                ? 'Approximate · room dimensions estimated' : 'From configured room dimensions';
+            const h = Math.round(metrics.horizontalAngle);
+            const v = Math.round(metrics.verticalAngle);
+            document.getElementById('metric-angle').textContent = `${h > 0 ? '+' : ''}${h}° H / ${v > 0 ? '+' : ''}${v}° V`;
+            document.getElementById('metric-angle-desc').textContent = geometryEstimated
+                ? 'Calculated to screen centre · approximate geometry'
+                : 'Calculated to configured screen centre';
+            document.getElementById('metric-audio').textContent = geometryEstimated
+                ? 'Estimated model' : 'Configured dimensions';
+            document.getElementById('metric-geometry-desc').textContent = geometryEstimated
+                ? 'Room and screen dimensions are approximate' : 'Using configured room and screen dimensions';
+            document.getElementById('metric-geometry-desc').title = currentAudi.reference_status_label || '';
+        }
 
-            document.getElementById('metric-distance').textContent = `${distMeters.toFixed(1)} m`;
-            const distDesc = document.getElementById('metric-distance-desc');
-            if (distMeters < 10.5) {
-                distDesc.textContent = 'Near screen (estimated)';
-                distDesc.className = 'text-[10px] text-amber-400 font-medium';
-            } else if (distMeters <= 18.5) {
-                distDesc.textContent = 'Mid-room (estimated)';
-                distDesc.className = 'text-[10px] text-emerald-400 font-medium';
-            } else {
-                distDesc.textContent = 'Far from screen (estimated)';
-                distDesc.className = 'text-[10px] text-cyan-300 font-medium';
-            }
-
-            document.getElementById('metric-angle').textContent = `${vertAngleDeg}° V / ${horizAngleDeg}° H`;
-            const angleDesc = document.getElementById('metric-angle-desc');
-            if (vertAngleDeg <= 14 && horizAngleDeg <= 16) {
-                angleDesc.textContent = 'Small screen angle';
-                angleDesc.className = 'text-[10px] text-emerald-400 font-medium';
-            } else {
-                angleDesc.textContent = 'Larger screen angle';
-                angleDesc.className = 'text-[10px] text-amber-400 font-medium';
-            }
-
-            document.getElementById('metric-audio').textContent = `${audioScore}% Relative`;            document.getElementById('metric-audio-bar').style.width = `${audioScore}%`;
+        function updateSeatTelemetryUI(seat) {
+            renderSeatViewMetrics(seat, 'selected view');
 
             if (nearestExitObj) {
                 document.getElementById('metric-exit-dist').textContent = `${nearestExitObj.dist} m (${nearestExitObj.exit.side})`;
@@ -2376,6 +2406,8 @@
         const pointer = new THREE.Vector2();
         let isDragging = false;
         let dragDistance = 0;
+        let gesturePointerId = null;
+        let gestureStartedOnCanvas = false;
         let prevPointer = { x: 0, y: 0 };
         const tooltipEl = document.getElementById('seat-tooltip');
         const activePointers = new Map();
@@ -2384,8 +2416,11 @@
             const focus = desiredLookAtTarget;
             const offset = cameraTargetPos.clone().sub(focus);
             const distance = Math.max(0.1, offset.length());
-            offset.multiplyScalar(THREE.MathUtils.clamp(distance * factor, 1.4, Math.max(24, auditoriumRearWallZ * 1.7)) / distance);
+            offset.multiplyScalar(THREE.MathUtils.clamp(distance * factor, 1.8, Math.max(24, auditoriumDepth * 1.25)) / distance);
             cameraTargetPos.copy(focus).add(offset);
+            cameraTargetPos.x = THREE.MathUtils.clamp(cameraTargetPos.x, -auditoriumHalfWidth - 2, auditoriumHalfWidth + 2);
+            cameraTargetPos.y = THREE.MathUtils.clamp(cameraTargetPos.y, 0.45, auditoriumRoomHeight + 2);
+            cameraTargetPos.z = THREE.MathUtils.clamp(cameraTargetPos.z, -4, auditoriumRearWallZ + 2);
         }
 
         // Resolve the first seat mesh hit into a seat id (deduplicates the 5 seat meshes).
@@ -2409,15 +2444,20 @@
         }
 
         container.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
             activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             if (e.pointerType === 'touch' && activePointers.size >= 2) {
                 const points = [...activePointers.values()];
                 pinchDistance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
                 isDragging = false;
+                gesturePointerId = null;
+                gestureStartedOnCanvas = false;
                 dragDistance = Infinity;
                 return;
             }
             isDragging = true;
+            gesturePointerId = e.pointerId;
+            gestureStartedOnCanvas = e.target === renderer.domElement;
             dragDistance = 0;
             prevPointer = { x: e.clientX, y: e.clientY };
             pointer.lastX = e.clientX;
@@ -2445,15 +2485,15 @@
             }
 
             if (isDragging) {
+                if (e.pointerId !== gesturePointerId) return;
                 const dx = e.clientX - prevPointer.x;
                 const dy = e.clientY - prevPointer.y;
                 dragDistance += Math.hypot(dx, dy);
                 prevPointer = { x: e.clientX, y: e.clientY };
 
                 const sensitivity = 0.0045;
-                targetYawOffset -= dx * sensitivity;
-                targetPitchOffset -= dy * sensitivity;
-                targetPitchOffset = Math.max(-Math.PI * 0.42, Math.min(Math.PI * 0.42, targetPitchOffset));
+                targetYawOffset = THREE.MathUtils.euclideanModulo(targetYawOffset - dx * sensitivity + Math.PI, Math.PI * 2) - Math.PI;
+                targetPitchOffset = THREE.MathUtils.clamp(targetPitchOffset - dy * sensitivity, -1.25, 1.25);
 
                 document.getElementById('look-hint').style.opacity = '0';
                 tooltipEl.classList.add('hidden');
@@ -2508,46 +2548,9 @@
                 const active = seatRegistry.get(activePOVSeatId);
                 if (active && !active.isOccupied) {
                     clearTimeout(hoverTelemetryTimer);
-                    document.getElementById('metric-seat-title').textContent = `Row ${active.row} • Seat ${active.num}`;
-                    document.getElementById('metric-seat-price').textContent = `₹${active.price}`;
                     document.getElementById('metric-tier-badge').textContent = active.tier.toUpperCase() === 'STANDARD' ? 'SEAT PREVIEW' : active.tier.toUpperCase();
-                    document.getElementById('metric-seat-subtitle').textContent =
-                        active.isRecliner ? 'Recliner · preview' : (active.isVIP ? 'VIP · preview' : 'Standard · preview');
-
-                    const distMeters = active.eyePos.distanceTo(screenCenterTarget);
-                    const dx = active.eyePos.x - screenCenterTarget.x;
-                    const dy = screenCenterTarget.y - active.eyePos.y;
-                    const dz = Math.abs(active.eyePos.z - screenCenterTarget.z);
-                    const vertAngleDeg = Math.round(Math.abs(Math.atan2(dy, dz) * (180 / Math.PI)));
-                    const horizAngleDeg = Math.round(Math.abs(Math.atan2(dx, dz) * (180 / Math.PI)));
-                    const radialPenalty = Math.hypot(dx / 9, (active.rowIndex - currentAudi.rows.length * 0.5) / 4);
-                    const audioScore = Math.max(76, Math.min(99, Math.round(100 - radialPenalty * 13)));
-
-                    document.getElementById('metric-distance').textContent = `${distMeters.toFixed(1)} m`;
-                    const distDesc = document.getElementById('metric-distance-desc');
-                    if (distMeters < 10.5) {
-                        distDesc.textContent = 'Near screen (estimated)';
-                        distDesc.className = 'text-[10px] text-amber-400 font-medium';
-                    } else if (distMeters <= 18.5) {
-                        distDesc.textContent = 'Mid-room (estimated)';
-                        distDesc.className = 'text-[10px] text-emerald-400 font-medium';
-                    } else {
-                        distDesc.textContent = 'Far from screen (estimated)';
-                        distDesc.className = 'text-[10px] text-cyan-300 font-medium';
-                    }
-
-                    document.getElementById('metric-angle').textContent = `${vertAngleDeg}° V / ${horizAngleDeg}° H`;
-                    const angleDesc = document.getElementById('metric-angle-desc');
-                    if (vertAngleDeg <= 14 && horizAngleDeg <= 16) {
-                        angleDesc.textContent = 'Small screen angle';
-                        angleDesc.className = 'text-[10px] text-emerald-400 font-medium';
-                    } else {
-                        angleDesc.textContent = 'Larger screen angle';
-                        angleDesc.className = 'text-[10px] text-amber-400 font-medium';
-                    }
-
-                    document.getElementById('metric-audio').textContent = `${audioScore}% Relative`;
-                    document.getElementById('metric-audio-bar').style.width = `${audioScore}%`;
+                    renderSeatViewMetrics(active, 'current view');
+                    document.getElementById('metric-tier-badge').textContent = active.tier.toUpperCase() === 'STANDARD' ? 'SEAT PREVIEW' : active.tier.toUpperCase();
                     tryHighlightSeatIn3D(active.id);
                 }
             }
@@ -2601,46 +2604,8 @@
             // Show this seat's estimate in the metrics panel as a preview, without changing
             // the committed active POV seat or the cart.
             if (activePOVSeatId !== seat.id) {
-                document.getElementById('metric-seat-title').textContent = `Row ${seat.row} • Seat ${seat.num}`;
-                document.getElementById('metric-seat-price').textContent = `₹${seat.price}`;
-                document.getElementById('metric-tier-badge').textContent = seat.tier;
-                document.getElementById('metric-seat-subtitle').textContent =
-                    seat.isRecliner ? 'Recliner · preview' : (seat.isVIP ? 'VIP · preview' : 'Standard · preview');
-
-                const distMeters = seat.eyePos.distanceTo(screenCenterTarget);
-                const dx = seat.eyePos.x - screenCenterTarget.x;
-                const dy = screenCenterTarget.y - seat.eyePos.y;
-                const dz = Math.abs(seat.eyePos.z - screenCenterTarget.z);
-                const vertAngleDeg = Math.round(Math.abs(Math.atan2(dy, dz) * (180 / Math.PI)));
-                const horizAngleDeg = Math.round(Math.abs(Math.atan2(dx, dz) * (180 / Math.PI)));
-                const radialPenalty = Math.hypot(dx / 9, (seat.rowIndex - currentAudi.rows.length * 0.5) / 4);
-                const audioScore = Math.max(76, Math.min(99, Math.round(100 - radialPenalty * 13)));
-
-                document.getElementById('metric-distance').textContent = `${distMeters.toFixed(1)} m`;
-                const distDesc = document.getElementById('metric-distance-desc');
-                if (distMeters < 10.5) {
-                    distDesc.textContent = 'Near screen (estimated)';
-                    distDesc.className = 'text-[10px] text-amber-400 font-medium';
-                } else if (distMeters <= 18.5) {
-                    distDesc.textContent = 'Mid-room (estimated)';
-                    distDesc.className = 'text-[10px] text-emerald-400 font-medium';
-                } else {
-                    distDesc.textContent = 'Far from screen (estimated)';
-                    distDesc.className = 'text-[10px] text-cyan-300 font-medium';
-                }
-
-                document.getElementById('metric-angle').textContent = `${vertAngleDeg}° V / ${horizAngleDeg}° H`;
-                const angleDesc = document.getElementById('metric-angle-desc');
-                if (vertAngleDeg <= 14 && horizAngleDeg <= 16) {
-                    angleDesc.textContent = 'Small screen angle';
-                    angleDesc.className = 'text-[10px] text-emerald-400 font-medium';
-                } else {
-                    angleDesc.textContent = 'Larger screen angle';
-                    angleDesc.className = 'text-[10px] text-amber-400 font-medium';
-                }
-
-                document.getElementById('metric-audio').textContent = `${audioScore}% Relative`;
-                document.getElementById('metric-audio-bar').style.width = `${audioScore}%`;
+                renderSeatViewMetrics(seat, 'hover preview');
+                document.getElementById('metric-tier-badge').textContent = seat.tier.toUpperCase() === 'STANDARD' ? 'SEAT PREVIEW' : seat.tier.toUpperCase();
 
                 tryHighlightSeatIn3D(seat.id);
             }
@@ -2649,9 +2614,7 @@
             hoverEchoTimer = setTimeout(() => {
                 const active = seatRegistry.get(activePOVSeatId);
                 if (active) {
-                    const same = active.id === seat.id;
-                    document.getElementById('metric-seat-title').textContent = same ? `Row ${active.row} • Seat ${active.num}` : defaultMetricSeatTitle;
-                    document.getElementById('metric-seat-price').textContent = same ? `₹${active.price}` : defaultMetricSeatPrice;
+                    renderSeatViewMetrics(active, 'selected view');
                 } else {
                     document.getElementById('metric-seat-title').textContent = defaultMetricSeatTitle;
                     document.getElementById('metric-seat-price').textContent = defaultMetricSeatPrice;
@@ -2718,7 +2681,7 @@
             document.getElementById('metric-angle-desc').textContent = 'Viewing angle';
             document.getElementById('metric-angle-desc').className = 'text-[10px] text-emerald-400 font-medium';
             document.getElementById('metric-audio').textContent = '—';
-            document.getElementById('metric-audio-bar').style.width = '0%';
+            document.getElementById('metric-geometry-desc').textContent = 'Room dimensions';
             document.getElementById('metric-exit-dist').textContent = '—';
             document.getElementById('metric-exit-name').textContent = 'Select a seat to check';
             document.getElementById('dock-seat-code').textContent = '—';
@@ -2728,10 +2691,11 @@
         window.addEventListener('pointerup', (e) => {
             activePointers.delete(e.pointerId);
             if (activePointers.size < 2) pinchDistance = 0;
-            if (!isDragging) return;
+            if (!isDragging || e.pointerId !== gesturePointerId) return;
             isDragging = false;
+            gesturePointerId = null;
 
-            if (dragDistance < 6 && e.target === renderer.domElement) {
+            if (dragDistance < 6 && gestureStartedOnCanvas) {
                 // Tap-to-select in 3D: commit the hovered seat if there is one.
                 const hitSeatId = currentHoverSeatId();
                 if (hitSeatId) {
@@ -2751,6 +2715,7 @@
                     if (seat) selectAndFlyToSeat(seat.row, seat.num, true);
                 }
             }
+            gestureStartedOnCanvas = false;
             hideHoverPreview();
         });
 
@@ -2923,7 +2888,8 @@
             camera.position.lerp(cameraTargetPos, cameraBlend);
             currentLookAtTarget.lerp(desiredLookAtTarget, cameraBlend);
 
-            yawOffset += (targetYawOffset - yawOffset) * rotationBlend;
+            const yawDelta = THREE.MathUtils.euclideanModulo(targetYawOffset - yawOffset + Math.PI, Math.PI * 2) - Math.PI;
+            yawOffset += yawDelta * rotationBlend;
             pitchOffset += (targetPitchOffset - pitchOffset) * rotationBlend;
 
             dummyCam.position.copy(camera.position);
@@ -2966,6 +2932,7 @@
             const h = window.innerHeight;
             renderer.setSize(w, h);
             camera.aspect = (isVRStereo ? w / 2 : w) / h;
+            if (cameraMode === 'overview') applyOverviewFieldOfView();
             camera.updateProjectionMatrix();
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, renderQuality === 'high' ? 1.75 : (renderQuality === 'balanced' ? 1.5 : 1)));
         });
