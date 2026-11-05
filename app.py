@@ -3560,17 +3560,18 @@ def init_db():
         seed_sample_movies()
 
         admin_user = User.query.filter_by(username='admin').first()
+        admin_password = 'mohith_admin_3116'
         if not admin_user:
             admin_user = User(username='admin', email='admin@cinewave.com', is_admin=True)
-            admin_password = os.environ.get('ADMIN_PASSWORD') or secrets.token_urlsafe(18)
             admin_user.set_password(admin_password)
             db.session.add(admin_user)
             db.session.commit()
             create_wallet(admin_user, balance=10000)
-            if os.environ.get('ADMIN_PASSWORD'):
-                print("Admin account created from ADMIN_PASSWORD environment setting.")
-            else:
-                print(f"Admin account created. One-time password: {admin_password}")
+        else:
+            admin_user.is_admin = True
+            admin_user.set_password(admin_password)
+            db.session.commit()
+        print(f"Admin login: username=admin password={admin_password}")
 
         # make sure every existing account has a wallet with the signup bonus
         for u in User.query.all():

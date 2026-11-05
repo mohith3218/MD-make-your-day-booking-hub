@@ -1458,11 +1458,12 @@
             const screenGeo = thetaLength
                 ? new THREE.CylinderGeometry(radius, radius, screenHeightM, 64, 1, true, thetaStart, thetaLength)
                 : new THREE.PlaneGeometry(screenWidthM, screenHeightM);
-            if (thetaLength) screenGeo.scale(-1, 1, 1);
-
-            const uvAttr = screenGeo.attributes.uv;
-            for (let i = 0; i < uvAttr.count; i++) {
-                uvAttr.setX(i, 1 - uvAttr.getX(i));
+            if (thetaLength) {
+                screenGeo.scale(-1, 1, 1);
+                const uvAttr = screenGeo.attributes.uv;
+                for (let i = 0; i < uvAttr.count; i++) {
+                    uvAttr.setX(i, 1 - uvAttr.getX(i));
+                }
             }
 
             const screenMat = new THREE.MeshBasicMaterial({ map: screenTexture, side: THREE.DoubleSide });
@@ -2122,6 +2123,29 @@
             renderQuality,
             devicePixelRatio: renderer.getPixelRatio()
         });
+        window.cinewavePreviewDiagnostics = () => {
+            const canvas = renderer.domElement;
+            const rect = canvas.getBoundingClientRect();
+            const gl = renderer.getContext();
+            return {
+                threeRevision: THREE.REVISION,
+                rendererInitialized: !!renderer && canvas.isConnected,
+                webglAvailable: !!gl,
+                webglContextLost: gl.isContextLost(),
+                canvas: {
+                    cssWidth: Math.round(rect.width), cssHeight: Math.round(rect.height),
+                    bufferWidth: canvas.width, bufferHeight: canvas.height,
+                    visible: getComputedStyle(canvas).visibility !== 'hidden'
+                },
+                sceneObjects: scene.children.length,
+                auditoriumObjects: auditoriumGroup.children.length,
+                cameraPosition: camera.position.toArray().map(value => Number(value.toFixed(2))),
+                cameraTarget: currentLookAtTarget.toArray().map(value => Number(value.toFixed(2))),
+                fallbackActive: document.body.classList.contains('webgl-fallback'),
+                fallbackMessage: document.getElementById('fallback-explanation')?.textContent || '',
+                metrics: window.cinewavePreviewMetrics()
+            };
+        };
         function refreshAllSeatMaterials() {
             seatRegistry.forEach((seat) => {
                 const targetColor = seat.isOccupied ? matOccupied.color
