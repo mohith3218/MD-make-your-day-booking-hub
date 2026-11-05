@@ -1190,16 +1190,59 @@
         let auditoriumDepth = 30;
         let overviewHorizontalSlope = 0;
         let overviewVerticalSlope = 0;
+        const overviewBaseCamera = new THREE.Vector3();
+        const overviewForward = new THREE.Vector3();
+        const overviewRight = new THREE.Vector3();
+        const overviewUp = new THREE.Vector3();
+        const overviewBounds = [];
+
+        function setCameraFieldOfView(value) {
+            camera.fov = Number(value);
+            camera.updateProjectionMatrix();
+            document.getElementById('fov-label').textContent = `${Math.round(camera.fov)}°`;
+            document.getElementById('fov-slider').value = String(Math.round(camera.fov));
+        }
 
         function applyOverviewFieldOfView() {
-            const aspect = Math.max(0.5, container.clientWidth / Math.max(1, container.clientHeight));
-            const requiredSlope = Math.max(overviewVerticalSlope, overviewHorizontalSlope / aspect);
+            const aspect = Math.max(0.25, container.clientWidth / Math.max(1, container.clientHeight));
+            const targetFov = 62;
+            const tanVertical = Math.tan(THREE.MathUtils.degToRad(targetFov / 2)) / 1.08;
+            const tanHorizontal = tanVertical * aspect;
+            let backoff = 0;
+            overviewBounds.forEach(point => {
+                const relative = point.clone().sub(overviewBaseCamera);
+                const depth = relative.dot(overviewForward);
+                backoff = Math.max(backoff,
+                    Math.abs(relative.dot(overviewUp)) / tanVertical - depth,
+                    Math.abs(relative.dot(overviewRight)) / tanHorizontal - depth);
+            });
+            // Keep the camera inside the rear wall with a little clearance.
+            // If an unusually narrow viewport cannot fit within the room,
+            // widen the lens only after using all available rear concourse.
+            const maxBackoff = overviewForward.z < -0.001
+                ? Math.max(0, (auditoriumRearWallZ - 0.65 - overviewBaseCamera.z) / -overviewForward.z)
+                : 0;
+            backoff = Math.min(Math.max(0, backoff), maxBackoff);
+            auditoriumOverviewCamera.copy(overviewBaseCamera).addScaledVector(overviewForward, -backoff);
+            const forward = auditoriumCenterTarget.clone().sub(auditoriumOverviewCamera).normalize();
+            const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+            const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+            let horizontalSlope = 0;
+            let verticalSlope = 0;
+            overviewBounds.forEach(point => {
+                const relative = point.clone().sub(auditoriumOverviewCamera);
+                const depth = relative.dot(forward);
+                if (depth <= 0.25) return;
+                horizontalSlope = Math.max(horizontalSlope, Math.abs(relative.dot(right)) / depth);
+                verticalSlope = Math.max(verticalSlope, Math.abs(relative.dot(up)) / depth);
+            });
+            const requiredSlope = Math.max(verticalSlope, horizontalSlope / aspect);
             const fittedFov = THREE.MathUtils.radToDeg(2 * Math.atan(requiredSlope * 1.08));
             auditoriumOverviewFov = Number.isFinite(fittedFov)
-                ? THREE.MathUtils.clamp(fittedFov, 32, 78) : 58;
+                ? THREE.MathUtils.clamp(fittedFov, 32, 72) : targetFov;
             if (cameraMode === 'overview') {
-                camera.fov = auditoriumOverviewFov;
-                camera.updateProjectionMatrix();
+                cameraTargetPos.copy(auditoriumOverviewCamera);
+                setCameraFieldOfView(auditoriumOverviewFov);
             }
         }
 
@@ -1336,7 +1379,7 @@
             const forward = overviewTarget.clone().sub(auditoriumOverviewCamera).normalize();
             const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
             const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-            const overviewBounds = [];
+        overviewBounds.length = 0;
             [-hallHalfWidth * 0.94, hallHalfWidth * 0.94].forEach(x => {
                 [0.05, roomHeight * 0.92].forEach(y => {
                     [screenSurfaceZ, farthestRowZ].forEach(z => overviewBounds.push(new THREE.Vector3(x, y, z)));
@@ -1346,16 +1389,11 @@
                 [screenBottomM, screenBottomM + screenHeightM].forEach(y =>
                     overviewBounds.push(new THREE.Vector3(x, y, screenSurfaceZ)));
             });
-            overviewHorizontalSlope = 0;
-            overviewVerticalSlope = 0;
-            overviewBounds.forEach(point => {
-                const relative = point.clone().sub(auditoriumOverviewCamera);
-                const depth = relative.dot(forward);
-                if (depth <= 0.25) return;
-                overviewHorizontalSlope = Math.max(overviewHorizontalSlope, Math.abs(relative.dot(right)) / depth);
-                overviewVerticalSlope = Math.max(overviewVerticalSlope, Math.abs(relative.dot(up)) / depth);
-            });
             auditoriumCenterTarget.copy(overviewTarget);
+            overviewBaseCamera.copy(auditoriumOverviewCamera);
+            overviewForward.copy(overviewTarget).sub(overviewBaseCamera).normalize();
+            overviewRight.copy(forward);
+            overviewUp.copy(up);
             applyOverviewFieldOfView();
             camera.far = Math.max(160, hallDepth + radius * 2 + 60);
             camera.updateProjectionMatrix();
@@ -2092,15 +2130,13 @@
             if (mode === 'overview') {
                 // Use a wide, fixed field of view for the first view so the
                 // screen, seating bowl, and aisle fit together in the frame.
-                camera.fov = auditoriumOverviewFov;
-                camera.updateProjectionMatrix();
+                setCameraFieldOfView(auditoriumOverviewFov);
                 cameraTargetPos.copy(auditoriumOverviewCamera);
                 desiredLookAtTarget.copy(auditoriumCenterTarget);
                 targetYawOffset = 0;
                 targetPitchOffset = 0;
             } else {
-                camera.fov = 65;
-                camera.updateProjectionMatrix();
+                setCameraFieldOfView(65);
                 const seat = seatRegistry.get(activePOVSeatId);
                 if (seat) cameraTargetPos.copy(seat.eyePos);
                 desiredLookAtTarget.copy(screenCenterTarget);
@@ -2116,8 +2152,7 @@
             if (preset === 'screen') {
                 cameraMode = preset;
                 updateCameraModeButtons();
-                camera.fov = 60;
-                camera.updateProjectionMatrix();
+                setCameraFieldOfView(60);
                 cameraTargetPos.copy(auditoriumScreenCamera);
                 desiredLookAtTarget.copy(screenCenterTarget);
                 targetYawOffset = 0;
@@ -2127,8 +2162,7 @@
             if (preset === 'left' || preset === 'right') {
                 cameraMode = preset;
                 updateCameraModeButtons();
-                camera.fov = 58;
-                camera.updateProjectionMatrix();
+                setCameraFieldOfView(58);
                 cameraTargetPos.copy(preset === 'left' ? auditoriumLeftCamera : auditoriumRightCamera);
                 desiredLookAtTarget.copy(screenCenterTarget);
                 targetYawOffset = 0;
@@ -2141,6 +2175,7 @@
                 const middle = balconyRows[Math.floor(balconyRows.length / 2)];
                 cameraMode = preset;
                 updateCameraModeButtons();
+                setCameraFieldOfView(60);
                 cameraTargetPos.set(0, Number(middle.y) + 2.2, Number(middle.z) + 3.5);
                 desiredLookAtTarget.set(0, screenCenterTarget.y, screenCenterTarget.z);
                 targetYawOffset = 0;
@@ -2152,11 +2187,16 @@
             targetYawOffset = 0;
             targetPitchOffset = 0;
             if (preset === 'stage') {
+                setCameraFieldOfView(60);
                 cameraTargetPos.set(0, Math.max(2.8, screenCenterTarget.y * 0.42), screenCenterTarget.z + 4.5);
                 desiredLookAtTarget.copy(auditoriumCenterTarget);
             } else if (preset === 'birdseye') {
-                cameraTargetPos.set(0.1, auditoriumOverviewCamera.y + Math.max(8, auditoriumOverviewCamera.y * 0.7), auditoriumCenterTarget.z);
-                desiredLookAtTarget.copy(auditoriumCenterTarget);
+                // Stay below the opaque ceiling and look steeply across the
+                // seating bowl; an outside/vertical camera sees only the roof
+                // or hits the lookAt up-vector singularity.
+                setCameraFieldOfView(72);
+                cameraTargetPos.set(0.1, Math.max(2.8, auditoriumRoomHeight - 1.25), auditoriumCenterTarget.z + 3.0);
+                desiredLookAtTarget.set(0, 0.2, auditoriumCenterTarget.z);
             }
         }
 
@@ -2271,7 +2311,7 @@
             document.getElementById('metric-seat-price-value').textContent = `₹${seat.price}`;
             document.getElementById('metric-tier-badge').textContent = seat.tier;
             document.getElementById('metric-seat-subtitle').textContent =
-                `${currentAudi.name} · ${currentAudi.screenLabel || 'Cinema screen'} · ${seat.tier} · ${stateLabel}`;
+                `${currentAudi.name} · ${seat.tier} · ${stateLabel}`;
             document.getElementById('metric-distance').textContent = `${metrics.distance.toFixed(1)} m`;
             document.getElementById('metric-distance-desc').textContent = geometryEstimated
                 ? 'Approximate · room dimensions estimated' : 'From configured room dimensions';
@@ -2733,9 +2773,7 @@
          ********************************************************************/
         function updateFOV(val) {
             const numVal = parseFloat(val);
-            camera.fov = numVal;
-            camera.updateProjectionMatrix();
-            document.getElementById('fov-label').textContent = `${numVal}°`;
+            setCameraFieldOfView(numVal);
         }
 
         function toggleVRStereo() {
