@@ -1,65 +1,52 @@
-# Phase 1: 3D Camera Verification Report
+# Phase 1 3D Camera Report
 
 ## Status
 
-Phase 1 is **not yet complete**. The Flask app and 3D scene were verified in a real browser, and the selected-seat camera works for the seven requested seats. Screenshot files could not be saved through the available browser workflow, and touchscreen rotation and pinch-to-zoom could not be exercised. See limitations below.
+The latest camera changes are implemented and browser-checked for the viewports and auditoriums listed below. Phase 1 remains incomplete because touch gestures were not testable in this browser session and the browser screenshot API did not provide a permitted way to save image files into the repository. No Phase 2 work has started.
+
+## Implemented
+
+- `applyOverviewFieldOfView()` now uses one responsive target for camera position fitting, final frustum fitting, and the live overview look direction. It updates `desiredLookAtTarget` whenever overview is active.
+- `setCameraMode('overview')` recalculates responsive framing before setting the transition target. Returning from a seat POV therefore uses the current viewport's camera and target.
+- The resize handler reapplies overview framing and synchronizes its target while overview is active.
+- Bird's-eye framing is derived from seat bounds. It places the camera inside the rear of the auditorium, below its ceiling, aims at the seating centre, and computes FOV from the projected seat envelope and current canvas aspect ratio. The FOV remains capped at 72°.
+- Bird's-eye framing recalculates on viewport resize. A slight horizontal offset avoids a vertical look-at singularity.
+- Booking routes, seat availability, and payment integration were not changed. No booking or payment transaction was submitted.
 
 ## Environment and startup
 
-- Project dependencies are declared in `requirements.txt`; it includes Flask and Flask-SQLAlchemy. No additional dependency manifest was found.
-- Used the existing `.venv` (Python 3.14.6) and installed the pinned-by-range project requirements rather than choosing unrelated latest packages. Verified imports for SQLAlchemy, Flask-SQLAlchemy, and the Flask application.
-- Installed versions included Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.8, Flask-Login 0.6.3, requests 2.34.2, qrcode 8.2, and razorpay 2.0.1.
-- A SQLite connection check (`SELECT 1`) succeeded. The application was started using the README's `app.py` startup path and an existing seeded test database (`instance/test_flow.db`), with Flask debug mode disabled. The app reported successful startup and no new demo-data rows needed seeding.
-- The test database contains demo movies, showtimes, screens, and a test account. The destructive test-flow script was not run because it drops database tables.
-- Startup emitted a Python 3.14 deprecation warning for `datetime.utcnow()` in `app.py`, plus Flask's normal development-server notice.
+- `requirements.txt` declares Flask and Flask-SQLAlchemy. SQLAlchemy and Flask-SQLAlchemy imports and a SQLite `SELECT 1` connection check were verified in the existing `.venv`.
+- Flask started through the README `app.py` path with the pre-seeded `instance/cinewave_flow_qa.db` and debug mode off. Startup succeeded and left the app on its mock payment gateway.
+- Startup logs included the existing Python 3.14 `datetime.utcnow()` deprecation warning and Flask's development-server notice.
 
-## Routes and rendering
+## Browser-tested
 
-- Logged into the local demo account and loaded the booking page at `/book/2`.
-- Confirmed its embedded preview route `/book/2/vr-preview?embed=1` and the standalone route `/book/2/vr-preview` both load.
-- Confirmed WebGL 2 is available and the scene renders. No JavaScript errors or WebGL errors appeared in the browser console. The only console warnings were for the Tailwind CDN script being intended for development use.
+Browser checks used `/book/2`, `/book/15`, and `/book/15/vr-preview` on the local app.
 
-## Camera and seat checks
-
-Camera positions were compared against the selected seat coordinates and aim direction after transitions settled. All seven selected-seat cameras settled at realistic eye height (1.16 m), aimed at the screen centre, and matched their selected seat:
-
-| Seat | Layout position | Distance to screen | Horizontal angle | Vertical angle |
-|---|---|---:|---:|---:|
-| G5 | Front centre | 7.0 m | +3.5° | +12.1° |
-| D4 | Middle centre | 10.2 m | -4.0° | +5.2° |
-| A4 | Rear centre | 13.7 m | -3.0° | +1.6° |
-| G1 | Front left | 7.5 m | -22.5° | +11.2° |
-| G9 | Front right | 7.5 m | +22.5° | +11.2° |
-| A1 | Rear left | 13.9 m | -10.6° | +1.6° |
-| A8 | Rear right | 13.9 m | +10.6° | +1.6° |
-
-The seeded auditorium's row lettering places G nearest the screen and A at the rear. Camera position errors after settling were negligible; aim direction had a dot product of 1.0 with the screen-centre direction in the measured cases. The selected seat remained synchronized during drag rotation. Seat transitions were observed; one intermediate sample was taken before a longer rear-right transition had settled, and a follow-up confirmed exact final alignment.
-
-The camera eye is above the seating and floor in all tested positions, with no observed seat or wall clipping in the rendered views. Mouse drag changed camera yaw and pitch while retaining seat A8. Mouse-wheel input changed camera distance. Screen, left, right, stage, and overview presets were exercised. The stage preset faces the screen. Bird's-eye now uses an interior camera below the opaque ceiling; it renders the auditorium, though the embedded framing only shows part of the seating. This auditorium has no balcony rows, so its balcony control falls back to the overview.
-
-## Camera adjustment made
-
-Adjusted overview framing in `templates/vr_seat_preview.html` to back the camera away and fit the auditorium at a practical field of view, with recalculation on resize and a maximum field of view of 72°. Updated field-of-view control synchronization and corrected the auditorium label shown in camera metrics. Moved the bird's-eye camera below the opaque ceiling so it can see into the room. Existing booking behavior was preserved during route and seat-selection checks.
-
-## Desktop and mobile
-
-| Viewport | Result |
+| Viewport | Checks and observations |
 |---|---|
-| 1920×1080 | Scene and full auditorium overview rendered; screen, seats, side walls, and roof were visible. Overview field of view settled near 62.7°. Mouse drag and wheel zoom responded. |
-| 1366×768 | Canvas matched the viewport and overview rendered with the room in view. |
-| 390×844 | Canvas matched the portrait viewport and rendered the screen and seats. Field of view reached its 72° cap; side walls are partly outside the portrait framing. Collapsing the map overlay makes the view clearer. |
+| 1920×1080 | Overview and bird's-eye rendered. Screen, room, and seating envelope were visible. |
+| 1366×768 | Overview and bird's-eye rendered; the small auditorium's screen, side walls, and seating were visible. |
+| 390×844 | Portrait overview and bird's-eye rendered. The embedded booking canvas measured 333×520 in the 58-seat case and the view recalculated after resize. The booking page has horizontal overflow at this width; the camera canvas itself remains within the viewport. |
 
-The mobile viewport was tested, but the in-app browser did not support the touch-event dispatch needed to exercise touchscreen rotation or pinch-to-zoom. Those touch gestures remain unverified. Mouse-based camera dragging did not accidentally change the selected seat.
+Two seeded auditorium shapes were exercised:
 
-## Screenshots
+- AAA Cinemas Screen 1: 7 rows, 58 seats.
+- Jagadamba Theatre 70MM Main: 38 rows, 886 available seats. Its bird's-eye view rendered at desktop and mobile sizes; the seating envelope remained inside the camera view. Individual seats are very dark in this auditorium render, which limits visual verification of seat-by-seat gaps.
 
-Browser screenshots were visually captured during the live checks, including overview and seat/preset views at desktop and mobile sizes. The requested folder `docs/screenshots/phase-1-camera/` was created, but no screenshot files were saved there. The browser explicitly blocked navigating to a data URL for the purpose of saving the captured image and disallowed workaround attempts. As a result, this report does not present screenshot files as evidence and the requested screenshot deliverable remains outstanding.
+For the 38-row auditorium, the selected-seat preview opened at Row V, Seat 12 and showed its screen sightline. The displayed distance was 24.3 m, with a 0° horizontal and 0° vertical screen-centre angle. The booking page displayed 886 / 886 seats available. Switching between bird's-eye and overview was exercised in the smaller auditorium. Browser console inspection showed the existing Tailwind CDN production warning and no JavaScript errors.
 
-## Remaining limitations
+## Regression checks
 
-- Genuine browser screenshots still need to be saved into `docs/screenshots/phase-1-camera/` through an allowed screenshot-saving workflow.
-- Touchscreen rotation and pinch-to-zoom remain untested because the browser did not support touch-event dispatch.
-- Portrait framing shows less of the side walls, and the bird's-eye embedded view shows only part of the seating.
-- Python 3.14 reports the existing `datetime.utcnow()` deprecation warning.
+- `python -m unittest test_auditorium_geometry.py`: **9 tests passed**.
+- `git diff --check`: **passed**.
+- `test_flow.py` was not run because it drops and recreates tables in `instance/test_flow.db`; that destructive integration test was not needed for the camera template change.
 
-Do not mark Phase 1 complete until the screenshot files are captured and touch interactions are verified or the verification scope is explicitly revised.
+## Unverified and remaining limits
+
+- One-finger touch rotation, two-finger pinch-to-zoom, and touch drag seat-selection suppression remain unverified. This browser session exposes no touchscreen gesture API; the earlier in-app browser touch dispatch attempt was unsupported. Mouse and seat interaction results from the earlier report do not substitute for touch testing.
+- Genuine browser screenshots were captured and visually inspected during this run, but no image files were written to `docs/screenshots/phase-1-camera/`. The supported browser screenshot call returns image bytes for display and offers no file path. A previous browser safety refusal also disallowed saving the same capture through a workaround. The requested folder exists and is empty.
+- The large auditorium's dark materials make individual-seat visibility difficult to judge, even though the projected seat envelope is in frame.
+- The Python app still emits the existing `datetime.utcnow()` deprecation warning and the normal development-server notice.
+
+Do not mark Phase 1 complete until touch interactions and saved screenshots are verified through an available permitted workflow, or those deliverables are explicitly waived.

@@ -1191,6 +1191,7 @@
         let overviewHorizontalSlope = 0;
         let overviewVerticalSlope = 0;
         const overviewBaseCamera = new THREE.Vector3();
+        const auditoriumOverviewTarget = new THREE.Vector3();
         const overviewForward = new THREE.Vector3();
         const overviewRight = new THREE.Vector3();
         const overviewUp = new THREE.Vector3();
@@ -1217,6 +1218,7 @@
             const responsiveTarget = auditoriumCenterTarget.clone();
             responsiveTarget.y = Math.max(0.35,
                 responsiveTarget.y - auditoriumRoomHeight * 0.13 * portraitBias);
+            auditoriumOverviewTarget.copy(responsiveTarget);
             const responsiveForward = responsiveTarget.clone().sub(responsiveCamera).normalize();
             const responsiveRight = new THREE.Vector3().crossVectors(responsiveForward, new THREE.Vector3(0, 1, 0)).normalize();
             const responsiveUp = new THREE.Vector3().crossVectors(responsiveRight, responsiveForward).normalize();
@@ -1238,7 +1240,7 @@
                 : 0;
             backoff = Math.min(Math.max(0, backoff), maxBackoff);
             auditoriumOverviewCamera.copy(responsiveCamera).addScaledVector(responsiveForward, -backoff);
-            const forward = auditoriumCenterTarget.clone().sub(auditoriumOverviewCamera).normalize();
+            const forward = auditoriumOverviewTarget.clone().sub(auditoriumOverviewCamera).normalize();
             const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
             const up = new THREE.Vector3().crossVectors(right, forward).normalize();
             let horizontalSlope = 0;
@@ -1256,6 +1258,7 @@
                 ? THREE.MathUtils.clamp(fittedFov, 32, 72) : targetFov;
             if (cameraMode === 'overview') {
                 cameraTargetPos.copy(auditoriumOverviewCamera);
+                desiredLookAtTarget.copy(auditoriumOverviewTarget);
                 setCameraFieldOfView(auditoriumOverviewFov);
             }
         }
@@ -2142,11 +2145,11 @@
             cameraMode = mode;
             updateCameraModeButtons();
             if (mode === 'overview') {
-                // Use a wide, fixed field of view for the first view so the
-                // screen, seating bowl, and aisle fit together in the frame.
-                setCameraFieldOfView(auditoriumOverviewFov);
+                // Recompute the responsive eye and target before returning
+                // from another mode or applying a new viewport aspect ratio.
+                applyOverviewFieldOfView();
                 cameraTargetPos.copy(auditoriumOverviewCamera);
-                desiredLookAtTarget.copy(auditoriumCenterTarget);
+                desiredLookAtTarget.copy(auditoriumOverviewTarget);
                 targetYawOffset = 0;
                 targetPitchOffset = 0;
             } else {
@@ -2157,6 +2160,50 @@
                 targetYawOffset = 0;
                 targetPitchOffset = reclineLevel * 0.12;
             }
+        }
+
+        function applyBirdseyeFraming() {
+            // Frame the actual seat envelope from the rear of the room, just
+            // below the opaque ceiling. The rearward offset provides enough
+            // perspective distance for wide seat blocks without a vertical
+            // lookAt singularity or a camera outside the auditorium.
+            const seats = [...seatRegistry.values()];
+            const minX = seats.length ? Math.min(...seats.map(seat => seat.worldPos.x)) : -auditoriumHalfWidth * 0.6;
+            const maxX = seats.length ? Math.max(...seats.map(seat => seat.worldPos.x)) : auditoriumHalfWidth * 0.6;
+            const minZ = seats.length ? Math.min(...seats.map(seat => seat.worldPos.z)) : auditoriumCenterTarget.z - 4;
+            const maxZ = seats.length ? Math.max(...seats.map(seat => seat.worldPos.z)) : auditoriumCenterTarget.z + 4;
+            const minY = seats.length ? Math.min(...seats.map(seat => seat.worldPos.y)) : 0;
+            const maxY = seats.length ? Math.max(...seats.map(seat => seat.worldPos.y)) + 1.1 : 1.1;
+            const seatCenter = new THREE.Vector3((minX + maxX) * 0.5,
+                Math.max(0.3, (minY + maxY) * 0.22), (minZ + maxZ) * 0.5);
+            const framingMargin = Math.max(1.2, (maxX - minX) * 0.12);
+            const frameAspect = Math.max(0.25, container.clientWidth / Math.max(1, container.clientHeight));
+            const eyeHeight = Math.max(0.6,
+                Math.min(auditoriumRoomHeight - 0.4, auditoriumRoomHeight * 0.9));
+            const rearAisleZ = Math.max(maxZ + 3.5, auditoriumRearWallZ - 0.65);
+            const candidatePosition = new THREE.Vector3(seatCenter.x + 0.14, eyeHeight, rearAisleZ);
+            const forward = seatCenter.clone().sub(candidatePosition).normalize();
+            const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+            const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+            let horizontalSlope = 0;
+            let verticalSlope = 0;
+            [minX - framingMargin, maxX + framingMargin].forEach(x => {
+                [minY - 0.15, maxY + 0.15].forEach(y => {
+                    [minZ - framingMargin * 0.5, maxZ + framingMargin * 0.5].forEach(z => {
+                        const relative = new THREE.Vector3(x, y, z).sub(candidatePosition);
+                        const depth = relative.dot(forward);
+                        if (depth <= 0.25) return;
+                        horizontalSlope = Math.max(horizontalSlope, Math.abs(relative.dot(right)) / depth);
+                        verticalSlope = Math.max(verticalSlope, Math.abs(relative.dot(up)) / depth);
+                    });
+                });
+            });
+            const requiredSlope = Math.max(verticalSlope, horizontalSlope / frameAspect) * 1.08;
+            const requiredFov = THREE.MathUtils.radToDeg(2 * Math.atan(requiredSlope));
+            const birdseyeFov = THREE.MathUtils.clamp(Math.max(68, requiredFov), 68, 72);
+            setCameraFieldOfView(birdseyeFov);
+            cameraTargetPos.copy(candidatePosition);
+            desiredLookAtTarget.copy(seatCenter);
         }
 
         function setCameraPreset(preset) {
@@ -2205,22 +2252,7 @@
                 cameraTargetPos.set(0, Math.max(2.8, screenCenterTarget.y * 0.42), screenCenterTarget.z + 4.5);
                 desiredLookAtTarget.copy(auditoriumCenterTarget);
             } else if (preset === 'birdseye') {
-                // Frame the actual seat envelope from just below the opaque
-                // ceiling. A slight diagonal offset keeps the view-up vector
-                // away from the straight-down lookAt singularity.
-                const seats = [...seatRegistry.values()];
-                const minX = seats.length ? Math.min(...seats.map(seat => seat.worldPos.x)) : -auditoriumHalfWidth * 0.6;
-                const maxX = seats.length ? Math.max(...seats.map(seat => seat.worldPos.x)) : auditoriumHalfWidth * 0.6;
-                const minZ = seats.length ? Math.min(...seats.map(seat => seat.worldPos.z)) : auditoriumCenterTarget.z - 4;
-                const maxZ = seats.length ? Math.max(...seats.map(seat => seat.worldPos.z)) : auditoriumCenterTarget.z + 4;
-                const seatCenter = new THREE.Vector3((minX + maxX) * 0.5, 0.3, (minZ + maxZ) * 0.5);
-                const framingMargin = Math.max(1.2, (maxX - minX) * 0.12);
-                const requiredHeight = Math.max((maxX - minX + framingMargin * 2) / 1.65,
-                    (maxZ - minZ + framingMargin * 2) / 1.4);
-                const eyeHeight = Math.min(auditoriumRoomHeight - 0.4, Math.max(3.5, requiredHeight));
-                setCameraFieldOfView(68);
-                cameraTargetPos.set(seatCenter.x + 0.14, eyeHeight, seatCenter.z + 0.32);
-                desiredLookAtTarget.copy(seatCenter);
+                applyBirdseyeFraming();
             }
         }
 
@@ -2995,6 +3027,7 @@
             renderer.setSize(w, h);
             camera.aspect = (isVRStereo ? w / 2 : w) / h;
             if (cameraMode === 'overview') applyOverviewFieldOfView();
+            else if (cameraMode === 'birdseye') applyBirdseyeFraming();
             camera.updateProjectionMatrix();
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, renderQuality === 'high' ? 1.75 : (renderQuality === 'balanced' ? 1.5 : 1)));
         });
