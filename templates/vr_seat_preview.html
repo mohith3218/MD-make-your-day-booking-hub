@@ -1206,24 +1206,38 @@
         function applyOverviewFieldOfView() {
             const aspect = Math.max(0.25, container.clientWidth / Math.max(1, container.clientHeight));
             const targetFov = 62;
+            // A portrait viewport loses horizontal coverage much faster than
+            // it gains vertical coverage. Raise the overview eye and lower its
+            // aim point progressively on narrow screens so the room width is
+            // seen at a steeper angle without exceeding the lens limit.
+            const portraitBias = THREE.MathUtils.clamp((1.12 - aspect) / 0.82, 0, 1);
+            const responsiveCamera = overviewBaseCamera.clone();
+            responsiveCamera.y = Math.min(auditoriumRoomHeight - 0.45,
+                responsiveCamera.y + auditoriumRoomHeight * 0.3 * portraitBias);
+            const responsiveTarget = auditoriumCenterTarget.clone();
+            responsiveTarget.y = Math.max(0.35,
+                responsiveTarget.y - auditoriumRoomHeight * 0.13 * portraitBias);
+            const responsiveForward = responsiveTarget.clone().sub(responsiveCamera).normalize();
+            const responsiveRight = new THREE.Vector3().crossVectors(responsiveForward, new THREE.Vector3(0, 1, 0)).normalize();
+            const responsiveUp = new THREE.Vector3().crossVectors(responsiveRight, responsiveForward).normalize();
             const tanVertical = Math.tan(THREE.MathUtils.degToRad(targetFov / 2)) / 1.08;
             const tanHorizontal = tanVertical * aspect;
             let backoff = 0;
             overviewBounds.forEach(point => {
-                const relative = point.clone().sub(overviewBaseCamera);
-                const depth = relative.dot(overviewForward);
+                const relative = point.clone().sub(responsiveCamera);
+                const depth = relative.dot(responsiveForward);
                 backoff = Math.max(backoff,
-                    Math.abs(relative.dot(overviewUp)) / tanVertical - depth,
-                    Math.abs(relative.dot(overviewRight)) / tanHorizontal - depth);
+                    Math.abs(relative.dot(responsiveUp)) / tanVertical - depth,
+                    Math.abs(relative.dot(responsiveRight)) / tanHorizontal - depth);
             });
             // Keep the camera inside the rear wall with a little clearance.
             // If an unusually narrow viewport cannot fit within the room,
             // widen the lens only after using all available rear concourse.
-            const maxBackoff = overviewForward.z < -0.001
-                ? Math.max(0, (auditoriumRearWallZ - 0.65 - overviewBaseCamera.z) / -overviewForward.z)
+            const maxBackoff = responsiveForward.z < -0.001
+                ? Math.max(0, (auditoriumRearWallZ - 0.65 - responsiveCamera.z) / -responsiveForward.z)
                 : 0;
             backoff = Math.min(Math.max(0, backoff), maxBackoff);
-            auditoriumOverviewCamera.copy(overviewBaseCamera).addScaledVector(overviewForward, -backoff);
+            auditoriumOverviewCamera.copy(responsiveCamera).addScaledVector(responsiveForward, -backoff);
             const forward = auditoriumCenterTarget.clone().sub(auditoriumOverviewCamera).normalize();
             const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
             const up = new THREE.Vector3().crossVectors(right, forward).normalize();
@@ -2191,12 +2205,22 @@
                 cameraTargetPos.set(0, Math.max(2.8, screenCenterTarget.y * 0.42), screenCenterTarget.z + 4.5);
                 desiredLookAtTarget.copy(auditoriumCenterTarget);
             } else if (preset === 'birdseye') {
-                // Stay below the opaque ceiling and look steeply across the
-                // seating bowl; an outside/vertical camera sees only the roof
-                // or hits the lookAt up-vector singularity.
-                setCameraFieldOfView(72);
-                cameraTargetPos.set(0.1, Math.max(2.8, auditoriumRoomHeight - 1.25), auditoriumCenterTarget.z + 3.0);
-                desiredLookAtTarget.set(0, 0.2, auditoriumCenterTarget.z);
+                // Frame the actual seat envelope from just below the opaque
+                // ceiling. A slight diagonal offset keeps the view-up vector
+                // away from the straight-down lookAt singularity.
+                const seats = [...seatRegistry.values()];
+                const minX = seats.length ? Math.min(...seats.map(seat => seat.worldPos.x)) : -auditoriumHalfWidth * 0.6;
+                const maxX = seats.length ? Math.max(...seats.map(seat => seat.worldPos.x)) : auditoriumHalfWidth * 0.6;
+                const minZ = seats.length ? Math.min(...seats.map(seat => seat.worldPos.z)) : auditoriumCenterTarget.z - 4;
+                const maxZ = seats.length ? Math.max(...seats.map(seat => seat.worldPos.z)) : auditoriumCenterTarget.z + 4;
+                const seatCenter = new THREE.Vector3((minX + maxX) * 0.5, 0.3, (minZ + maxZ) * 0.5);
+                const framingMargin = Math.max(1.2, (maxX - minX) * 0.12);
+                const requiredHeight = Math.max((maxX - minX + framingMargin * 2) / 1.65,
+                    (maxZ - minZ + framingMargin * 2) / 1.4);
+                const eyeHeight = Math.min(auditoriumRoomHeight - 0.4, Math.max(3.5, requiredHeight));
+                setCameraFieldOfView(68);
+                cameraTargetPos.set(seatCenter.x + 0.14, eyeHeight, seatCenter.z + 0.32);
+                desiredLookAtTarget.copy(seatCenter);
             }
         }
 
