@@ -874,6 +874,12 @@
         let animationFrameId = 0;
         let lastFrameAt = 0;
         let animationDestroyed = false;
+        let auditoriumBuildDurationMs = 0;
+        let previewUsableAt = 0;
+        let fpsSampleStartedAt = performance.now();
+        let fpsSampleFrames = 0;
+        let measuredFps = 0;
+        const previewStartedAt = performance.now();
         function startAnimationLoop() {
             if (animationDestroyed || document.hidden || !container.isConnected || animationFrameId) return;
             clock.start();
@@ -1176,6 +1182,11 @@
 
         const interactiveSeatMeshes = [];
         let architecturalAccentMaterials = [];
+        function registerArchitecturalAccent(material, role = 'wall') {
+            material.userData.accentRole = role;
+            architecturalAccentMaterials.push(material);
+            return material;
+        }
         let screenCenterTarget = new THREE.Vector3(0, 6.2, -15.5);
         const currentLookAtTarget = new THREE.Vector3(0, 6.2, -15.5);
         const desiredLookAtTarget = new THREE.Vector3(0, 6.2, -15.5);
@@ -1277,6 +1288,27 @@
         const matSeatInset = new THREE.MeshStandardMaterial({ color: 0x10221f, roughness: 0.82, metalness: 0.01 });
         const matSeatStitch = new THREE.MeshStandardMaterial({ color: 0x9c8251, roughness: 0.72, metalness: 0.08 });
 
+        function createSeatFabricTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#bcb9b0';
+            ctx.fillRect(0, 0, 128, 128);
+            for (let p = 0; p < 128; p += 4) {
+                ctx.fillStyle = 'rgba(24, 27, 30, 0.14)';
+                ctx.fillRect(p, 0, 1, 128);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+                ctx.fillRect(0, p + 1, 128, 1);
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1.5, 1.5);
+            texture.encoding = THREE.sRGBEncoding;
+            texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+            return texture;
+        }
+        const seatFabricTexture = createSeatFabricTexture();
+
         function createExitSignCanvasTexture(label) {
             const c = document.createElement('canvas');
             c.width = 256;
@@ -1296,6 +1328,7 @@
         }
 
         function buildParametricAuditorium(config) {
+            const buildStartedAt = performance.now();
             // Release generated geometry from the previous layout while keeping
             // global palette materials and the shared movie texture alive.
             const keepMaterials = new Set([matStdAvail, matVipAvail, matReclinerAvail,
@@ -1316,7 +1349,7 @@
             });
             oldGeometries.forEach(geometry => geometry.dispose());
             oldMaterials.forEach(material => material.dispose());
-            oldTextures.forEach(texture => texture.dispose());
+            oldTextures.forEach(texture => { if (texture !== seatFabricTexture) texture.dispose(); });
             // Clear existing 3D objects
             while (auditoriumGroup.children.length > 0) {
                 auditoriumGroup.remove(auditoriumGroup.children[0]);
@@ -1469,9 +1502,12 @@
 
             // Screen Gold/Cyan Ambient Frame
             if (thetaLength) {
-                const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, screenHeightM + 0.5, 64, 1, true, thetaStart - 0.01, thetaLength + 0.02);
+            const frameGeo = new THREE.CylinderGeometry(radius + 0.16, radius + 0.16, screenHeightM + 0.5, 64, 1, true, thetaStart - 0.01, thetaLength + 0.02);
                 frameGeo.scale(-1, 1, 1);
-                const frameMat = new THREE.MeshBasicMaterial({ color: trimBaseColor, transparent: true, opacity: 0.18, side: THREE.DoubleSide });
+                const frameMat = registerArchitecturalAccent(new THREE.MeshStandardMaterial({
+                    color: trimBaseColor, emissive: trimBaseColor, emissiveIntensity: 0.025,
+                    transparent: true, opacity: 0.62, roughness: 0.48, side: THREE.DoubleSide
+                }), 'frame');
                 const frameMesh = new THREE.Mesh(frameGeo, frameMat);
                 frameMesh.position.copy(screenMesh.position);
                 auditoriumGroup.add(frameMesh);
@@ -1486,9 +1522,10 @@
 
             const stageLedGeo = new THREE.BoxGeometry(hallHalfWidth * 1.85, 0.025, 0.04);
             const stageLedMat = new THREE.MeshStandardMaterial({
-                color: trimBaseColor, emissive: trimBaseColor, emissiveIntensity: 0.12,
+                color: trimBaseColor, emissive: trimBaseColor, emissiveIntensity: 0.04,
                 roughness: 0.8, metalness: 0.02
             });
+            registerArchitecturalAccent(stageLedMat, 'stage');
             const stageLed = new THREE.Mesh(stageLedGeo, stageLedMat);
             stageLed.position.set(0, 0.24, screenSurfaceZ + 1.12);
             auditoriumGroup.add(stageLed);
@@ -1528,20 +1565,53 @@
             });
             const ribSpacing = Math.max(2.2, Math.min(5.5, Number(architecture.ceiling_panel_spacing_m) || 3.4));
             if (!/plain|flat/i.test(String(ceilingStyle))) {
+                const ribCount = Math.max(1, Math.ceil((auditoriumRearWallZ - screenSurfaceZ - 1) / ribSpacing));
+                const ceilingRibs = new THREE.InstancedMesh(ceilingRibGeo, ceilingRibMat, ribCount);
+                const ribTransform = new THREE.Object3D();
+                let ribIndex = 0;
                 for (let z = screenSurfaceZ + 1; z < auditoriumRearWallZ; z += ribSpacing) {
-                    const ceilingRib = new THREE.Mesh(ceilingRibGeo, ceilingRibMat);
-                    ceilingRib.position.set(0, roomHeight - 0.16, z);
-                    auditoriumGroup.add(ceilingRib);
+                    ribTransform.position.set(0, roomHeight - 0.16, z);
+                    ribTransform.updateMatrix();
+                    ceilingRibs.setMatrixAt(ribIndex++, ribTransform.matrix);
                 }
+                ceilingRibs.count = ribIndex;
+                ceilingRibs.instanceMatrix.needsUpdate = true;
+                auditoriumGroup.add(ceilingRibs);
                 if (/grid|cross/i.test(String(ceilingStyle))) {
                     const ceilingCrossGeo = new THREE.BoxGeometry(0.12, 0.1, hallDepth - 1);
-                    [-0.34, 0.34].forEach(offset => {
-                        const crossRib = new THREE.Mesh(ceilingCrossGeo, ceilingRibMat);
-                        crossRib.position.set(offset * hallHalfWidth * 2, roomHeight - 0.18, hallCenterZ);
-                        auditoriumGroup.add(crossRib);
+                    const ceilingCrossRibs = new THREE.InstancedMesh(ceilingCrossGeo, ceilingRibMat, 2);
+                    [-0.34, 0.34].forEach((offset, index) => {
+                        ribTransform.position.set(offset * hallHalfWidth * 2, roomHeight - 0.18, hallCenterZ);
+                        ribTransform.updateMatrix();
+                        ceilingCrossRibs.setMatrixAt(index, ribTransform.matrix);
                     });
+                    ceilingCrossRibs.count = 2;
+                    ceilingCrossRibs.instanceMatrix.needsUpdate = true;
+                    auditoriumGroup.add(ceilingCrossRibs);
                 }
             }
+
+            const ceilingBayCount = Math.max(1, Math.ceil(hallDepth / 5.2) - 1);
+            const ceilingLightGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const ceilingLightColor = architecture.ceiling_light_color || architecture.lighting_color || '#cbbf9f';
+            const ceilingLightMaterial = registerArchitecturalAccent(new THREE.MeshStandardMaterial({
+                color: ceilingLightColor, emissive: ceilingLightColor, emissiveIntensity: 0.01,
+                roughness: 0.38, metalness: 0.02
+            }), 'ceiling');
+            const ceilingLightInstances = new THREE.InstancedMesh(ceilingLightGeometry, ceilingLightMaterial, ceilingBayCount * 3);
+            const ceilingLightTransform = new THREE.Object3D();
+            let ceilingLightIndex = 0;
+            for (let z = screenSurfaceZ + 3.2; z < auditoriumRearWallZ - 1.2; z += 5.2) {
+                [-0.31, 0, 0.31].forEach(lane => {
+                    ceilingLightTransform.position.set(lane * hallHalfWidth * 2, roomHeight - 0.055, z);
+                    ceilingLightTransform.scale.set(Math.max(0.45, hallHalfWidth * 0.11), 0.035, 1.05);
+                    ceilingLightTransform.updateMatrix();
+                    ceilingLightInstances.setMatrixAt(ceilingLightIndex++, ceilingLightTransform.matrix);
+                });
+            }
+            ceilingLightInstances.count = ceilingLightIndex;
+            ceilingLightInstances.instanceMatrix.needsUpdate = true;
+            auditoriumGroup.add(ceilingLightInstances);
 
             // Elevated levels receive one structural deck and simple continuous
             // guard rails, keeping object count independent of seat count.
@@ -1578,79 +1648,149 @@
             });
 
             const spkBoxGeo = new THREE.BoxGeometry(0.45, 0.85, 0.55);
-            const spkMat = new THREE.MeshStandardMaterial({ color: 0x05070b, roughness: 0.4, metalness: 0.7 });
-            const spkLedGeo = new THREE.SphereGeometry(0.06, 8, 8);
-            const spkLedMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            const spkMat = new THREE.MeshStandardMaterial({ color: 0x090b10, roughness: 0.48, metalness: 0.46 });
+            const spkLedGeo = new THREE.SphereGeometry(0.045, 8, 8);
+            const wallAccentColor = lightingBaseColor;
 
-            for (let side of [-1, 1]) {
+            for (const side of [-1, 1]) {
+                const profile = side < 0 ? leftWallProfile : rightWallProfile;
                 const wallX = side * hallHalfWidth;
-                const sideWallGeo = new THREE.BoxGeometry(0.35, roomHeight, hallDepth);
                 const sideWallMaterial = new THREE.MeshStandardMaterial({
-                    color: side < 0 ? (leftWallProfile.color || architecture.left_wall_color || wallBaseColor) : (rightWallProfile.color || architecture.right_wall_color || wallBaseColor),
-                    roughness: 0.88
+                    color: profile.color || (side < 0 ? architecture.left_wall_color : architecture.right_wall_color) || wallBaseColor,
+                    roughness: 0.91
                 });
-                const sideWall = new THREE.Mesh(sideWallGeo, sideWallMaterial);
+                const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.35, roomHeight, hallDepth), sideWallMaterial);
                 sideWall.position.set(wallX, roomHeight / 2, hallCenterZ);
                 auditoriumGroup.add(sideWall);
 
-                const wallStyle = side < 0 ? leftWallStyle : rightWallStyle;
+                const styleText = String(profile.style || (side < 0 ? leftWallStyle : rightWallStyle));
                 const panelSpacing = Number((side < 0 ? architecture.left_panel_spacing_m : architecture.right_panel_spacing_m)
                     || architecture.panel_spacing_m || Math.max(3.5, hallDepth / 12));
-                for (let z = screenSurfaceZ + 1; z <= auditoriumRearWallZ - 3; z += panelSpacing) {
-                    const panelHeight = Math.min(10, roomHeight * 0.66);
-                    const panelY = roomHeight * 0.53;
-                    const panelDepth = Math.max(0.35, Math.min(3.2, panelSpacing * 0.72));
-                    const styleText = String(wallStyle);
-                    const ribbed = /rib|vertical/i.test(styleText);
-                    const horizontal = /horizontal|linear/i.test(styleText);
-                    const panelGeo = new THREE.BoxGeometry(
-                        ribbed ? 0.5 : 0.22,
-                        horizontal ? Math.max(0.35, panelHeight * 0.28) : panelHeight,
-                        ribbed ? 0.34 : panelDepth
-                    );
-                    const panelMat = new THREE.MeshStandardMaterial({
-                        color: side < 0 ? (leftWallProfile.panel_color || architecture.left_panel_color || panelBaseColor) : (rightWallProfile.panel_color || architecture.right_panel_color || panelBaseColor),
-                        roughness: 0.92
-                    });
-                    const panel = new THREE.Mesh(panelGeo, panelMat);
-                    panel.position.set(wallX - side * 0.25,
-                        horizontal ? panelY + Math.sin(z * 0.24) * panelHeight * 0.22 : panelY,
-                        z);
-                    auditoriumGroup.add(panel);
+                const panelHeight = Math.min(10, roomHeight * 0.66);
+                const panelY = roomHeight * 0.53;
+                const panelDepth = Math.max(0.35, Math.min(3.2, panelSpacing * 0.72));
+                const zValues = [];
+                for (let z = screenSurfaceZ + 1; z <= auditoriumRearWallZ - 3; z += panelSpacing) zValues.push(z);
+                const count = Math.max(1, zValues.length);
+                const verticalRibs = /rib|vertical/i.test(styleText);
+                const horizontalBands = /horizontal|linear/i.test(styleText);
+                const geometric = /geometric|angled|blue/i.test(styleText) || /geometric|blue/i.test(String(profile.accent || architecture.lighting_style || ''));
+                const recessed = /recess|geometric|acoustic|fabric|panel/i.test(styleText);
+                const panelColor = profile.panel_color || (side < 0 ? architecture.left_panel_color : architecture.right_panel_color) || panelBaseColor;
+                const panelGeometry = new THREE.BoxGeometry(recessed ? 0.34 : 0.22,
+                    horizontalBands ? Math.max(0.38, panelHeight * 0.24) : panelHeight,
+                    horizontalBands ? panelDepth * 0.92 : panelDepth);
+                const panelMaterial = new THREE.MeshStandardMaterial({ color: panelColor, roughness: 0.89, metalness: 0.01 });
+                const panelInstances = new THREE.InstancedMesh(panelGeometry, panelMaterial, count);
+                const detailGeometry = verticalRibs
+                    ? new THREE.BoxGeometry(0.045, panelHeight * 0.91, 0.065)
+                    : new THREE.BoxGeometry(0.07, 0.08, panelDepth * 0.88);
+                const detailMaterial = new THREE.MeshStandardMaterial({
+                    color: profile.detail_color || (verticalRibs ? panelColor : wallBaseColor),
+                    roughness: verticalRibs ? 0.82 : 0.7, metalness: 0.04
+                });
+                const detailsPerBay = verticalRibs ? 4 : (horizontalBands ? 2 : 1);
+                const detailInstances = new THREE.InstancedMesh(detailGeometry, detailMaterial, count * detailsPerBay);
+                const accentGeometry = new THREE.BoxGeometry(0.075, geometric ? 0.11 : 0.08, panelDepth * 0.68);
+                const accentMaterial = new THREE.MeshStandardMaterial({
+                    color: wallAccentColor, emissive: wallAccentColor, emissiveIntensity: 0.08,
+                    roughness: 0.46, metalness: 0.04
+                });
+                const accentInstances = new THREE.InstancedMesh(accentGeometry, accentMaterial, count);
+                const sconceStyle = String(profile.light_band || profile.accent || architecture.lighting_style || 'accent');
+                const linearSconce = /linear|geometric|blue/i.test(sconceStyle);
+                const sconceGeometry = linearSconce
+                    ? new THREE.BoxGeometry(0.075, 0.07, Math.min(2.8, panelSpacing * 0.8))
+                    : new THREE.BoxGeometry(0.09, Math.min(2.6, roomHeight * 0.24), 0.09);
+                const sconceMaterial = new THREE.MeshStandardMaterial({
+                    color: wallAccentColor, emissive: wallAccentColor, emissiveIntensity: 0.1,
+                    roughness: 0.48, metalness: 0.02
+                });
+                const sconceInstances = new THREE.InstancedMesh(sconceGeometry, sconceMaterial, count);
+                const speakerInstances = new THREE.InstancedMesh(spkBoxGeo, spkMat, count);
+                const speakerLedMaterial = new THREE.MeshStandardMaterial({
+                    color: wallAccentColor, emissive: wallAccentColor, emissiveIntensity: 0.05,
+                    roughness: 0.42, metalness: 0.02
+                });
+                const speakerLedInstances = new THREE.InstancedMesh(spkLedGeo, speakerLedMaterial, count);
+                const borderGeometry = new THREE.BoxGeometry(0.12, 0.1, hallDepth - 1.5);
+                const borderMaterial = new THREE.MeshStandardMaterial({ color: panelColor, roughness: 0.62, metalness: 0.12 });
+                const borderInstances = new THREE.InstancedMesh(borderGeometry, borderMaterial, 2);
+                [panelInstances, detailInstances, accentInstances, sconceInstances, speakerInstances, speakerLedInstances].forEach(mesh => mesh.count = 0);
+                borderInstances.count = 2;
+                auditoriumGroup.add(panelInstances, detailInstances, accentInstances, sconceInstances, speakerInstances, speakerLedInstances, borderInstances);
+                registerArchitecturalAccent(accentMaterial, 'geometric');
+                registerArchitecturalAccent(sconceMaterial, 'wall');
+                registerArchitecturalAccent(speakerLedMaterial, 'speaker');
 
-                    if (/geometric|angled|blue/i.test(styleText)) {
-                        const accentGeo = new THREE.BoxGeometry(0.1, 0.1, Math.min(2.4, panelDepth * 0.8));
-                        const accent = new THREE.Mesh(accentGeo, new THREE.MeshBasicMaterial({ color: lightingBaseColor }));
-                        accent.position.set(wallX - side * 0.43, panelY - panelHeight * 0.28, z);
-                        accent.rotation.x = (z % 2 ? 1 : -1) * 0.18;
-                        auditoriumGroup.add(accent);
+                const transform = new THREE.Object3D();
+                let detailIndex = 0;
+                zValues.forEach((z, panelIndex) => {
+                    const panelX = wallX - side * (recessed ? 0.32 : 0.25);
+                    const panelBaseY = horizontalBands ? panelY + Math.sin(z * 0.24) * panelHeight * 0.1 : panelY;
+                    transform.position.set(panelX, panelBaseY, z);
+                    transform.scale.set(1, 1, 1);
+                    transform.updateMatrix();
+                    panelInstances.setMatrixAt(panelIndex, transform.matrix);
+                    panelInstances.count = panelIndex + 1;
+
+                    if (verticalRibs) {
+                        for (let rib = 0; rib < detailsPerBay; rib++) {
+                            transform.position.set(panelX - side * 0.055, panelBaseY, z + (rib - 1.5) * panelDepth * 0.21);
+                            transform.updateMatrix();
+                            detailInstances.setMatrixAt(detailIndex++, transform.matrix);
+                        }
+                    } else if (horizontalBands) {
+                        for (let band = 0; band < detailsPerBay; band++) {
+                            transform.position.set(panelX - side * 0.06, panelBaseY + (band ? 0.31 : -0.31) * panelHeight, z);
+                            transform.updateMatrix();
+                            detailInstances.setMatrixAt(detailIndex++, transform.matrix);
+                        }
+                    } else {
+                        transform.position.set(panelX - side * 0.06, panelBaseY - panelHeight * 0.38, z);
+                        transform.rotation.z = panelIndex % 2 ? 0.24 : -0.24;
+                        transform.updateMatrix();
+                        detailInstances.setMatrixAt(detailIndex++, transform.matrix);
+                        transform.rotation.z = 0;
                     }
+                    detailInstances.count = detailIndex;
 
-                    // Wall Sconce Neon Bar
-                    const lightingStyle = String(architecture.lighting_style || 'accent');
-                    const sconceGeo = /linear|geometric|blue/i.test(lightingStyle)
-                        ? new THREE.BoxGeometry(0.08, 0.08, Math.min(2.8, panelSpacing * 0.8))
-                        : new THREE.BoxGeometry(0.1, Math.min(2.8, roomHeight * 0.26), 0.1);
-                    const sconceMat = new THREE.MeshStandardMaterial({
-                        color: lightingBaseColor, emissive: lightingBaseColor,
-                        emissiveIntensity: 0.24, roughness: 0.42, metalness: 0.08
-                    });
-                    architecturalAccentMaterials.push(sconceMat);
-                    const sconce = new THREE.Mesh(sconceGeo, sconceMat);
-                    sconce.position.set(wallX - side * 0.42,
-                        /linear|geometric|blue/i.test(lightingStyle) ? roomHeight * 0.48 : roomHeight * 0.56,
-                        z + (sconceGeo.parameters.depth || 1.65) / 2);
-                    auditoriumGroup.add(sconce);
+                    if (geometric) {
+                        transform.position.set(wallX - side * 0.43, panelBaseY - panelHeight * 0.27, z);
+                        transform.rotation.z = panelIndex % 2 ? 0.22 : -0.22;
+                        transform.updateMatrix();
+                        accentInstances.setMatrixAt(panelIndex, transform.matrix);
+                        accentInstances.count = panelIndex + 1;
+                        transform.rotation.z = 0;
+                    }
+                    transform.position.set(wallX - side * 0.42,
+                        linearSconce ? roomHeight * 0.48 : roomHeight * 0.56,
+                        z + (linearSconce ? (sconceGeometry.parameters.depth || 1.65) / 2 : 0));
+                    transform.updateMatrix();
+                    sconceInstances.setMatrixAt(panelIndex, transform.matrix);
+                    sconceInstances.count = panelIndex + 1;
 
-                    // 3D Dolby Atmos Wall Surround Speaker + Blue LED
-                    const spk = new THREE.Mesh(spkBoxGeo, spkMat);
-                    spk.position.set(wallX - side * 0.48, roomHeight * 0.72, z);
-                    auditoriumGroup.add(spk);
-
-                    const led = new THREE.Mesh(spkLedGeo, spkLedMat);
-                    led.position.set(wallX - side * 0.72, roomHeight * 0.72, z);
-                    auditoriumGroup.add(led);
-                }
+                    transform.position.set(wallX - side * 0.48, roomHeight * 0.72, z);
+                    transform.updateMatrix();
+                    speakerInstances.setMatrixAt(panelIndex, transform.matrix);
+                    speakerInstances.count = panelIndex + 1;
+                    transform.position.set(wallX - side * 0.72, roomHeight * 0.72, z);
+                    transform.updateMatrix();
+                    speakerLedInstances.setMatrixAt(panelIndex, transform.matrix);
+                    speakerLedInstances.count = panelIndex + 1;
+                });
+                [panelInstances, detailInstances, accentInstances, sconceInstances, speakerInstances, speakerLedInstances].forEach(mesh => {
+                    mesh.instanceMatrix.needsUpdate = true;
+                });
+                [
+                    [roomHeight * 0.18, 0],
+                    [roomHeight * 0.88, 0]
+                ].forEach(([y], borderIndex) => {
+                    transform.position.set(wallX - side * 0.31, y, hallCenterZ);
+                    transform.updateMatrix();
+                    borderInstances.setMatrixAt(borderIndex, transform.matrix);
+                });
+                borderInstances.instanceMatrix.needsUpdate = true;
             }
 
             // Rear Projection Booth Wall & Volumetric Light Cone
@@ -1760,24 +1900,57 @@
                 for (let n = start; n < start + count; n++) if (blocked.has(`${row.label}${n}`)) blockedInRow++;
                 return sum + Math.max(0, count - blockedInRow);
             }, 0);
-            const upholsteryMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0.01 });
+            const leatherLike = /leather|vinyl/i.test(String(seatProfile.upholstery || ''));
+            const upholsteryMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff, map: leatherLike ? null : seatFabricTexture,
+                roughness: leatherLike ? 0.58 : 0.88, metalness: 0.01
+            });
             const armGeometry = new THREE.SphereGeometry(1, 10, 8);
             const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
             const seatLegMaterial = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.58, metalness: 0.42 });
             const cupHolderGeometry = new THREE.CylinderGeometry(0.052, 0.046, 0.035, 12);
             const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x101217, roughness: 0.36, metalness: 0.6 });
+            const stitchGeometry = new THREE.BoxGeometry(1, 1, 1);
             const cushionInstances = new THREE.InstancedMesh(upholsteryGeo, upholsteryMaterial, Math.max(1, seatCapacity * 3));
             const backInstances = new THREE.InstancedMesh(seatBackGeo, upholsteryMaterial, Math.max(1, seatCapacity));
             const armInstances = new THREE.InstancedMesh(armGeometry, matArmrest, Math.max(1, seatCapacity * 2));
-            const legInstances = new THREE.InstancedMesh(seatLegGeometry, seatLegMaterial, Math.max(1, seatCapacity * 2));
+            const legInstances = new THREE.InstancedMesh(seatLegGeometry, seatLegMaterial, Math.max(1, seatCapacity * 3));
             const cupHolderInstances = new THREE.InstancedMesh(cupHolderGeometry, cupHolderMaterial, Math.max(1, seatCapacity * 2));
-            seatInstanceMeshes = [cushionInstances, backInstances, armInstances, legInstances, cupHolderInstances];
+            const stitchInstances = new THREE.InstancedMesh(stitchGeometry, matSeatStitch, Math.max(1, seatCapacity * 2));
+            seatInstanceMeshes = [cushionInstances, backInstances, armInstances, legInstances, cupHolderInstances, stitchInstances];
             seatInstanceMeshes.forEach(mesh => {
                 mesh.count = 0;
                 mesh.userData.instanceSeatIds = [];
             });
             auditoriumGroup.add(...seatInstanceMeshes);
             interactiveSeatMeshes.push(cushionInstances, backInstances);
+
+            const riserGeometry = new THREE.BoxGeometry(hallHalfWidth * 1.92, 1, 1);
+            const riserMaterials = [
+                new THREE.MeshStandardMaterial({ color: 0x0c1018, roughness: 0.86 }),
+                new THREE.MeshStandardMaterial({ color: 0x131724, roughness: 0.84 }),
+                new THREE.MeshStandardMaterial({ color: 0x16121e, roughness: 0.82 })
+            ];
+            const riserInstances = riserMaterials.map(material => {
+                const mesh = new THREE.InstancedMesh(riserGeometry, material, Math.max(1, config.rowDefs.length));
+                mesh.count = 0;
+                auditoriumGroup.add(mesh);
+                return mesh;
+            });
+            const riserCounts = [0, 0, 0];
+
+            const aisleMarkerCapacity = Math.max(1, config.rowDefs.reduce((sum, row) => sum + (row.aislesAfter || []).length, 0));
+            const aisleMarkerGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const aisleMarkerMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.1,
+                roughness: 0.62, metalness: 0.02
+            });
+            const aisleMarkerInstances = new THREE.InstancedMesh(aisleMarkerGeometry, aisleMarkerMaterial, aisleMarkerCapacity);
+            aisleMarkerInstances.count = 0;
+            auditoriumGroup.add(aisleMarkerInstances);
+            registerArchitecturalAccent(aisleMarkerMaterial, 'aisle');
+            const aisleMarkerMatrix = new THREE.Object3D();
+            let aisleMarkerIndex = 0;
             function writeSeatPart(seat, part) {
                 const child = new THREE.Object3D();
                 child.position.copy(part.position);
@@ -1791,6 +1964,7 @@
             }
 
             let seatInstanceIndex = 0;
+            let stitchInstanceIndex = 0;
             rows.forEach((rowLetter, rIdx) => {
                 const rowConfig = config.rowDefs[rIdx];
                 if (!rowConfig) return;
@@ -1802,13 +1976,16 @@
                 const rowSpan = Math.max(1, rowConfig.seatSpan || 1);
                 const aisles = rowConfig.aislesAfter || [];
 
-                const riserGeo = new THREE.BoxGeometry(hallHalfWidth * 1.92, Math.max(0.08, Number(rowPhysical.riserHeight || stadiumSlope)), Number(rowPhysical.rowSpacing || rowSpacing));
-                const riserMat = new THREE.MeshStandardMaterial({
-                    color: isRecliner ? 0x16121e : (isVIP ? 0x131724 : 0x0c1018), roughness: 0.8
-                });
-                const riserMesh = new THREE.Mesh(riserGeo, riserMat);
-                riserMesh.position.set(0, Math.max(0, rowY - Number(rowPhysical.riserHeight || stadiumSlope) / 2), rowZ);
-                auditoriumGroup.add(riserMesh);
+                const riserHeight = Math.max(0.08, Number(rowPhysical.riserHeight || stadiumSlope));
+                const riserIndex = isRecliner ? 2 : (isVIP ? 1 : 0);
+                const riserMesh = riserInstances[riserIndex];
+                const riserMatrix = new THREE.Object3D();
+                riserMatrix.position.set(0, Math.max(0, rowY - riserHeight / 2), rowZ);
+                riserMatrix.scale.set(1, riserHeight, Number(rowPhysical.rowSpacing || rowSpacing));
+                riserMatrix.updateMatrix();
+                riserMesh.setMatrixAt(riserCounts[riserIndex], riserMatrix.matrix);
+                riserCounts[riserIndex]++;
+                riserMesh.count = riserCounts[riserIndex];
 
                 const firstSeat = Number(rowConfig.start || 1);
                 const rowWidthM = rowConfig.count * rowSpan * 0.62 + aisles.length * 0.85 + Number(rowConfig.offset || 0) * 0.62;
@@ -1848,11 +2025,12 @@
                     const backIndex = base;
                     const upholsteryStart = base * 3;
                     const armStart = base * 2;
-                    const accessoryStart = base * 2;
+                    const supportStart = base * 3;
+                    const cupStart = base * 2;
                     const reclineTilt = seatId === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
                     const isWide = rowSpan > 1;
-                    const seatWidth = rowSpan * (isRecliner ? 0.68 : (isVIP ? 0.62 : 0.58));
-                    const seatHeight = isRecliner ? 0.72 : (isVIP ? 0.69 : 0.67);
+                    const seatWidth = rowSpan * (isRecliner ? 0.72 : (isVIP ? 0.66 : 0.58));
+                    const seatHeight = isRecliner ? 0.78 : (isVIP ? 0.73 : 0.67);
                     const seatDepth = isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82);
                     const seat = {
                         id: seatId, row: rowLetter, rowIndex: rIdx, num: sNum,
@@ -1867,20 +2045,25 @@
                         eyePos: seatGroup.localToWorld(new THREE.Vector3(0, 1.16 / seatGroup.scale.y, -0.24)),
                         group: seatGroup,
                         instanceParts: [
-                            part(cushionInstances, upholsteryStart, [0, 0.43, 0], [0.5 * seatWidth, 0.17 * seatHeight, 0.47 * seatDepth]),
-                            part(cushionInstances, upholsteryStart + 1, [0, 1.58, 0.41], [0.33 * seatWidth, 0.2 * seatHeight, 0.12 * seatDepth]),
+                            part(cushionInstances, upholsteryStart, [0, 0.43, 0], [0.5 * seatWidth, 0.21 * seatHeight, 0.47 * seatDepth]),
+                            part(cushionInstances, upholsteryStart + 1, [0, isRecliner ? 1.62 : 1.58, 0.41], [0.38 * seatWidth, 0.22 * seatHeight, 0.14 * seatDepth]),
                             // Recliner footrest sits in front of the seat pan
                             // (negative local Z points toward the screen).
                             part(cushionInstances, upholsteryStart + 2, [0, 0.22, -0.72], isRecliner ? [0.43 * seatWidth, 0.105 * seatHeight, 0.27 * seatDepth] : [0, 0, 0]),
-                            part(backInstances, backIndex, [0, 0.48, 0.22], [seatWidth, seatHeight, seatDepth], reclineTilt, 'back'),
-                            part(armInstances, armStart, [-0.52 * seatWidth, 0.65, 0.035], [0.13 * seatWidth, 0.115 * seatHeight, 0.43 * seatDepth]),
-                            part(armInstances, armStart + 1, [0.52 * seatWidth, 0.65, 0.035], [0.13 * seatWidth, 0.115 * seatHeight, 0.43 * seatDepth]),
-                            part(legInstances, accessoryStart, [-0.32 * seatWidth, 0.17, 0.1], [0.055, 0.34, 0.07]),
-                            part(legInstances, accessoryStart + 1, [0.32 * seatWidth, 0.17, 0.1], [0.055, 0.34, 0.07]),
+                            part(backInstances, backIndex, [0, 0.48, 0.22], [seatWidth, isRecliner ? seatHeight * 1.12 : seatHeight, seatDepth], reclineTilt, 'back'),
+                            part(armInstances, armStart, [-0.52 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [(isRecliner ? 0.17 : (isVIP ? 0.15 : 0.13)) * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
+                            part(armInstances, armStart + 1, [0.52 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [(isRecliner ? 0.17 : (isVIP ? 0.15 : 0.13)) * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
+                            part(legInstances, supportStart, [-0.32 * seatWidth, 0.17, 0.1], [0.065, 0.34, 0.08]),
+                            part(legInstances, supportStart + 1, [0.32 * seatWidth, 0.17, 0.1], [0.065, 0.34, 0.08]),
+                            part(legInstances, supportStart + 2, [0, 0.08, 0.02], [0.68 * seatWidth, 0.055, 0.075]),
                             ...(seatProfile.cup_holder === false ? [] : [
-                                part(cupHolderInstances, accessoryStart, [-0.52 * seatWidth, 0.73, 0.045], [1, 1, 1]),
-                                part(cupHolderInstances, accessoryStart + 1, [0.52 * seatWidth, 0.73, 0.045], [1, 1, 1])
-                            ])
+                                part(cupHolderInstances, cupStart, [-0.52 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1]),
+                                part(cupHolderInstances, cupStart + 1, [0.52 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1])
+                            ]),
+                            ...(isVIP || isRecliner ? [
+                                part(stitchInstances, stitchInstanceIndex++, [0, 0.43, -0.38], [0.42 * seatWidth, 0.012, 0.012]),
+                                part(stitchInstances, stitchInstanceIndex++, [0, 1.34, 0.34], [0.64 * seatWidth, 0.009, 0.009])
+                            ] : [])
                         ],
                         meshes: [
                             { mesh: cushionInstances, index: upholsteryStart },
@@ -1904,11 +2087,14 @@
                     seat.meshes.forEach(ref => ref.mesh.setColorAt(ref.index, initialColor));
 
                     if (aisles.includes(sNum)) {
-                        const stripGeo = new THREE.BoxGeometry(0.14, 0.04, 2.3);
-                        const stripMat = new THREE.MeshBasicMaterial({ color: isVIP || isRecliner ? 0xC9A84C : 0x00f0ff });
-                        const strip = new THREE.Mesh(stripGeo, stripMat);
-                        strip.position.set(seatX + rowSpan * 0.6 + 0.4, rowY + 0.02, rowZ);
-                        auditoriumGroup.add(strip);
+                        aisleMarkerMatrix.position.set(seatX + rowSpan * 0.6 + 0.4, rowY + 0.02, rowZ);
+                        aisleMarkerMatrix.scale.set(0.14, 0.04, 2.3);
+                        aisleMarkerMatrix.updateMatrix();
+                        aisleMarkerInstances.setMatrixAt(aisleMarkerIndex, aisleMarkerMatrix.matrix);
+                        aisleMarkerInstances.setColorAt(aisleMarkerIndex, isVIP || isRecliner
+                            ? new THREE.Color('#c9a84c') : new THREE.Color('#43a9a0'));
+                        aisleMarkerIndex++;
+                        aisleMarkerInstances.count = aisleMarkerIndex;
                     }
 
                     // Put the camera at seated eye height on the seat's front
@@ -1916,11 +2102,26 @@
                     // it through the seat group also handles side-row rotation.
                 }
             });
-            [cushionInstances, backInstances, armInstances].forEach(mesh => {
+            [...seatInstanceMeshes, ...riserInstances, aisleMarkerInstances].forEach(mesh => {
                 if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
                 mesh.instanceMatrix.needsUpdate = true;
             });
+            auditoriumBuildDurationMs = performance.now() - buildStartedAt;
+            applyArchitecturalLightingMode();
         }
+
+        window.cinewavePreviewMetrics = () => ({
+            sceneBuildMs: Number(auditoriumBuildDurationMs.toFixed(1)),
+            sceneUsableMs: previewUsableAt ? Number((previewUsableAt - previewStartedAt).toFixed(1)) : null,
+            averageFps: Number(measuredFps.toFixed(1)),
+            drawCalls: renderer.info.render.calls,
+            triangles: renderer.info.render.triangles,
+            renderedSeats: seatRegistry.size,
+            geometries: renderer.info.memory.geometries,
+            textures: renderer.info.memory.textures,
+            renderQuality,
+            devicePixelRatio: renderer.getPixelRatio()
+        });
         function refreshAllSeatMaterials() {
             seatRegistry.forEach((seat) => {
                 const targetColor = seat.isOccupied ? matOccupied.color
@@ -2871,25 +3072,25 @@
             }
         }
 
+        function applyArchitecturalLightingMode() {
+            const lightValues = lightingMode === 'movie'
+                ? { ambient: 0.46, house: 0.0, wall: 0.045, geometric: 0.04, speaker: 0.025, aisle: 0.025, ceiling: 0.008, stage: 0.025, frame: 0.018 }
+                : (lightingMode === 'preshow'
+                    ? { ambient: 0.9, house: 0.35, wall: 0.2, geometric: 0.16, speaker: 0.1, aisle: 0.13, ceiling: 0.16, stage: 0.09, frame: 0.05 }
+                    : { ambient: 1.35, house: 1.15, wall: 0.42, geometric: 0.32, speaker: 0.18, aisle: 0.3, ceiling: 0.42, stage: 0.24, frame: 0.11 });
+            ambientLight.intensity = lightValues.ambient;
+            houseLight.intensity = lightValues.house;
+            architecturalAccentMaterials.forEach(material => {
+                material.emissiveIntensity = lightValues[material.userData.accentRole] ?? lightValues.wall;
+            });
+        }
+
         function cycleHouseLights() {
             const modes = ['movie', 'preshow', 'house'];
             lightingMode = modes[(modes.indexOf(lightingMode) + 1) % modes.length];
             const labelEl = document.getElementById('lights-label');
-            if (lightingMode === 'movie') {
-                houseLight.intensity = 0.0;
-                ambientLight.intensity = 0.75;
-                if (labelEl) labelEl.textContent = 'Showtime';
-            } else if (lightingMode === 'preshow') {
-                houseLight.intensity = 0.45;
-                ambientLight.intensity = 1.05;
-                if (labelEl) labelEl.textContent = 'Preshow';
-            } else {
-                houseLight.intensity = 1.25;
-                ambientLight.intensity = 1.5;
-                if (labelEl) labelEl.textContent = 'House On';
-            }
-            const accentIntensity = lightingMode === 'movie' ? 0.16 : (lightingMode === 'preshow' ? 0.38 : 0.62);
-            architecturalAccentMaterials.forEach(material => { material.emissiveIntensity = accentIntensity; });
+            applyArchitecturalLightingMode();
+            if (labelEl) labelEl.textContent = lightingMode === 'movie' ? 'Showtime' : (lightingMode === 'preshow' ? 'Preshow' : 'House On');
         }
 
         function switchScreenContent(channel) {
@@ -3046,6 +3247,14 @@
                 renderer.render(scene, camera);
 
                 camera.translateX(-0.032);
+            }
+            const renderedAt = performance.now();
+            if (!previewUsableAt) previewUsableAt = renderedAt;
+            fpsSampleFrames++;
+            if (renderedAt - fpsSampleStartedAt >= 1000) {
+                measuredFps = fpsSampleFrames * 1000 / (renderedAt - fpsSampleStartedAt);
+                fpsSampleStartedAt = renderedAt;
+                fpsSampleFrames = 0;
             }
             animationFrameId = requestAnimationFrame(animate);
         }

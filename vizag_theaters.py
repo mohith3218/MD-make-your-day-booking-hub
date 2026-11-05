@@ -1151,8 +1151,8 @@ AUDITORIUM_SCREEN_PROFILES = {
                 "recline": "unknown", "dimensions_status": "estimated"
             },
             "wall_profiles": {
-                "left": {"style": "dark_acoustic_panels", "color": "#20212a", "panel_color": "#162333", "accent": "blue_geometric"},
-                "right": {"style": "dark_acoustic_panels", "color": "#20212a", "panel_color": "#162333", "accent": "blue_geometric"}
+                "left": {"style": "dark_acoustic_panels", "color": "#20212a", "panel_color": "#162333", "detail_color": "#263c53", "accent": "blue_geometric"},
+                "right": {"style": "dark_acoustic_panels", "color": "#20212a", "panel_color": "#162333", "detail_color": "#263c53", "accent": "blue_geometric"}
             },
             "lighting_profile": {"mode": "restrained_blue_accents", "confidence": "medium"}
         },
@@ -1178,8 +1178,8 @@ AUDITORIUM_SCREEN_PROFILES = {
             "screen_type": "curved",
             "seat_profile": {"model": "classic_bucket_estimated", "upholstery": "fabric_estimated", "cup_holder": True, "dimensions_status": "estimated"},
             "wall_profiles": {
-                "left": {"style": "red_ribbed_upper_panels_estimated", "color": "#65251c", "panel_color": "#3c2c26"},
-                "right": {"style": "red_ribbed_upper_panels_estimated", "color": "#65251c", "panel_color": "#3c2c26"}
+                "left": {"style": "red_ribbed_upper_panels_estimated", "color": "#65251c", "panel_color": "#3c2c26", "detail_color": "#281d1a"},
+                "right": {"style": "red_ribbed_upper_panels_estimated", "color": "#65251c", "panel_color": "#3c2c26", "detail_color": "#281d1a"}
             },
             "lighting_profile": {"mode": "warm_ceiling_estimated", "confidence": "low"}
         },
@@ -1209,8 +1209,8 @@ AUDITORIUM_SCREEN_PROFILES = {
             "floor_color": "#242328", "screen_type": "unverified",
             "seat_profile": {"model": "cinema_bucket", "upholstery": "purple_fabric", "cup_holder": True, "dimensions_status": "estimated"},
             "wall_profiles": {
-                "left": {"style": "vertical_ribbed_acoustic_panels", "color": "#1a1a20", "panel_color": "#62413d", "light_band": "linear_warm"},
-                "right": {"style": "vertical_ribbed_acoustic_panels", "color": "#1a1a20", "panel_color": "#62413d", "light_band": "linear_warm"}
+                "left": {"style": "vertical_ribbed_acoustic_panels", "color": "#1a1a20", "panel_color": "#62413d", "detail_color": "#392d2b", "light_band": "linear_warm"},
+                "right": {"style": "vertical_ribbed_acoustic_panels", "color": "#1a1a20", "panel_color": "#62413d", "detail_color": "#392d2b", "light_band": "linear_warm"}
             },
             "lighting_profile": {"mode": "linear_warm", "confidence": "medium"}
         },
@@ -1241,8 +1241,8 @@ AUDITORIUM_SCREEN_PROFILES = {
             "floor_color": "#211f20", "screen_type": "unverified",
             "seat_profile": {"model": "cinema_bucket", "upholstery": "dark_branded_fabric", "cup_holder": True, "dimensions_status": "estimated"},
             "wall_profiles": {
-                "left": {"style": "horizontal_bands", "color": "#203443", "panel_color": "#315064", "light_band": "linear_warm"},
-                "right": {"style": "horizontal_bands", "color": "#282622", "panel_color": "#49433b", "light_band": "linear_warm"}
+                "left": {"style": "horizontal_bands", "color": "#203443", "panel_color": "#315064", "detail_color": "#17252e", "light_band": "linear_warm"},
+                "right": {"style": "horizontal_bands", "color": "#282622", "panel_color": "#49433b", "detail_color": "#332f2a", "light_band": "linear_warm"}
             },
             "lighting_profile": {"mode": "linear_warm", "confidence": "medium"}
         },
@@ -1261,15 +1261,15 @@ AUDITORIUM_SCREEN_PROFILES = {
         }],
         "architecture": {
             "levels": 1, "seating_style": "steep_stadium_estimated",
-            "wall_style": "dark_estimated", "seat_color": "#27334a",
+            "wall_style": "acoustic_fabric_panels_estimated", "seat_color": "#27334a",
             "wall_color": "#10141b", "panel_color": "#171c25",
             "lighting_color": "#526b87", "lighting_style": "low_level_estimated",
             "screen_type": "flat_led", "estimated_row_spacing_m": 1.05,
             "estimated_riser_height_m": 0.25,
             "seat_profile": {"model": "cinema_bucket_estimated", "upholstery": "fabric_estimated", "cup_holder": True, "dimensions_status": "estimated"},
             "wall_profiles": {
-                "left": {"style": "dark_estimated", "color": "#10141b", "panel_color": "#171c25"},
-                "right": {"style": "dark_estimated", "color": "#10141b", "panel_color": "#171c25"}
+                "left": {"style": "acoustic_fabric_panels_estimated", "color": "#10141b", "panel_color": "#171c25", "detail_color": "#26313d", "light_band": "low_level_estimated"},
+                "right": {"style": "geometric_panels_estimated", "color": "#10141b", "panel_color": "#202633", "detail_color": "#171d26", "accent": "cool_geometric_estimated"}
             },
             "lighting_profile": {"mode": "low_level_estimated", "confidence": "low"}
         },
@@ -1321,7 +1321,12 @@ def _attach_auditorium_screen_profile(layout, theater_name, screen_name):
         recliner = any("reclin" in str(c.get("name", "")).lower() or
                        "reclin" in str(c.get("code", "")).lower()
                        for c in classes)
-        style_index = sum(ord(char) for char in f"{theater_name}/{screen_name}") % 4
+        premium = any(any(word in str(c.get("name", "")).lower()
+                          for word in ("vip", "prime", "premium", "lounge", "gold"))
+                      for c in classes)
+        # Estimated visual families follow the saved seat classes, never a
+        # per-theater hash or random color assignment.
+        style_index = 3 if (recliner and premium) else (2 if recliner else (1 if premium else 0))
         estimated_styles = [
             ("acoustic_panels_estimated", "grid_estimated", "warm_sconces_estimated", "#bc9463"),
             ("vertical_ribbed_estimated", "ribbed_estimated", "low_level_estimated", "#486a85"),
@@ -1353,6 +1358,7 @@ def _attach_auditorium_screen_profile(layout, theater_name, screen_name):
             },
             "lighting_profile": {"mode": lighting_style, "confidence": "low"},
             "geometry_source": "saved_screen_seat_layout; room dimensions estimated",
+            "wall_profile_source": "controlled_class_based_estimate",
         }
         profile = {
             "theater": theater_name, "screen": screen_name,
