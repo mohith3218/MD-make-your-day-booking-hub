@@ -1175,6 +1175,7 @@
         scene.add(auditoriumGroup);
 
         const interactiveSeatMeshes = [];
+        let architecturalAccentMaterials = [];
         let screenCenterTarget = new THREE.Vector3(0, 6.2, -15.5);
         const currentLookAtTarget = new THREE.Vector3(0, 6.2, -15.5);
         const desiredLookAtTarget = new THREE.Vector3(0, 6.2, -15.5);
@@ -1323,17 +1324,22 @@
             interactiveSeatMeshes.length = 0;
             seatRegistry.clear();
             exitDoorsList.length = 0;
+            architecturalAccentMaterials = [];
 
             const rows = config.rows;
             const visual = config.visual || {};
             const architecture = (config.referenceProfile || {}).architecture || {};
+            const wallProfiles = architecture.wall_profiles || {};
+            const leftWallProfile = wallProfiles.left || {};
+            const rightWallProfile = wallProfiles.right || {};
+            const seatProfile = architecture.seat_profile || {};
             const seatBaseColor = architecture.seat_color || visual.seat_color || '#51252d';
             const wallBaseColor = architecture.wall_color || visual.wall_color || '#11151d';
             const trimBaseColor = architecture.trim_color || visual.trim_color || '#c9a84c';
             const lightingBaseColor = architecture.lighting_color || trimBaseColor;
             const panelBaseColor = architecture.panel_color || '#121826';
-            const leftWallStyle = architecture.left_wall || architecture.wall_style || 'acoustic_panels';
-            const rightWallStyle = architecture.right_wall || architecture.wall_style || 'acoustic_panels';
+            const leftWallStyle = leftWallProfile.style || architecture.left_wall || architecture.wall_style || 'acoustic_panels';
+            const rightWallStyle = rightWallProfile.style || architecture.right_wall || architecture.wall_style || 'acoustic_panels';
             const ceilingColor = architecture.ceiling_color || wallBaseColor;
             const floorColor = architecture.floor_color || '#15151a';
             const ceilingStyle = architecture.ceiling_style || 'acoustic_grid';
@@ -1580,7 +1586,7 @@
                 const wallX = side * hallHalfWidth;
                 const sideWallGeo = new THREE.BoxGeometry(0.35, roomHeight, hallDepth);
                 const sideWallMaterial = new THREE.MeshStandardMaterial({
-                    color: side < 0 ? (architecture.left_wall_color || wallBaseColor) : (architecture.right_wall_color || wallBaseColor),
+                    color: side < 0 ? (leftWallProfile.color || architecture.left_wall_color || wallBaseColor) : (rightWallProfile.color || architecture.right_wall_color || wallBaseColor),
                     roughness: 0.88
                 });
                 const sideWall = new THREE.Mesh(sideWallGeo, sideWallMaterial);
@@ -1603,7 +1609,7 @@
                         ribbed ? 0.34 : panelDepth
                     );
                     const panelMat = new THREE.MeshStandardMaterial({
-                        color: side < 0 ? (architecture.left_panel_color || panelBaseColor) : (architecture.right_panel_color || panelBaseColor),
+                        color: side < 0 ? (leftWallProfile.panel_color || architecture.left_panel_color || panelBaseColor) : (rightWallProfile.panel_color || architecture.right_panel_color || panelBaseColor),
                         roughness: 0.92
                     });
                     const panel = new THREE.Mesh(panelGeo, panelMat);
@@ -1625,7 +1631,11 @@
                     const sconceGeo = /linear|geometric|blue/i.test(lightingStyle)
                         ? new THREE.BoxGeometry(0.08, 0.08, Math.min(2.8, panelSpacing * 0.8))
                         : new THREE.BoxGeometry(0.1, Math.min(2.8, roomHeight * 0.26), 0.1);
-                    const sconceMat = new THREE.MeshBasicMaterial({ color: lightingBaseColor });
+                    const sconceMat = new THREE.MeshStandardMaterial({
+                        color: lightingBaseColor, emissive: lightingBaseColor,
+                        emissiveIntensity: 0.24, roughness: 0.42, metalness: 0.08
+                    });
+                    architecturalAccentMaterials.push(sconceMat);
                     const sconce = new THREE.Mesh(sconceGeo, sconceMat);
                     sconce.position.set(wallX - side * 0.42,
                         /linear|geometric|blue/i.test(lightingStyle) ? roomHeight * 0.48 : roomHeight * 0.56,
@@ -1739,8 +1749,8 @@
                 depth: 0.14, bevelEnabled: true, bevelSegments: 4,
                 bevelThickness: 0.045, bevelSize: 0.035, curveSegments: 10
             });
-            // Three instanced batches replace the many individual seat meshes:
-            // upholstery (cushion/headrest/footrest), backs, and armrests.
+            // Instanced batches keep seat upholstery, backs, armrests, frames,
+            // and cup holders efficient for the largest saved layouts.
             // Instance colors preserve availability, class and cart states.
             const seatCapacity = config.rowDefs.reduce((sum, row) => {
                 const start = Number(row.start || 1);
@@ -1752,15 +1762,21 @@
             }, 0);
             const upholsteryMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0.01 });
             const armGeometry = new THREE.SphereGeometry(1, 10, 8);
+            const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const seatLegMaterial = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.58, metalness: 0.42 });
+            const cupHolderGeometry = new THREE.CylinderGeometry(0.052, 0.046, 0.035, 12);
+            const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x101217, roughness: 0.36, metalness: 0.6 });
             const cushionInstances = new THREE.InstancedMesh(upholsteryGeo, upholsteryMaterial, Math.max(1, seatCapacity * 3));
             const backInstances = new THREE.InstancedMesh(seatBackGeo, upholsteryMaterial, Math.max(1, seatCapacity));
             const armInstances = new THREE.InstancedMesh(armGeometry, matArmrest, Math.max(1, seatCapacity * 2));
-            seatInstanceMeshes = [cushionInstances, backInstances, armInstances];
-            cushionInstances.count = backInstances.count = armInstances.count = 0;
-            cushionInstances.userData.instanceSeatIds = [];
-            backInstances.userData.instanceSeatIds = [];
-            armInstances.userData.instanceSeatIds = [];
-            auditoriumGroup.add(cushionInstances, backInstances, armInstances);
+            const legInstances = new THREE.InstancedMesh(seatLegGeometry, seatLegMaterial, Math.max(1, seatCapacity * 2));
+            const cupHolderInstances = new THREE.InstancedMesh(cupHolderGeometry, cupHolderMaterial, Math.max(1, seatCapacity * 2));
+            seatInstanceMeshes = [cushionInstances, backInstances, armInstances, legInstances, cupHolderInstances];
+            seatInstanceMeshes.forEach(mesh => {
+                mesh.count = 0;
+                mesh.userData.instanceSeatIds = [];
+            });
+            auditoriumGroup.add(...seatInstanceMeshes);
             interactiveSeatMeshes.push(cushionInstances, backInstances);
             function writeSeatPart(seat, part) {
                 const child = new THREE.Object3D();
@@ -1810,7 +1826,9 @@
                     const seatGroup = new THREE.Group();
                     seatGroup.position.set(seatX, rowY, rowZ);
                     if (isRecliner || isVIP || rowSpan > 1) {
-                        const widthScale = rowSpan * (isRecliner ? 1.12 : (isVIP ? 1.07 : 1));
+                        // rowSpan is represented by seatWidth below; applying
+                        // it here too made couple seats grow by span squared.
+                        const widthScale = isRecliner ? 1.12 : (isVIP ? 1.07 : 1);
                         seatGroup.scale.set(widthScale, isRecliner ? 0.72 : (isVIP ? 0.69 : 0.67), isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82));
                     } else {
                         seatGroup.scale.set(1, 0.67, 0.82);
@@ -1830,6 +1848,7 @@
                     const backIndex = base;
                     const upholsteryStart = base * 3;
                     const armStart = base * 2;
+                    const accessoryStart = base * 2;
                     const reclineTilt = seatId === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
                     const isWide = rowSpan > 1;
                     const seatWidth = rowSpan * (isRecliner ? 0.68 : (isVIP ? 0.62 : 0.58));
@@ -1850,10 +1869,18 @@
                         instanceParts: [
                             part(cushionInstances, upholsteryStart, [0, 0.43, 0], [0.5 * seatWidth, 0.17 * seatHeight, 0.47 * seatDepth]),
                             part(cushionInstances, upholsteryStart + 1, [0, 1.58, 0.41], [0.33 * seatWidth, 0.2 * seatHeight, 0.12 * seatDepth]),
-                            part(cushionInstances, upholsteryStart + 2, [0, 0.22, 0.72], isRecliner ? [0.43 * seatWidth, 0.105 * seatHeight, 0.27 * seatDepth] : [0, 0, 0]),
+                            // Recliner footrest sits in front of the seat pan
+                            // (negative local Z points toward the screen).
+                            part(cushionInstances, upholsteryStart + 2, [0, 0.22, -0.72], isRecliner ? [0.43 * seatWidth, 0.105 * seatHeight, 0.27 * seatDepth] : [0, 0, 0]),
                             part(backInstances, backIndex, [0, 0.48, 0.22], [seatWidth, seatHeight, seatDepth], reclineTilt, 'back'),
                             part(armInstances, armStart, [-0.52 * seatWidth, 0.65, 0.035], [0.13 * seatWidth, 0.115 * seatHeight, 0.43 * seatDepth]),
-                            part(armInstances, armStart + 1, [0.52 * seatWidth, 0.65, 0.035], [0.13 * seatWidth, 0.115 * seatHeight, 0.43 * seatDepth])
+                            part(armInstances, armStart + 1, [0.52 * seatWidth, 0.65, 0.035], [0.13 * seatWidth, 0.115 * seatHeight, 0.43 * seatDepth]),
+                            part(legInstances, accessoryStart, [-0.32 * seatWidth, 0.17, 0.1], [0.055, 0.34, 0.07]),
+                            part(legInstances, accessoryStart + 1, [0.32 * seatWidth, 0.17, 0.1], [0.055, 0.34, 0.07]),
+                            ...(seatProfile.cup_holder === false ? [] : [
+                                part(cupHolderInstances, accessoryStart, [-0.52 * seatWidth, 0.73, 0.045], [1, 1, 1]),
+                                part(cupHolderInstances, accessoryStart + 1, [0.52 * seatWidth, 0.73, 0.045], [1, 1, 1])
+                            ])
                         ],
                         meshes: [
                             { mesh: cushionInstances, index: upholsteryStart },
@@ -2861,6 +2888,8 @@
                 ambientLight.intensity = 1.5;
                 if (labelEl) labelEl.textContent = 'House On';
             }
+            const accentIntensity = lightingMode === 'movie' ? 0.16 : (lightingMode === 'preshow' ? 0.38 : 0.62);
+            architecturalAccentMaterials.forEach(material => { material.emissiveIntensity = accentIntensity; });
         }
 
         function switchScreenContent(channel) {

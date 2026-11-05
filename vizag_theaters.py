@@ -1144,7 +1144,17 @@ AUDITORIUM_SCREEN_PROFILES = {
             "wall_style": "dark_acoustic_panels",
             "seat_color": "#243d68", "lighting_style": "blue_geometric_accents",
             "lighting_color": "#174bff", "wall_color": "#20212a",
-            "screen_type": "flat"
+            "screen_type": "flat",
+            "seat_profile": {
+                "model": "cinema_bucket", "upholstery": "dark_fabric",
+                "armrest_style": "shared", "cup_holder": True,
+                "recline": "unknown", "dimensions_status": "estimated"
+            },
+            "wall_profiles": {
+                "left": {"style": "dark_acoustic_panels", "color": "#20212a", "panel_color": "#162333", "accent": "blue_geometric"},
+                "right": {"style": "dark_acoustic_panels", "color": "#20212a", "panel_color": "#162333", "accent": "blue_geometric"}
+            },
+            "lighting_profile": {"mode": "restrained_blue_accents", "confidence": "medium"}
         },
         "confidence": {"appearance": "medium", "geometry": "estimated"},
         "notes": "Two inspected interior views support the dark walls, blue accent lighting, tiered seating, and visible speaker positions. Single-screen listings establish the photo-to-screen match; room dimensions and currentness remain for review."
@@ -1165,7 +1175,13 @@ AUDITORIUM_SCREEN_PROFILES = {
             "seat_color": "#394457", "wall_color": "#65251c",
             "panel_color": "#3c2c26", "lighting_style": "warm_ceiling_lights",
             "lighting_color": "#e3a548",
-            "screen_type": "curved"
+            "screen_type": "curved",
+            "seat_profile": {"model": "classic_bucket_estimated", "upholstery": "fabric_estimated", "cup_holder": True, "dimensions_status": "estimated"},
+            "wall_profiles": {
+                "left": {"style": "red_ribbed_upper_panels_estimated", "color": "#65251c", "panel_color": "#3c2c26"},
+                "right": {"style": "red_ribbed_upper_panels_estimated", "color": "#65251c", "panel_color": "#3c2c26"}
+            },
+            "lighting_profile": {"mode": "warm_ceiling_estimated", "confidence": "low"}
         },
         "confidence": {"appearance": "medium", "geometry": "estimated"},
         "notes": "Historical venue-level photo shows red ribbed side walls, dark lower wall panels, and classic seats. Existing upper/lower balcony divisions remain from the saved seat layout; the photo does not verify them."
@@ -1190,7 +1206,13 @@ AUDITORIUM_SCREEN_PROFILES = {
             "panel_color": "#62413d", "lighting_style": "linear_warm",
             "lighting_color": "#d2c5a8", "ceiling_color": "#292a30",
             "ceiling_style": "grid", "ceiling_panel_color": "#33343b",
-            "floor_color": "#242328", "screen_type": "unverified"
+            "floor_color": "#242328", "screen_type": "unverified",
+            "seat_profile": {"model": "cinema_bucket", "upholstery": "purple_fabric", "cup_holder": True, "dimensions_status": "estimated"},
+            "wall_profiles": {
+                "left": {"style": "vertical_ribbed_acoustic_panels", "color": "#1a1a20", "panel_color": "#62413d", "light_band": "linear_warm"},
+                "right": {"style": "vertical_ribbed_acoustic_panels", "color": "#1a1a20", "panel_color": "#62413d", "light_band": "linear_warm"}
+            },
+            "lighting_profile": {"mode": "linear_warm", "confidence": "medium"}
         },
         "confidence": {"appearance": "medium", "geometry": "estimated"},
         "notes": "Appearance values reconstruct the inspected interior photo. Room dimensions, exact screen curvature, and seat-by-seat geometry remain estimated or taken from the saved booking layout."
@@ -1216,7 +1238,13 @@ AUDITORIUM_SCREEN_PROFILES = {
             "right_panel_color": "#49433b", "lighting_style": "linear_warm",
             "lighting_color": "#d4c9a8", "ceiling_color": "#292821",
             "ceiling_style": "grid", "ceiling_panel_color": "#33323a",
-            "floor_color": "#211f20", "screen_type": "unverified"
+            "floor_color": "#211f20", "screen_type": "unverified",
+            "seat_profile": {"model": "cinema_bucket", "upholstery": "dark_branded_fabric", "cup_holder": True, "dimensions_status": "estimated"},
+            "wall_profiles": {
+                "left": {"style": "horizontal_bands", "color": "#203443", "panel_color": "#315064", "light_band": "linear_warm"},
+                "right": {"style": "horizontal_bands", "color": "#282622", "panel_color": "#49433b", "light_band": "linear_warm"}
+            },
+            "lighting_profile": {"mode": "linear_warm", "confidence": "medium"}
         },
         "confidence": {"appearance": "medium", "geometry": "estimated"},
         "notes": "The visible Screen 5 label supports the screen match. Measurements, exact screen surface, and physical seat spacing remain estimates based on the saved layout."
@@ -1237,7 +1265,13 @@ AUDITORIUM_SCREEN_PROFILES = {
             "wall_color": "#10141b", "panel_color": "#171c25",
             "lighting_color": "#526b87", "lighting_style": "low_level_estimated",
             "screen_type": "flat_led", "estimated_row_spacing_m": 1.05,
-            "estimated_riser_height_m": 0.25
+            "estimated_riser_height_m": 0.25,
+            "seat_profile": {"model": "cinema_bucket_estimated", "upholstery": "fabric_estimated", "cup_holder": True, "dimensions_status": "estimated"},
+            "wall_profiles": {
+                "left": {"style": "dark_estimated", "color": "#10141b", "panel_color": "#171c25"},
+                "right": {"style": "dark_estimated", "color": "#10141b", "panel_color": "#171c25"}
+            },
+            "lighting_profile": {"mode": "low_level_estimated", "confidence": "low"}
         },
         "confidence": {"appearance": "low", "geometry": "estimated"},
         "notes": "Only the flat LED screen dimensions and screen identity are published; room finish and the steeper row pitch are conservative estimates."
@@ -1312,6 +1346,12 @@ def _attach_auditorium_screen_profile(layout, theater_name, screen_name):
             "left_panel_spacing_m": 2.7 + style_index * 0.38,
             "right_panel_spacing_m": 2.9 + style_index * 0.34,
             "screen_type": (layout.get("screen") or {}).get("surface", "flat_estimated"),
+            "seat_profile": {"model": "cinema_bucket_estimated", "upholstery": "fabric_estimated", "cup_holder": True, "dimensions_status": "estimated"},
+            "wall_profiles": {
+                "left": {"style": wall_style, "color": visual.get("wall_color", "#11151d"), "panel_color": visual.get("panel_color", "#1a202b")},
+                "right": {"style": wall_style, "color": visual.get("wall_color", "#11151d"), "panel_color": visual.get("panel_color", "#1a202b")}
+            },
+            "lighting_profile": {"mode": lighting_style, "confidence": "low"},
             "geometry_source": "saved_screen_seat_layout; room dimensions estimated",
         }
         profile = {
