@@ -1284,8 +1284,8 @@
         const matSelectedCart = new THREE.MeshStandardMaterial({ color: 0xf0d58a, emissive: 0x38270b, roughness: 0.38, metalness: 0.08 });
         const matActivePOV = new THREE.MeshStandardMaterial({ color: 0x76cbb9, emissive: 0x16443a, roughness: 0.38, metalness: 0.04 });
         const matOccupied = new THREE.MeshStandardMaterial({ color: 0x28272b, roughness: 0.55, metalness: 0.02 });
-        const matArmrest = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.62, metalness: 0.08 });
-        const matSeatInset = new THREE.MeshStandardMaterial({ color: 0x10221f, roughness: 0.82, metalness: 0.01 });
+        const matArmrest = new THREE.MeshStandardMaterial({ color: 0x242832, roughness: 0.7, metalness: 0.03 });
+        const matSeatInset = new THREE.MeshStandardMaterial({ color: 0x17201f, roughness: 0.82, metalness: 0.01 });
         const matSeatStitch = new THREE.MeshStandardMaterial({ color: 0x9c8251, roughness: 0.72, metalness: 0.08 });
 
         function createSeatFabricTexture() {
@@ -1376,9 +1376,16 @@
             const ceilingColor = architecture.ceiling_color || wallBaseColor;
             const floorColor = architecture.floor_color || '#15151a';
             const ceilingStyle = architecture.ceiling_style || 'acoustic_grid';
-            matStdAvail.color.set(seatBaseColor);
-            matVipAvail.color.set(trimBaseColor);
-            matReclinerAvail.color.set(seatBaseColor);
+            // Profile colours are authored as dark cinema fabrics. Instanced
+            // colors are multiplied by the upholstery map and then lit, so
+            // modest linear-space compensation keeps the profile hue while
+            // preventing the available seats from collapsing to black.
+            const setUpholsteryTint = (material, color, gain) => {
+                material.color.set(color).multiplyScalar(gain).clampRGB(0, 1);
+            };
+            setUpholsteryTint(matStdAvail, seatBaseColor, 2.1);
+            setUpholsteryTint(matVipAvail, trimBaseColor, 1.45);
+            setUpholsteryTint(matReclinerAvail, seatBaseColor, 1.9);
             const geometry = config.geometry || {};
             const physicalRoom = geometry.room || {};
             const physicalScreen = geometry.screen || {};
@@ -1904,13 +1911,13 @@
             const leatherLike = /leather|vinyl/i.test(String(seatProfile.upholstery || ''));
             const upholsteryMaterial = new THREE.MeshStandardMaterial({
                 color: 0xffffff, map: leatherLike ? null : seatFabricTexture,
-                roughness: leatherLike ? 0.58 : 0.78, metalness: 0.01
+                roughness: leatherLike ? 0.58 : 0.72, metalness: 0.01
             });
             const armGeometry = new THREE.SphereGeometry(1, 10, 8);
             const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
             const seatLegMaterial = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.58, metalness: 0.42 });
             const cupHolderGeometry = new THREE.CylinderGeometry(0.052, 0.046, 0.035, 12);
-            const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x101217, roughness: 0.36, metalness: 0.6 });
+            const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.44, metalness: 0.32 });
             const stitchGeometry = new THREE.BoxGeometry(1, 1, 1);
             const cushionInstances = new THREE.InstancedMesh(upholsteryGeo, upholsteryMaterial, Math.max(1, seatCapacity * 3));
             const backInstances = new THREE.InstancedMesh(seatBackGeo, upholsteryMaterial, Math.max(1, seatCapacity));
@@ -2144,6 +2151,31 @@
                 fallbackActive: document.body.classList.contains('webgl-fallback'),
                 fallbackMessage: document.getElementById('fallback-explanation')?.textContent || '',
                 metrics: window.cinewavePreviewMetrics()
+            };
+        };
+        // Read-only mapping hook used by browser regression checks to ensure
+        // 2D seat IDs, raycast instance IDs and stored transforms stay aligned.
+        window.cinewavePreviewSeatMapping = seatId => {
+            const seat = seatRegistry.get(String(seatId));
+            if (!seat) return null;
+            return {
+                seatId: seat.id,
+                row: seat.row,
+                number: seat.num,
+                rowIndex: seat.rowIndex,
+                worldPosition: seat.worldPos.toArray().map(value => Number(value.toFixed(3))),
+                instances: seat.meshes.map(ref => {
+                    const matrix = new THREE.Matrix4();
+                    ref.mesh.getMatrixAt(ref.index, matrix);
+                    const position = new THREE.Vector3().setFromMatrixPosition(matrix);
+                    return {
+                        index: ref.index,
+                        part: ref.mesh.userData.instanceSeatIds[ref.index],
+                        kind: ref.mesh.userData.partKind || 'upholstery',
+                        position: position.toArray().map(value => Number(value.toFixed(3)))
+                    };
+                }),
+                mappingValid: seat.meshes.every(ref => ref.mesh.userData.instanceSeatIds[ref.index] === seat.id)
             };
         };
         function refreshAllSeatMaterials() {
