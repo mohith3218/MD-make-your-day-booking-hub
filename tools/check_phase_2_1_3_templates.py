@@ -23,4 +23,4 @@ for name, show_id in qa.show_ids.items():
             target.write_text(source, encoding='utf-8')
             subprocess.run(['node', '--check', str(target)], check=True, capture_output=True)
             checked += 1
-print(f'PASS: {checked} rendered inline JavaScript blocks across four previews and booking page')
+print(f'PASS: {checked} rendered inline JavaScript blocks across seeded previews and booking page')

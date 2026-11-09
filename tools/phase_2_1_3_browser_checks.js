@@ -20,6 +20,7 @@
             yawOffset=targetYawOffset=0;pitchOffset=targetPitchOffset=0;
             camera.position.copy(cameraTargetPos);currentLookAtTarget.copy(desiredLookAtTarget);
             camera.lookAt(currentLookAtTarget);
+            renderer.render(scene,camera);
         },
         sampleSeatIds() {
             const seats=[...seatRegistry.values()], byDepth=[...seats].sort((a,b)=>a.worldPos.z-b.worldPos.z);
@@ -27,12 +28,12 @@
                 seats.reduce((a,b)=>a.worldPos.x<b.worldPos.x?a:b),seats.reduce((a,b)=>a.worldPos.x>b.worldPos.x?a:b),
                 seats.find(s=>s.isVIP),seats.find(s=>s.isRecliner)].filter(Boolean).map(s=>s.id))];
         },
-        closeup(premium) {
+        closeup(premium, seatId) {
             this.light('house');
             const seats = [...seatRegistry.values()];
             const category = seats.filter(s => premium ? s.isVIP || s.isRecliner : !s.isVIP && !s.isRecliner);
             const centre = [...category].sort((a,b)=>Math.abs(a.worldPos.x)-Math.abs(b.worldPos.x));
-            const seat = centre[Math.min(2, centre.length-1)] || seats[0];
+            const seat = (seatId && seatRegistry.get(seatId)) || centre[Math.min(2, centre.length-1)] || seats[0];
             selectedSeats.clear();
             activePOVSeatId = '';
             refreshAllSeatMaterials();

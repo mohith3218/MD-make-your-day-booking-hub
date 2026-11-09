@@ -43,6 +43,7 @@ with A.app.app_context():
         ("inox", "INOX Varun Beach", "Screen 5"),
         ("jagadamba", "Jagadamba Theatre", "70MM Main"),
         ("recliner", "AAA Cinemas", "Screen 1"),
+        ("couple", "Mukta A2 Cinemas", "Screen 1"),
     ]:
         screen = A.Screen.query.join(A.Theater).filter(
             A.Theater.name == theater_name, A.Screen.name == screen_name).one()

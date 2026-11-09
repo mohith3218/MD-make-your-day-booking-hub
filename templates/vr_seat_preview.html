@@ -1895,7 +1895,14 @@
             // 4. BUILD STADIUM RISERS & 3D SEATING GRID
             // Soft, bevelled upholstery panels keep the seat silhouette clean
             // at both overview distance and close seat POV.
-            const upholsteryGeo = new THREE.SphereGeometry(1, 24, 18);
+            const upholsteryGeo = new THREE.SphereGeometry(1, 16, 10);
+            // A shared superellipsoid gives padding flat centres and rounded edges.
+            const padding = upholsteryGeo.attributes.position;
+            for (let i=0;i<padding.count;i++) {
+                const rounded = value => Math.sign(value) * Math.pow(Math.abs(value), 0.42);
+                padding.setXYZ(i, rounded(padding.getX(i)), rounded(padding.getY(i)), rounded(padding.getZ(i)));
+            }
+            upholsteryGeo.computeVertexNormals();
             const backShape = new THREE.Shape();
             backShape.moveTo(-0.4, 0.02);
             backShape.bezierCurveTo(-0.48, 0.02, -0.49, 0.14, -0.44, 0.22);
@@ -1907,9 +1914,30 @@
             backShape.bezierCurveTo(0.49, 0.14, 0.48, 0.02, 0.4, 0.02);
             backShape.quadraticCurveTo(0, -0.05, -0.4, 0.02);
             const seatBackGeo = new THREE.ExtrudeGeometry(backShape, {
-                depth: 0.14, bevelEnabled: true, bevelSegments: 4,
-                bevelThickness: 0.045, bevelSize: 0.035, curveSegments: 10
+                depth: 0.14, bevelEnabled: true, bevelSegments: 2,
+                bevelThickness: 0.045, bevelSize: 0.035, curveSegments: 5
             });
+            const backVertices = seatBackGeo.attributes.position;
+            for (let i=0;i<backVertices.count;i++) {
+                const y=backVertices.getY(i);
+                backVertices.setZ(i, backVertices.getZ(i) + 0.10*Math.pow((y-0.58)/0.7,2));
+            }
+            seatBackGeo.computeVertexNormals();
+            // Smooth coincident vertices in the non-indexed extrusion so the
+            // curved fabric face does not expose diagonal triangulation seams.
+            const backNormals = seatBackGeo.attributes.normal;
+            const normalSums = new Map();
+            const normalKey = i => [backVertices.getX(i), backVertices.getY(i), backVertices.getZ(i)]
+                .map(value => value.toFixed(5)).join(',');
+            for (let i=0;i<backVertices.count;i++) {
+                const key=normalKey(i), sum=normalSums.get(key)||new THREE.Vector3();
+                sum.add(new THREE.Vector3().fromBufferAttribute(backNormals,i));
+                normalSums.set(key,sum);
+            }
+            for (let i=0;i<backVertices.count;i++) {
+                const n=normalSums.get(normalKey(i)).clone().normalize();
+                backNormals.setXYZ(i,n.x,n.y,n.z);
+            }
             // Instanced batches keep seat upholstery, backs, armrests, frames,
             // and cup holders efficient for the largest saved layouts.
             // Instance colors preserve availability, class and cart states.
@@ -1934,13 +1962,13 @@
             const armGeometry = new THREE.SphereGeometry(1, 10, 8);
             const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
             const seatLegMaterial = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.58, metalness: 0.42 });
-            const cupHolderGeometry = new THREE.CylinderGeometry(0.052, 0.046, 0.035, 12);
+            const cupHolderGeometry = new THREE.TorusGeometry(0.038, 0.008, 6, 12).rotateX(Math.PI / 2);
             const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.44, metalness: 0.32 });
             const stitchGeometry = new THREE.BoxGeometry(1, 1, 1);
             // Three shared class materials, rather than one material per chair.
             const upholsteryBatches = upholsteryMaterials.map((material, index) => ({
-                cushionInstances: new THREE.InstancedMesh(upholsteryGeo, material, Math.max(1, categoryCapacity[index] * 3)),
-                backInstances: new THREE.InstancedMesh(seatBackGeo, material, Math.max(1, categoryCapacity[index]))
+                cushionInstances: new THREE.InstancedMesh(upholsteryGeo, material, Math.max(1, categoryCapacity[index] * 5)),
+                backInstances: new THREE.InstancedMesh(seatBackGeo, material, Math.max(1, categoryCapacity[index] * 2))
             }));
             upholsteryBatches.forEach(batch => {
                 batch.cushionInstances.userData.partKind = 'cushion';
@@ -2007,7 +2035,7 @@
             }
 
             let seatInstanceIndex = 0;
-            const upholsteryIndices = [0, 0, 0];
+            const upholsteryIndices = Array.from({length:3}, () => ({cushion:0, back:0}));
             let stitchInstanceIndex = 0;
             rows.forEach((rowLetter, rIdx) => {
                 const rowConfig = config.rowDefs[rIdx];
@@ -2068,14 +2096,16 @@
                 scale: new THREE.Vector3(...scale), rotationX, kind
                     });
                     const base = seatInstanceIndex++;
-                    const backIndex = upholsteryIndices[category]++;
-                    const upholsteryStart = backIndex * 3;
+                    const backIndex = upholsteryIndices[category].back;
+                    const upholsteryStart = upholsteryIndices[category].cushion;
+                    upholsteryIndices[category].back += rowSpan > 1 ? 2 : 1;
+                    upholsteryIndices[category].cushion += (rowSpan > 1 ? 4 : 2) + (isRecliner ? 1 : 0);
                     const armStart = base * 2;
                     const supportStart = base * 3;
                     const cupStart = base * 2;
                     const reclineTilt = seatId === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
                     const isWide = rowSpan > 1;
-                    const seatWidth = rowSpan * (isRecliner ? 0.72 : (isVIP ? 0.66 : 0.58));
+                    const seatWidth = rowSpan * (isRecliner ? 0.46 : (isVIP ? 0.48 : 0.46));
                     const seatHeight = isRecliner ? 0.78 : (isVIP ? 0.73 : 0.67);
                     const seatDepth = isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82);
                     const seat = {
@@ -2091,37 +2121,37 @@
                         eyePos: seatGroup.localToWorld(new THREE.Vector3(0, 1.16 / seatGroup.scale.y, -0.24)),
                         group: seatGroup,
                         instanceParts: [
-                            part(cushionInstances, upholsteryStart, [0, 0.43, 0], [0.5 * seatWidth, 0.21 * seatHeight, 0.47 * seatDepth]),
-                            part(cushionInstances, upholsteryStart + 1, [0, isRecliner ? 1.62 : 1.58, 0.41], [0.38 * seatWidth, 0.22 * seatHeight, 0.14 * seatDepth]),
-                            // Recliner footrest sits in front of the seat pan
-                            // (negative local Z points toward the screen).
-                            part(cushionInstances, upholsteryStart + 2, [0, 0.22, -0.72], isRecliner ? [0.43 * seatWidth, 0.105 * seatHeight, 0.27 * seatDepth] : [0, 0, 0]),
-                            part(backInstances, backIndex, [0, 0.48, 0.22], [seatWidth, isRecliner ? seatHeight * 1.12 : seatHeight, seatDepth], reclineTilt, 'back'),
-                            part(armInstances, armStart, [-0.52 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [(isRecliner ? 0.17 : (isVIP ? 0.15 : 0.13)) * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
-                            part(armInstances, armStart + 1, [0.52 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [(isRecliner ? 0.17 : (isVIP ? 0.15 : 0.13)) * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
+                            ...Array.from({length:isWide?2:1}, (_,side) => {
+                                const width=isWide?seatWidth*0.48:seatWidth;
+                                const x=isWide?(side===0?-1:1)*seatWidth*0.25:0;
+                                return [
+                                    part(cushionInstances, upholsteryStart+side*2, [x,0.48,-0.04], [width*0.48,isVIP||isRecliner?0.17:0.13,seatDepth*0.40],0,'cushion'),
+                                    part(cushionInstances, upholsteryStart+side*2+1, [x,1.28,0.30], [width*0.43,isVIP||isRecliner?0.18:0.14,0.12],0,'headrest'),
+                                    part(backInstances,backIndex+side,[x,0.48,0.22],[width,isVIP||isRecliner?seatHeight*1.15:seatHeight,seatDepth],reclineTilt,'back')
+                                ];
+                            }).flat(),
+                            ...(isRecliner ? [part(cushionInstances,upholsteryStart+(isWide?4:2),[0,0.28,-0.62],[seatWidth*0.44,0.10,0.23],0,'footrest')] : []),
+                            part(armInstances, armStart, [-0.50 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [0.10 * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
+                            part(armInstances, armStart + 1, [0.50 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [0.10 * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
                             part(legInstances, supportStart, [-0.32 * seatWidth, 0.17, 0.1], [0.065, 0.34, 0.08]),
                             part(legInstances, supportStart + 1, [0.32 * seatWidth, 0.17, 0.1], [0.065, 0.34, 0.08]),
                             part(legInstances, supportStart + 2, [0, 0.08, 0.02], [0.68 * seatWidth, 0.055, 0.075]),
                             ...(seatProfile.cup_holder === false ? [] : [
-                                part(cupHolderInstances, cupStart, [-0.52 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1]),
-                                part(cupHolderInstances, cupStart + 1, [0.52 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1])
+                                part(cupHolderInstances, cupStart, [-0.50 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1]),
+                                part(cupHolderInstances, cupStart + 1, [0.50 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1])
                             ]),
-                            ...(isVIP || isRecliner ? [
+                            ...([
                                 part(stitchInstances, stitchInstanceIndex++, [0, 0.43, -0.38], [0.42 * seatWidth, 0.012, 0.012]),
                                 part(stitchInstances, stitchInstanceIndex++, [0, 1.34, 0.34], [0.64 * seatWidth, 0.009, 0.009])
-                            ] : [])
+                            ])
                         ],
-                        meshes: [
-                            { mesh: cushionInstances, index: upholsteryStart },
-                            { mesh: cushionInstances, index: upholsteryStart + 1 },
-                            { mesh: backInstances, index: backIndex },
-                            ...(isRecliner ? [{ mesh: cushionInstances, index: upholsteryStart + 2 }] : [])
-                        ],
+                        meshes: [],
                         updateTransforms() {
                             this.group.updateMatrix();
                             this.instanceParts.forEach(item => writeSeatPart(this, item));
                         }
                     };
+                    seat.meshes = seat.instanceParts.filter(item => item.mesh===cushionInstances || item.mesh===backInstances);
                     seat.instanceParts.forEach(item => {
                         item.mesh.count = Math.max(item.mesh.count, item.index + 1);
                         writeSeatPart(seat, item);
@@ -2213,8 +2243,22 @@
                     : (seat.id === activePOVSeatId ? matActivePOV.color
                     : (seat.isRecliner ? matReclinerAvail.color : (seat.isVIP ? matVipAvail.color : matStdAvail.color))));
                 seat.meshes.forEach(ref => ref.mesh.setColorAt(ref.index, targetColor));
-                const back = seat.instanceParts.find(item => item.kind === 'back');
-                if (back) back.rotationX = seat.id === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
+                const level = seat.isRecliner && seat.id===activePOVSeatId ? reclineLevel : 0;
+                const angle = seat.isRecliner ? -THREE.MathUtils.degToRad([8,25,45][level]) : -0.14;
+                seat.instanceParts.forEach(item => {
+                    if(item.kind==='back') item.rotationX=angle;
+                    if(item.kind==='headrest') {
+                        const height=0.80;
+                        item.position.y=0.48+height*Math.cos(angle);
+                        item.position.z=0.22-height*Math.sin(angle);
+                        item.rotationX=angle;
+                    }
+                    if(item.kind==='footrest') {
+                        item.position.y=0.28+level*0.10;
+                        item.position.z=-0.62-level*0.07;
+                        item.rotationX=-level*0.08;
+                    }
+                });
 
                 seat.updateTransforms();
             });

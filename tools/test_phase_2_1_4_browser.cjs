@@ -1,0 +1,24 @@
+const Q=require('./phase_2_1_3_chrome.cjs'),fs=require('node:fs/promises'),path=require('node:path');
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{const q=await Q.connect(),out=path.join(__dirname,'../docs/screenshots/phase-2.1.4-premium-seats');await fs.mkdir(out,{recursive:true});
+const {windowId}=await q.call('Browser.getWindowForTarget');await q.call('Browser.setWindowBounds',{windowId,bounds:{windowState:'normal'}});await q.call('Emulation.setFocusEmulationEnabled',{enabled:true});
+const run=s=>q.evaluate(`document.querySelector('#v').contentWindow.eval(${JSON.stringify(s)})`);
+const shot=async n=>{const r=await q.call('Page.captureScreenshot',{format:'png'});await fs.writeFile(path.join(out,n+'.png'),Buffer.from(r.data,'base64'));};
+const records=[];const baseline=process.argv[2]==='baseline',integrityOnly=process.argv[2]==='integrity';
+for(const key of baseline?['jagadamba']:process.argv[2] && !integrityOnly?[process.argv[2]]:['inox','melody','jagadamba','recliner','couple']){
+ await q.call('Page.navigate',{url:'http://127.0.0.1:5014/__qa__/?theater='+key});await q.call('Browser.setWindowBounds',{windowId,bounds:{windowState:'normal'}});await q.call('Page.bringToFront');
+ for(let i=0;i<100;i++){try{if(await run('typeof __qa!=="undefined" && cinewavePreviewMetrics().sceneUsableMs>0'))break;}catch{}await wait(300);}
+ await run('__qa.overview();__qa.light("house");__qa.settleCamera()');await wait(integrityOnly?200:8000);
+ const samples=[];for(let i=0;i<(integrityOnly?0:5);i++){samples.push(await run('cinewavePreviewMetrics()'));await wait(1100);}
+ const integrity=await run(`(()=>{let checked=0;const errors=[];seatRegistry.forEach(s=>{checked++;if(s.instanceParts.some(p=>p.mesh.userData.instanceSeatIds[p.index]!==s.id))errors.push(s.id);s.meshes.forEach(p=>{const c=new THREE.Color();p.mesh.getColorAt(p.index,c);if(!c.toArray().every(Number.isFinite))errors.push(s.id);});});seatInstanceMeshes.forEach(mesh=>{for(let i=0;i<mesh.count;i++)if(!seatRegistry.has(mesh.userData.instanceSeatIds[i]))errors.push("unmapped draw instance "+i);});return{checked,errors};})()`);if(integrity.errors.length)throw Error('Instance integrity failure');
+ if(!integrityOnly && !samples.some(s=>s.averageFps>0))throw Error('Renderer paused: no usable FPS samples');
+ const mapping=await run('__qa.sampleSeatIds().map(cinewavePreviewSeatMapping)');if(mapping.some(m=>!m.mappingValid))throw Error('mapping failure');
+ records.push({key,samples,mapping,integrity});if(integrityOnly){await fs.writeFile(path.join(out,"integrity.json"),JSON.stringify(records,null,2));console.log(key,"integrity passed",integrity.checked);continue;}await shot((baseline?'before-':'after-')+key+'-overview');
+ if(!baseline){await run('__qa.closeup(false)');await wait(800);await shot(key+'-standard-close');await run('__qa.closeup(true)');await wait(800);await shot(key+'-premium-close');
+ if(key==='inox'){for(const [w,h] of [[1920,1080],[1366,768],[390,844]]){await q.call('Emulation.setDeviceMetricsOverride',{width:w,height:h,deviceScaleFactor:1,mobile:false});await run("if(innerWidth<500){document.querySelector('#metrics-panel').classList.add('details-collapsed');document.querySelector('#minimap-drawer').style.display='none';} __qa.overview();__qa.settleCamera()");await wait(800);await shot('overview-'+w);}
+ await q.call('Emulation.setDeviceMetricsOverride',{width:1600,height:900,deviceScaleFactor:1,mobile:false});
+ for(const [label,expr] of [['front','0'],['middle','Math.floor(seats.length/2)'],['rear','seats.length-1']]){await run(`(()=>{const seats=[...seatRegistry.values()].sort((a,b)=>a.worldPos.z-b.worldPos.z);const s=seats[${expr}];selectAndFlyToSeat(s.row,s.num,false);__qa.settleCamera();})()`);await wait(800);await shot(label+'-seat-POV');}}
+ if(key==='couple'){const id=await run('[...seatRegistry.values()].find(s=>s.instanceParts.filter(p=>p.kind==="back").length===2)?.id');if(!id)throw Error('No real couple seat found');await run('__qa.closeup(true,'+JSON.stringify(id)+')');await wait(900);await shot('Couple-seat-close-up');records.at(-1).couple=await run('cinewavePreviewSeatMapping('+JSON.stringify(id)+')');}
+ if(key==='recliner'){const motion=[];for(const level of [0,1,2]){await run(`(()=>{const s=[...seatRegistry.values()].find(s=>s.isRecliner);__qa.closeup(true,s.id);activePOVSeatId=s.id;setSeatRecline(${level});})()`);motion.push(await run('[...seatRegistry.values()].find(s=>s.id===activePOVSeatId).instanceParts.filter(p=>["back","footrest","headrest"].includes(p.kind)).map(p=>({kind:p.kind,position:p.position.toArray(),angle:p.rotationX}))'));await shot('recliner-'+level);}records.at(-1).motion=motion;}}
+ console.log(key,'captured');await fs.writeFile(path.join(out,baseline?'before.json':process.argv[2]?process.argv[2]+'-detail.json':'after.json'),JSON.stringify(records,null,2));}
+ q.ws.close();})().catch(e=>{console.error(e);process.exitCode=1;});

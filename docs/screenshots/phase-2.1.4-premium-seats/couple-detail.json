@@ -1,0 +1,1171 @@
+[
+  {
+    "key": "couple",
+    "samples": [
+      {
+        "sceneBuildMs": 85.7,
+        "sceneUsableMs": null,
+        "averageFps": 0,
+        "drawCalls": 60,
+        "triangles": 217788,
+        "renderedSeats": 78,
+        "geometries": 47,
+        "textures": 5,
+        "renderQuality": "balanced",
+        "devicePixelRatio": 1.0000000298023224
+      },
+      {
+        "sceneBuildMs": 85.7,
+        "sceneUsableMs": null,
+        "averageFps": 0,
+        "drawCalls": 60,
+        "triangles": 217788,
+        "renderedSeats": 78,
+        "geometries": 47,
+        "textures": 5,
+        "renderQuality": "balanced",
+        "devicePixelRatio": 1.0000000298023224
+      },
+      {
+        "sceneBuildMs": 85.7,
+        "sceneUsableMs": null,
+        "averageFps": 0,
+        "drawCalls": 60,
+        "triangles": 217788,
+        "renderedSeats": 78,
+        "geometries": 47,
+        "textures": 5,
+        "renderQuality": "balanced",
+        "devicePixelRatio": 1.0000000298023224
+      },
+      {
+        "sceneBuildMs": 85.7,
+        "sceneUsableMs": null,
+        "averageFps": 0,
+        "drawCalls": 60,
+        "triangles": 217788,
+        "renderedSeats": 78,
+        "geometries": 47,
+        "textures": 5,
+        "renderQuality": "balanced",
+        "devicePixelRatio": 1.0000000298023224
+      },
+      {
+        "sceneBuildMs": 85.7,
+        "sceneUsableMs": null,
+        "averageFps": 0,
+        "drawCalls": 60,
+        "triangles": 217788,
+        "renderedSeats": 78,
+        "geometries": 47,
+        "textures": 5,
+        "renderQuality": "balanced",
+        "devicePixelRatio": 1.0000000298023224
+      }
+    ],
+    "mapping": [
+      {
+        "seatId": "G1",
+        "found": true,
+        "row": "G",
+        "number": 1,
+        "rowIndex": 6,
+        "category": "Premium Recliner",
+        "price": 270,
+        "unavailable": false,
+        "instances": [
+          {
+            "batch": 4,
+            "index": 300,
+            "kind": "cushion",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.813,
+              0.346,
+              6.961
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 301,
+            "kind": "headrest",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -4.013,
+              0.916,
+              7.325
+            ]
+          },
+          {
+            "batch": 5,
+            "index": 120,
+            "kind": "back",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.953,
+              0.346,
+              7.216
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 304,
+            "kind": "footrest",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.501,
+              0.202,
+              6.391
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 132,
+            "kind": "armrest",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -4.08,
+              0.475,
+              6.911
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 133,
+            "kind": "armrest",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.628,
+              0.475,
+              7.158
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 198,
+            "kind": "support",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -4.033,
+              0.122,
+              7.019
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 199,
+            "kind": "support",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.744,
+              0.122,
+              7.177
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 200,
+            "kind": "support",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.846,
+              0.058,
+              7.02
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 132,
+            "kind": "cup-holder",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -4.085,
+              0.54,
+              6.92
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 133,
+            "kind": "cup-holder",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.633,
+              0.54,
+              7.168
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 132,
+            "kind": "stitch",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -3.631,
+              0.31,
+              6.627
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 133,
+            "kind": "stitch",
+            "resolvedSeatId": "G1",
+            "part": "G1",
+            "position": [
+              -4.018,
+              0.965,
+              7.334
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          -3.835,
+          0,
+          7
+        ]
+      },
+      {
+        "seatId": "D4",
+        "found": true,
+        "row": "D",
+        "number": 4,
+        "rowIndex": 3,
+        "category": "Recliner",
+        "price": 306,
+        "unavailable": false,
+        "instances": [
+          {
+            "batch": 4,
+            "index": 135,
+            "kind": "cushion",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -1.967,
+              0.886,
+              10.406
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 136,
+            "kind": "headrest",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -2.044,
+              1.456,
+              10.815
+            ]
+          },
+          {
+            "batch": 5,
+            "index": 54,
+            "kind": "back",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -2.021,
+              0.886,
+              10.692
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 139,
+            "kind": "footrest",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -1.846,
+              0.742,
+              9.768
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 66,
+            "kind": "armrest",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -2.235,
+              1.015,
+              10.441
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 67,
+            "kind": "armrest",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -1.729,
+              1.015,
+              10.536
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 99,
+            "kind": "support",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -2.158,
+              0.662,
+              10.529
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 100,
+            "kind": "support",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -1.834,
+              0.662,
+              10.591
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 101,
+            "kind": "support",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -1.979,
+              0.598,
+              10.472
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 66,
+            "kind": "cup-holder",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -2.237,
+              1.08,
+              10.452
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 67,
+            "kind": "cup-holder",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -1.731,
+              1.08,
+              10.547
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 66,
+            "kind": "stitch",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -1.896,
+              0.85,
+              10.032
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 67,
+            "kind": "stitch",
+            "resolvedSeatId": "D4",
+            "part": "D4",
+            "position": [
+              -2.046,
+              1.505,
+              10.824
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          -1.975,
+          0.54,
+          10.45
+        ]
+      },
+      {
+        "seatId": "A6",
+        "found": true,
+        "row": "A",
+        "number": 6,
+        "rowIndex": 0,
+        "category": "Couple Sofa",
+        "price": 576,
+        "unavailable": false,
+        "instances": [
+          {
+            "batch": 0,
+            "index": 25,
+            "kind": "cushion",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.294,
+              1.402,
+              13.925
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 26,
+            "kind": "headrest",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.369,
+              1.932,
+              14.22
+            ]
+          },
+          {
+            "batch": 1,
+            "index": 10,
+            "kind": "back",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.346,
+              1.402,
+              14.131
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 27,
+            "kind": "cushion",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.74,
+              1.402,
+              13.812
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 28,
+            "kind": "headrest",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.815,
+              1.932,
+              14.107
+            ]
+          },
+          {
+            "batch": 1,
+            "index": 11,
+            "kind": "back",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.792,
+              1.402,
+              14.018
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 10,
+            "kind": "armrest",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.086,
+              1.515,
+              14.041
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 11,
+            "kind": "armrest",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.978,
+              1.515,
+              13.815
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 15,
+            "kind": "support",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.26,
+              1.194,
+              14.052
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 16,
+            "kind": "support",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.831,
+              1.194,
+              13.907
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 17,
+            "kind": "support",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.529,
+              1.134,
+              13.916
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 10,
+            "kind": "cup-holder",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.088,
+              1.569,
+              14.049
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 11,
+            "kind": "cup-holder",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.98,
+              1.569,
+              13.823
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 10,
+            "kind": "stitch",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.448,
+              1.368,
+              13.598
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 11,
+            "kind": "stitch",
+            "resolvedSeatId": "A6",
+            "part": "A6",
+            "position": [
+              3.594,
+              1.978,
+              14.17
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          3.525,
+          1.08,
+          13.9
+        ]
+      },
+      {
+        "seatId": "G12",
+        "found": true,
+        "row": "G",
+        "number": 12,
+        "rowIndex": 6,
+        "category": "Premium Recliner",
+        "price": 270,
+        "unavailable": false,
+        "instances": [
+          {
+            "batch": 4,
+            "index": 355,
+            "kind": "cushion",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.813,
+              0.346,
+              6.961
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 356,
+            "kind": "headrest",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              4.013,
+              0.916,
+              7.325
+            ]
+          },
+          {
+            "batch": 5,
+            "index": 142,
+            "kind": "back",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.953,
+              0.346,
+              7.216
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 359,
+            "kind": "footrest",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.501,
+              0.202,
+              6.391
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 154,
+            "kind": "armrest",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.628,
+              0.475,
+              7.158
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 155,
+            "kind": "armrest",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              4.08,
+              0.475,
+              6.911
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 231,
+            "kind": "support",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.744,
+              0.122,
+              7.177
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 232,
+            "kind": "support",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              4.033,
+              0.122,
+              7.019
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 233,
+            "kind": "support",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.846,
+              0.058,
+              7.02
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 154,
+            "kind": "cup-holder",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.633,
+              0.54,
+              7.168
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 155,
+            "kind": "cup-holder",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              4.085,
+              0.54,
+              6.92
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 154,
+            "kind": "stitch",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              3.631,
+              0.31,
+              6.627
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 155,
+            "kind": "stitch",
+            "resolvedSeatId": "G12",
+            "part": "G12",
+            "position": [
+              4.018,
+              0.965,
+              7.334
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          3.835,
+          0,
+          7
+        ]
+      },
+      {
+        "seatId": "B1",
+        "found": true,
+        "row": "B",
+        "number": 1,
+        "rowIndex": 1,
+        "category": "Recliner",
+        "price": 306,
+        "unavailable": false,
+        "instances": [
+          {
+            "batch": 4,
+            "index": 0,
+            "kind": "cushion",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.822,
+              1.246,
+              12.707
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 1,
+            "kind": "headrest",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.942,
+              1.816,
+              13.105
+            ]
+          },
+          {
+            "batch": 5,
+            "index": 0,
+            "kind": "back",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.906,
+              1.246,
+              12.986
+            ]
+          },
+          {
+            "batch": 4,
+            "index": 4,
+            "kind": "footrest",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.635,
+              1.102,
+              12.085
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 12,
+            "kind": "armrest",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -4.093,
+              1.375,
+              12.713
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 13,
+            "kind": "armrest",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.6,
+              1.375,
+              12.862
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 18,
+            "kind": "support",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -4.025,
+              1.022,
+              12.81
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 19,
+            "kind": "support",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.709,
+              1.022,
+              12.905
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 20,
+            "kind": "support",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.841,
+              0.958,
+              12.771
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 12,
+            "kind": "cup-holder",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -4.096,
+              1.44,
+              12.724
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 13,
+            "kind": "cup-holder",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.603,
+              1.44,
+              12.872
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 12,
+            "kind": "stitch",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.712,
+              1.21,
+              12.342
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 13,
+            "kind": "stitch",
+            "resolvedSeatId": "B1",
+            "part": "B1",
+            "position": [
+              -3.945,
+              1.865,
+              13.115
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          -3.835,
+          0.9,
+          12.75
+        ]
+      }
+    ],
+    "integrity": {
+      "checked": 78,
+      "errors": []
+    },
+    "couple": {
+      "seatId": "A1",
+      "found": true,
+      "row": "A",
+      "number": 1,
+      "rowIndex": 0,
+      "category": "Couple Sofa",
+      "price": 576,
+      "unavailable": false,
+      "instances": [
+        {
+          "batch": 0,
+          "index": 0,
+          "kind": "cushion",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.74,
+            1.402,
+            13.812
+          ]
+        },
+        {
+          "batch": 0,
+          "index": 1,
+          "kind": "headrest",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.815,
+            1.932,
+            14.107
+          ]
+        },
+        {
+          "batch": 1,
+          "index": 0,
+          "kind": "back",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.792,
+            1.402,
+            14.018
+          ]
+        },
+        {
+          "batch": 0,
+          "index": 2,
+          "kind": "cushion",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.294,
+            1.402,
+            13.925
+          ]
+        },
+        {
+          "batch": 0,
+          "index": 3,
+          "kind": "headrest",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.369,
+            1.932,
+            14.22
+          ]
+        },
+        {
+          "batch": 1,
+          "index": 1,
+          "kind": "back",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.346,
+            1.402,
+            14.131
+          ]
+        },
+        {
+          "batch": 6,
+          "index": 0,
+          "kind": "armrest",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.978,
+            1.515,
+            13.815
+          ]
+        },
+        {
+          "batch": 6,
+          "index": 1,
+          "kind": "armrest",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.086,
+            1.515,
+            14.041
+          ]
+        },
+        {
+          "batch": 7,
+          "index": 0,
+          "kind": "support",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.831,
+            1.194,
+            13.907
+          ]
+        },
+        {
+          "batch": 7,
+          "index": 1,
+          "kind": "support",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.26,
+            1.194,
+            14.052
+          ]
+        },
+        {
+          "batch": 7,
+          "index": 2,
+          "kind": "support",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.529,
+            1.134,
+            13.916
+          ]
+        },
+        {
+          "batch": 8,
+          "index": 0,
+          "kind": "cup-holder",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.98,
+            1.569,
+            13.823
+          ]
+        },
+        {
+          "batch": 8,
+          "index": 1,
+          "kind": "cup-holder",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.088,
+            1.569,
+            14.049
+          ]
+        },
+        {
+          "batch": 9,
+          "index": 0,
+          "kind": "stitch",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.448,
+            1.368,
+            13.598
+          ]
+        },
+        {
+          "batch": 9,
+          "index": 1,
+          "kind": "stitch",
+          "resolvedSeatId": "A1",
+          "part": "A1",
+          "position": [
+            -3.594,
+            1.978,
+            14.17
+          ]
+        }
+      ],
+      "mappingValid": true,
+      "errors": [],
+      "worldPosition": [
+        -3.525,
+        1.08,
+        13.9
+      ]
+    }
+  }
+]
