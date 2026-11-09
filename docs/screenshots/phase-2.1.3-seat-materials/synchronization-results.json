@@ -1,0 +1,450 @@
+{
+  "startedAt": "2026-11-07T15:51:23.658Z",
+  "checks": [
+    {
+      "name": "2D to 3D, exact ID/details/category/price/camera",
+      "state": {
+        "book": {
+          "ids": [
+            "E8"
+          ],
+          "total": 135,
+          "active": "E8"
+        },
+        "preview": {
+          "ids": [
+            "E8"
+          ],
+          "active": "E8",
+          "title": "Row E · Seat 8",
+          "category": "Classic",
+          "price": "₹135",
+          "cameraMode": "seat",
+          "target": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ],
+          "eye": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ]
+        }
+      }
+    },
+    {
+      "name": "Deselect and change category to Prime",
+      "state": {
+        "book": {
+          "ids": [
+            "A8"
+          ],
+          "total": 189,
+          "active": "A8"
+        },
+        "preview": {
+          "ids": [
+            "A8"
+          ],
+          "active": "A8",
+          "title": "Row A · Seat 8",
+          "category": "Prime",
+          "price": "₹189",
+          "cameraMode": "seat",
+          "target": [
+            0.3057376794452238,
+            2.96,
+            18.245635708827894
+          ],
+          "eye": [
+            0.3057376794452238,
+            2.96,
+            18.245635708827894
+          ]
+        }
+      }
+    },
+    {
+      "name": "Mixed category cart prices and no duplicates",
+      "state": {
+        "book": {
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "total": 324,
+          "active": "E8"
+        },
+        "preview": {
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "active": "E8",
+          "title": "Row E · Seat 8",
+          "category": "Classic",
+          "price": "₹135",
+          "cameraMode": "seat",
+          "target": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ],
+          "eye": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ]
+        }
+      }
+    },
+    {
+      "name": "Booked seat blocked in 2D and 3D",
+      "seat": "E1",
+      "mapping": {
+        "seatId": "E1",
+        "found": true,
+        "row": "E",
+        "number": 1,
+        "rowIndex": 4,
+        "category": "Classic",
+        "price": 135,
+        "unavailable": true,
+        "instances": [
+          {
+            "batch": 0,
+            "index": 0,
+            "kind": "cushion",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.74,
+              1.368,
+              13.9
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 1,
+            "kind": "cushion",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.887,
+              2.139,
+              14.203
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 2,
+            "kind": "cushion",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.482,
+              1.227,
+              13.369
+            ]
+          },
+          {
+            "batch": 1,
+            "index": 0,
+            "kind": "back",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.819,
+              1.402,
+              14.062
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 128,
+            "kind": "armrest",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -7.024,
+              1.515,
+              13.794
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 129,
+            "kind": "armrest",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.481,
+              1.515,
+              14.057
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 192,
+            "kind": "support",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.943,
+              1.194,
+              13.893
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 193,
+            "kind": "support",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.609,
+              1.194,
+              14.055
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 194,
+            "kind": "support",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.747,
+              1.134,
+              13.915
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 128,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -7.027,
+              1.569,
+              13.802
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 129,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.485,
+              1.569,
+              14.065
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          -6.74,
+          1.08,
+          13.9
+        ]
+      }
+    },
+    {
+      "name": "Held seat blocked in 2D and 3D",
+      "seat": "E2",
+      "mapping": {
+        "seatId": "E2",
+        "found": true,
+        "row": "E",
+        "number": 2,
+        "rowIndex": 4,
+        "category": "Classic",
+        "price": 135,
+        "unavailable": true,
+        "instances": [
+          {
+            "batch": 0,
+            "index": 3,
+            "kind": "cushion",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.12,
+              1.368,
+              13.9
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 4,
+            "kind": "cushion",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.255,
+              2.139,
+              14.208
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 5,
+            "kind": "cushion",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.882,
+              1.227,
+              13.36
+            ]
+          },
+          {
+            "batch": 1,
+            "index": 1,
+            "kind": "back",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.193,
+              1.402,
+              14.065
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 130,
+            "kind": "armrest",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.408,
+              1.515,
+              13.805
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 131,
+            "kind": "armrest",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.856,
+              1.515,
+              14.048
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 195,
+            "kind": "support",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.323,
+              1.194,
+              13.9
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 196,
+            "kind": "support",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.983,
+              1.194,
+              14.05
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 197,
+            "kind": "support",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.127,
+              1.134,
+              13.915
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 130,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.411,
+              1.569,
+              13.812
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 131,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.859,
+              1.569,
+              14.055
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          -6.12,
+          1.08,
+          13.9
+        ]
+      }
+    },
+    {
+      "name": "Trusted 3D canvas click to exact 2D seat",
+      "clicked": "K2",
+      "state": {
+        "book": {
+          "ids": [
+            "A8",
+            "E8",
+            "K2"
+          ],
+          "total": 486,
+          "active": "K2"
+        },
+        "preview": {
+          "ids": [
+            "A8",
+            "E8",
+            "K2"
+          ],
+          "active": "K2",
+          "title": "Row K · Seat 2",
+          "category": "Executive",
+          "price": "₹162",
+          "cameraMode": "seat",
+          "target": [
+            -5.389912931094613,
+            1.3399999999999999,
+            7.9868709797129265
+          ],
+          "eye": [
+            -5.389912931094613,
+            1.3399999999999999,
+            7.9868709797129265
+          ]
+        }
+      }
+    }
+  ]
+}

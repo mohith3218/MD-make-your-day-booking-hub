@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js r128 -->
     <script src="{{ url_for('static', filename='js/three-r128.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/seat-preview-state.js') }}"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -300,14 +301,16 @@
         <div class="fallback-screen">{{ screen_type }} · Screen</div>
         <div class="fallback-bowl">
             {% for row in preview.rowDefs|reverse %}
+            {% set category_name = row.className|lower %}
+            {% set premium_row = ('vip' in category_name or 'prime' in category_name or 'premium' in category_name or 'gold' in category_name) and 'non-prem' not in category_name and 'non prem' not in category_name and 'non_prem' not in category_name and row.classCode != 'NONPREM' %}
             <div class="fallback-row" aria-label="Row {{ row.label }}">
                 <span class="fallback-row-label">{{ row.label }}</span>
                 {% for seat_id, seat_state in row.seats.items() %}
                     {% if seat_state != 'available' %}
-                    <button type="button" data-seat="{{ seat_id }}" data-seat-kind="{% if 'reclin' in row.className|lower or 'sofa' in row.className|lower %}fallback-recliner{% elif 'vip' in row.className|lower or 'prime' in row.className|lower or 'premium' in row.className|lower or 'gold' in row.className|lower %}fallback-premium{% else %}fallback-standard{% endif %}" class="fallback-seat fallback-unavailable" title="{{ seat_id }} · unavailable" aria-label="{{ seat_id }} unavailable" disabled></button>
+                    <button type="button" data-seat="{{ seat_id }}" data-seat-kind="{% if 'reclin' in row.className|lower or 'sofa' in row.className|lower %}fallback-recliner{% elif premium_row %}fallback-premium{% else %}fallback-standard{% endif %}" class="fallback-seat fallback-unavailable" title="{{ seat_id }} · unavailable" aria-label="{{ seat_id }} unavailable" disabled></button>
                     {% elif 'reclin' in row.className|lower or 'sofa' in row.className|lower %}
                     <button type="button" data-seat="{{ seat_id }}" class="fallback-seat fallback-recliner" title="{{ seat_id }} · {{ row.className }}" aria-label="Select seat {{ seat_id }}" onclick="window.parent.postMessage({type:'cinewave:toggle-seat',seatId:this.dataset.seat,cameraRequest:true},location.origin); this.classList.toggle('fallback-selected')"></button>
-                    {% elif 'vip' in row.className|lower or 'prime' in row.className|lower or 'premium' in row.className|lower or 'gold' in row.className|lower %}
+                    {% elif premium_row %}
                     <button type="button" data-seat="{{ seat_id }}" class="fallback-seat fallback-premium" title="{{ seat_id }} · {{ row.className }}" aria-label="Select seat {{ seat_id }}" onclick="window.parent.postMessage({type:'cinewave:toggle-seat',seatId:this.dataset.seat,cameraRequest:true},location.origin); this.classList.toggle('fallback-selected')"></button>
                     {% else %}
                     <button type="button" data-seat="{{ seat_id }}" class="fallback-seat fallback-standard" title="{{ seat_id }} · {{ row.className }}" aria-label="Select seat {{ seat_id }}" onclick="window.parent.postMessage({type:'cinewave:toggle-seat',seatId:this.dataset.seat,cameraRequest:true},location.origin); this.classList.toggle('fallback-selected')"></button>
@@ -859,6 +862,8 @@
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
+        // r128 does not enable sRGB output or convert authored hex colours for us.
+        renderer.outputEncoding = THREE.sRGBEncoding;
         container.appendChild(renderer.domElement);
         document.getElementById('quality-select').value = renderQuality;
         function setRenderQuality(value) {
@@ -964,6 +969,7 @@
         const sCtx = screenCanvas.getContext('2d');
 
         const screenTexture = new THREE.CanvasTexture(screenCanvas);
+        screenTexture.encoding = THREE.sRGBEncoding;
         screenTexture.minFilter = THREE.LinearFilter;
         screenTexture.magFilter = THREE.LinearFilter;
 
@@ -1287,6 +1293,9 @@
         const matArmrest = new THREE.MeshStandardMaterial({ color: 0x242832, roughness: 0.7, metalness: 0.03 });
         const matSeatInset = new THREE.MeshStandardMaterial({ color: 0x17201f, roughness: 0.82, metalness: 0.01 });
         const matSeatStitch = new THREE.MeshStandardMaterial({ color: 0x9c8251, roughness: 0.72, metalness: 0.08 });
+        // State colours become linear exactly once, before setColorAt().
+        [matSelectedCart, matActivePOV, matOccupied, matArmrest, matSeatInset, matSeatStitch]
+            .forEach(material => material.color.convertSRGBToLinear());
 
         function createSeatFabricTexture() {
             const canvas = document.createElement('canvas');
@@ -1381,7 +1390,11 @@
             // modest linear-space compensation keeps the profile hue while
             // preventing the available seats from collapsing to black.
             const setUpholsteryTint = (material, color, gain) => {
-                material.color.set(color).multiplyScalar(gain).clampRGB(0, 1);
+                material.color.set(color).convertSRGBToLinear().multiplyScalar(gain);
+                // THREE.Color in the locally bundled r128 has no clampRGB().
+                ['r', 'g', 'b'].forEach(channel => {
+                    material.color[channel] = THREE.MathUtils.clamp(material.color[channel], 0, 1);
+                });
             };
             setUpholsteryTint(matStdAvail, seatBaseColor, 2.1);
             setUpholsteryTint(matVipAvail, trimBaseColor, 1.45);
@@ -1909,9 +1922,14 @@
                 return sum + Math.max(0, count - blockedInRow);
             }, 0);
             const leatherLike = /leather|vinyl/i.test(String(seatProfile.upholstery || ''));
-            const upholsteryMaterial = new THREE.MeshStandardMaterial({
+            const upholsteryMaterials = [matStdAvail, matVipAvail, matReclinerAvail].map(tint => new THREE.MeshStandardMaterial({
                 color: 0xffffff, map: leatherLike ? null : seatFabricTexture,
-                roughness: leatherLike ? 0.58 : 0.72, metalness: 0.01
+                roughness: leatherLike ? 0.58 : tint.roughness, metalness: 0.01
+            }));
+            const categoryIndex = row => CinewaveSeatState.classifySeat(row);
+            const categoryCapacity = [0, 0, 0];
+            config.rowDefs.forEach(row => {
+                categoryCapacity[categoryIndex(row)] += Object.keys(row.seats).length;
             });
             const armGeometry = new THREE.SphereGeometry(1, 10, 8);
             const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -1919,19 +1937,35 @@
             const cupHolderGeometry = new THREE.CylinderGeometry(0.052, 0.046, 0.035, 12);
             const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.44, metalness: 0.32 });
             const stitchGeometry = new THREE.BoxGeometry(1, 1, 1);
-            const cushionInstances = new THREE.InstancedMesh(upholsteryGeo, upholsteryMaterial, Math.max(1, seatCapacity * 3));
-            const backInstances = new THREE.InstancedMesh(seatBackGeo, upholsteryMaterial, Math.max(1, seatCapacity));
+            // Three shared class materials, rather than one material per chair.
+            const upholsteryBatches = upholsteryMaterials.map((material, index) => ({
+                cushionInstances: new THREE.InstancedMesh(upholsteryGeo, material, Math.max(1, categoryCapacity[index] * 3)),
+                backInstances: new THREE.InstancedMesh(seatBackGeo, material, Math.max(1, categoryCapacity[index]))
+            }));
+            upholsteryBatches.forEach(batch => {
+                batch.cushionInstances.userData.partKind = 'cushion';
+                batch.backInstances.userData.partKind = 'back';
+                // r128 allocates instanceColor from mesh.count on its first
+                // setColorAt(). Allocate at full capacity BEFORE reducing the
+                // draw count; otherwise only the first chair gets a colour.
+                [batch.cushionInstances, batch.backInstances].forEach(mesh =>
+                    mesh.setColorAt(0, new THREE.Color(0xffffff)));
+            });
             const armInstances = new THREE.InstancedMesh(armGeometry, matArmrest, Math.max(1, seatCapacity * 2));
             const legInstances = new THREE.InstancedMesh(seatLegGeometry, seatLegMaterial, Math.max(1, seatCapacity * 3));
             const cupHolderInstances = new THREE.InstancedMesh(cupHolderGeometry, cupHolderMaterial, Math.max(1, seatCapacity * 2));
             const stitchInstances = new THREE.InstancedMesh(stitchGeometry, matSeatStitch, Math.max(1, seatCapacity * 2));
-            seatInstanceMeshes = [cushionInstances, backInstances, armInstances, legInstances, cupHolderInstances, stitchInstances];
+            [armInstances, legInstances, cupHolderInstances, stitchInstances].forEach((mesh, index) => {
+                mesh.userData.partKind = ['armrest', 'support', 'cup-holder', 'stitch'][index];
+            });
+            seatInstanceMeshes = [...upholsteryBatches.flatMap(batch => [batch.cushionInstances, batch.backInstances]),
+                armInstances, legInstances, cupHolderInstances, stitchInstances];
             seatInstanceMeshes.forEach(mesh => {
                 mesh.count = 0;
                 mesh.userData.instanceSeatIds = [];
             });
             auditoriumGroup.add(...seatInstanceMeshes);
-            interactiveSeatMeshes.push(cushionInstances, backInstances);
+            interactiveSeatMeshes.push(...upholsteryBatches.flatMap(batch => [batch.cushionInstances, batch.backInstances]));
 
             const riserGeometry = new THREE.BoxGeometry(hallHalfWidth * 1.92, 1, 1);
             const riserMaterials = [
@@ -1954,6 +1988,7 @@
                 roughness: 0.62, metalness: 0.02
             });
             const aisleMarkerInstances = new THREE.InstancedMesh(aisleMarkerGeometry, aisleMarkerMaterial, aisleMarkerCapacity);
+            aisleMarkerInstances.setColorAt(0, new THREE.Color(0xffffff));
             aisleMarkerInstances.count = 0;
             auditoriumGroup.add(aisleMarkerInstances);
             registerArchitecturalAccent(aisleMarkerMaterial, 'aisle');
@@ -1972,6 +2007,7 @@
             }
 
             let seatInstanceIndex = 0;
+            const upholsteryIndices = [0, 0, 0];
             let stitchInstanceIndex = 0;
             rows.forEach((rowLetter, rIdx) => {
                 const rowConfig = config.rowDefs[rIdx];
@@ -1979,8 +2015,10 @@
                 const rowPhysical = rowPositions[rIdx] || { z: 7 + rIdx * rowSpacing, y: rIdx * stadiumSlope, riserHeight: stadiumSlope };
                 const rowZ = Number(rowPhysical.z);
                 const rowY = Number(rowPhysical.y);
-                const isVIP = /vip|prime|premium|gold/i.test(rowConfig.className);
-                const isRecliner = /reclin|insignia|luxe/i.test(rowConfig.className);
+                const category = categoryIndex(rowConfig);
+                const isVIP = category === 1;
+                const isRecliner = category === 2;
+                const {cushionInstances, backInstances} = upholsteryBatches[category];
                 const rowSpan = Math.max(1, rowConfig.seatSpan || 1);
                 const aisles = rowConfig.aislesAfter || [];
 
@@ -2030,8 +2068,8 @@
                 scale: new THREE.Vector3(...scale), rotationX, kind
                     });
                     const base = seatInstanceIndex++;
-                    const backIndex = base;
-                    const upholsteryStart = base * 3;
+                    const backIndex = upholsteryIndices[category]++;
+                    const upholsteryStart = backIndex * 3;
                     const armStart = base * 2;
                     const supportStart = base * 3;
                     const cupStart = base * 2;
@@ -2085,7 +2123,6 @@
                         }
                     };
                     seat.instanceParts.forEach(item => {
-                        item.mesh.userData.partKind = item.kind;
                         item.mesh.count = Math.max(item.mesh.count, item.index + 1);
                         writeSeatPart(seat, item);
                     });
@@ -2157,26 +2194,17 @@
         // 2D seat IDs, raycast instance IDs and stored transforms stay aligned.
         window.cinewavePreviewSeatMapping = seatId => {
             const seat = seatRegistry.get(String(seatId));
-            if (!seat) return null;
-            return {
-                seatId: seat.id,
-                row: seat.row,
-                number: seat.num,
-                rowIndex: seat.rowIndex,
-                worldPosition: seat.worldPos.toArray().map(value => Number(value.toFixed(3))),
-                instances: seat.meshes.map(ref => {
-                    const matrix = new THREE.Matrix4();
-                    ref.mesh.getMatrixAt(ref.index, matrix);
-                    const position = new THREE.Vector3().setFromMatrixPosition(matrix);
-                    return {
-                        index: ref.index,
-                        part: ref.mesh.userData.instanceSeatIds[ref.index],
-                        kind: ref.mesh.userData.partKind || 'upholstery',
-                        position: position.toArray().map(value => Number(value.toFixed(3)))
-                    };
-                }),
-                mappingValid: seat.meshes.every(ref => ref.mesh.userData.instanceSeatIds[ref.index] === seat.id)
-            };
+            const result = CinewaveSeatState.inspectMapping(seatId, seatRegistry, seatInstanceMeshes, currentAudi.rowDefs);
+            if (!seat) return result;
+            result.worldPosition = seat.worldPos.toArray().map(value => Number(value.toFixed(3)));
+            result.instances.forEach(instance => {
+                if (instance.batch < 0 || instance.index < 0 || instance.index >= seatInstanceMeshes[instance.batch].count) return;
+                const matrix = new THREE.Matrix4();
+                seatInstanceMeshes[instance.batch].getMatrixAt(instance.index, matrix);
+                instance.position = new THREE.Vector3().setFromMatrixPosition(matrix).toArray()
+                    .map(value => Number(value.toFixed(3)));
+            });
+            return result;
         };
         function refreshAllSeatMaterials() {
             seatRegistry.forEach((seat) => {
@@ -3136,6 +3164,12 @@
                     : { ambient: 1.45, house: 1.25, wall: 0.42, geometric: 0.32, speaker: 0.18, aisle: 0.32, ceiling: 0.42, stage: 0.24, frame: 0.11 });
             ambientLight.intensity = lightValues.ambient;
             houseLight.intensity = lightValues.house;
+            // In small rooms the legacy full-strength screen point lights
+            // overpowered the Showtime preset, even with house lights off.
+            // Retain the sampled screen hues with restrained bounced light.
+            const screenBounce = lightingMode === 'movie' ? 0.2 : (lightingMode === 'preshow' ? 0.45 : 0.65);
+            screenLightCenter.intensity = 2.8 * screenBounce;
+            screenLightLeft.intensity = screenLightRight.intensity = 2.0 * screenBounce;
             architecturalAccentMaterials.forEach(material => {
                 material.emissiveIntensity = lightValues[material.userData.accentRole] ?? lightValues.wall;
             });

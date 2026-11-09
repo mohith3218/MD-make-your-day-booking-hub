@@ -9,6 +9,8 @@ import os
 import re
 import sys
 import threading
+import tempfile
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
@@ -16,10 +18,12 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 os.environ.pop('RAZORPAY_KEY_ID', None)
-os.environ.setdefault('ADMIN_PASSWORD', 'admin123')
-# Keep this destructive integration test isolated from the app's local or
+# Keep this integration test isolated from the app's local or
 # deployment database, even when DATABASE_URL is present in the shell.
-os.environ['DATABASE_URL'] = 'sqlite:///test_flow.db'
+_test_instance = Path(__file__).resolve().parent / 'instance'
+_test_instance.mkdir(exist_ok=True)
+_test_dir = tempfile.TemporaryDirectory(prefix='flow-', dir=_test_instance)
+os.environ['DATABASE_URL'] = 'sqlite:///' + (Path(_test_dir.name) / 'flow.db').as_posix()
 os.environ['APP_ENV'] = 'testing'
 
 import app as A
@@ -27,8 +31,6 @@ import app as A
 
 def main():
     A.app.config['WTF_CSRF_ENABLED'] = False
-    with A.app.app_context():
-        A.db.drop_all()
     A.init_db()
 
     with A.app.app_context():
@@ -287,8 +289,13 @@ def main():
     # ---- 11. wallet recharge approval flow -------------------------------
     c1.post('/wallet/recharge', data={'amount': 500}, follow_redirects=True)
     admin = A.app.test_client()
-    admin.post('/login', data={'username': 'admin', 'password': 'admin123'},
-               follow_redirects=True)
+    # Authenticate the isolated fixture without coupling the business-flow
+    # checks to an operator's admin password or changing any credentials.
+    with A.app.app_context():
+        admin_id = A.User.query.filter_by(username='admin').one().id
+    with admin.session_transaction() as admin_session:
+        admin_session['_user_id'] = str(admin_id)
+        admin_session['_fresh'] = True
     with A.app.app_context():
         req_id = A.RechargeRequest.query.filter_by(status='PENDING').one().id
     admin.post(f'/admin/recharges/{req_id}/approve', follow_redirects=True)
@@ -432,4 +439,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    finally:
+        with A.app.app_context():
+            A.db.session.remove()
+            A.db.engine.dispose()
+        _test_dir.cleanup()
