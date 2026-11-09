@@ -1852,6 +1852,8 @@
         type: isInitial ? 'cinewave:init' : 'cinewave:selection-state',
         selectedSeats: [...selected.keys()],
         unavailableSeats: [...document.querySelectorAll('[data-seat].seat-booked, [data-seat].seat-held')].map(button => button.dataset.seat),
+        bookedSeats: [...document.querySelectorAll('[data-seat].seat-booked')].map(button => button.dataset.seat),
+        heldSeats: [...document.querySelectorAll('[data-seat].seat-held')].map(button => button.dataset.seat),
         // Keep the initial camera in the full-room view. Later seat changes
         // still move the camera to the seat the customer is inspecting.
         activeSeat: activePovSeat?.dataset?.seat || '',

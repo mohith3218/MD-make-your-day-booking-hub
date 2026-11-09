@@ -5,6 +5,10 @@ const path=require('node:path');
 const ChromeQA=require('./phase_2_1_3_chrome.cjs');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let chrome;
+async function screenshot(name){
+ const {data}=await chrome.call('Page.captureScreenshot',{format:'png',fromSurface:true});
+ await fs.writeFile(path.join(__dirname,'../docs/screenshots/phase-2.1.4-premium-seats',name+'.png'),Buffer.from(data,'base64'));
+}
 const result={startedAt:new Date().toISOString(),checks:[]};
 const book=expr=>chrome.evaluate(`document.querySelector('#v').contentWindow.eval(${JSON.stringify(expr)})`);
 const preview=expr=>book(`document.querySelector('#vr-inline-frame').contentWindow.eval(${JSON.stringify(expr)})`);
@@ -27,6 +31,16 @@ async function state(){
 async function canvasPoint(id){
  const point=await preview(`(()=>{
     const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+    // Project real chair locations first, avoiding a dense raycast grid for
+    // the 886-seat screen. Verify the actual first hit before clicking it.
+    for(const seat of [...seatRegistry.values()].sort((a,b)=>Math.abs(a.worldPos.x)-Math.abs(b.worldPos.x))){
+      const p=seat.group.localToWorld(new THREE.Vector3(0,1.1,0.35)).project(camera);
+      const x=(p.x+1)*innerWidth/2,y=(1-p.y)*innerHeight/2;
+      if(p.z<-1||p.z>1||x<0||y<0||x>=innerWidth||y>=innerHeight||document.elementFromPoint(x,y)!==renderer.domElement)continue;
+      ray.setFromCamera(new THREE.Vector2(p.x,p.y),camera);
+      const hit=ray.intersectObjects(interactiveSeatMeshes,false)[0];
+      if(hit){const found=seatIdFromHit(hit);if(${id?`found===${JSON.stringify(id)}`:"found && !seatRegistry.get(found).isOccupied && !selectedSeats.has(found)"})return{x,y,id:found};}
+    }
     for(let y=innerHeight*0.32;y<innerHeight-30;y+=6)for(let x=30;x<innerWidth-30;x+=6){
       if(document.elementFromPoint(x,y)!==renderer.domElement)continue;
       ndc.set(x/innerWidth*2-1,-y/innerHeight*2+1);ray.setFromCamera(ndc,camera);
@@ -40,7 +54,6 @@ async function canvasPoint(id){
 }
 async function main(){
  chrome=await ChromeQA.connect();
- chrome.screenshot=async name=>{const capture=await chrome.call('Page.captureScreenshot',{format:'png'});await fs.writeFile(path.join(__dirname,'../docs/screenshots/phase-2.1.4-premium-seats',name+'.png'),Buffer.from(capture.data,'base64'));};
  const {windowId}=await chrome.call('Browser.getWindowForTarget');
  await chrome.call('Browser.setWindowBounds',{windowId,bounds:{windowState:'normal'}});
  await chrome.call('Page.bringToFront');
@@ -101,7 +114,7 @@ async function main(){
     desiredLookAtTarget.copy(seat.worldPos).add(new THREE.Vector3(0,0.55,0));
     setCameraFieldOfView(43);__qa.light('house');__qa.settleCamera();})()`);
  await sleep(1500);
- await chrome.screenshot('Selected-seat-highlighting');
+ await screenshot('Selected-seat-highlighting');
  // Show both actual application surfaces together for the synchronization
  // evidence image. Only QA layout visibility changes; the app DOM is retained.
  await book(`(()=>{const wrap=document.createElement('div');wrap.style.cssText='position:fixed;inset:75px 10px 10px;z-index:300;display:grid;grid-template-columns:1fr 1fr;gap:12px;background:#0b0b12';document.body.append(wrap);
@@ -113,7 +126,31 @@ async function main(){
  await until(async()=>(await state()).preview.ids.length===3,'Rearranged preview lost the shared cart');
  await preview("__qa.overview();__qa.light('house');__qa.settleCamera()");await sleep(1000);
  await chrome.evaluate(`document.querySelector('#status').textContent='PASS: 2D and 3D share the same three cart IDs and total'`);
- await chrome.screenshot('2D-3D-seat-synchronization');
+ await screenshot('2D-3D-seat-synchronization');
+ // Existing span-2 sofa IDs remain independent booking entries. Each entry
+ // already represented a sofa in the saved layout; never split or merge IDs.
+ await chrome.call('Page.navigate',{url:'http://127.0.0.1:5014/__qa__/?theater=couple&booking=1'});
+ await until(async()=>await preview('cinewavePreviewMetrics().renderedSeats===78'),'Couple preview never built');
+ const coupleIds=await preview(`currentAudi.rowDefs.filter(r=>r.seatSpan>1).flatMap(r=>Object.keys(r.seats)).slice(0,2)`);
+ assert.equal(coupleIds.length,2);
+ for(const id of coupleIds){await seat2D(id);await until(async()=>(await state()).preview.ids.includes(id),'Couple ID did not reach 3D');}
+ s=await state();assert.deepEqual([...s.book.ids].sort(),[...coupleIds].sort());
+ await seat2D(coupleIds[0]);await until(async()=>(await state()).preview.ids.length===1,'Couple deselection failed');
+ s=await state();assert.deepEqual(s.book.ids,[coupleIds[1]]);assert.deepEqual(s.preview.ids,[coupleIds[1]]);
+ const coupleMapping=await preview(`${JSON.stringify(coupleIds)}.map(cinewavePreviewSeatMapping)`);
+ assert.ok(coupleMapping.every(m=>m.mappingValid));
+ result.checks.push({name:'Two original Couple IDs select and deselect independently',ids:coupleIds,state:s,mapping:coupleMapping});
+ await chrome.call('Page.navigate',{url:'http://127.0.0.1:5014/__qa__/?theater=jagadamba&booking=1'});
+ await until(async()=>await preview('cinewavePreviewMetrics().renderedSeats===886'),'Jagadamba booking preview never built');
+ const largeId=await preview('currentAudi.defaultSeat');
+ await seat2D(largeId);await until(async()=>(await state()).preview.ids.includes(largeId),'886-seat 2D selection did not reach 3D');
+ await book(`toggleTheaterView('3d');document.querySelector('#vr-inline-frame').scrollIntoView({block:'center'})`);
+ await preview(`__qa.overview();__qa.light('house');__qa.settleCamera()`);
+ const largePoint=await canvasPoint();await click(largePoint.x,largePoint.y);
+ await until(async()=>(await state()).book.ids.includes(largePoint.id),'886-seat canvas selection did not reach 2D');
+ s=await state();assert.equal(s.book.active,largePoint.id);assert.equal(s.preview.active,largePoint.id);
+ assert.equal(new Set(s.book.ids).size,2);
+ result.checks.push({name:'Jagadamba 886-seat trusted selection in both directions',clicked:largePoint.id,state:s});
  console.log('PASS',result.checks.map(x=>x.name));
 }
 main().catch(error=>{result.failure=String(error.stack||error);console.error(error);process.exitCode=1;})

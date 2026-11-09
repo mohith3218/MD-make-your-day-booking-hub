@@ -1293,6 +1293,10 @@
         const matArmrest = new THREE.MeshStandardMaterial({ color: 0x242832, roughness: 0.7, metalness: 0.03 });
         const matSeatInset = new THREE.MeshStandardMaterial({ color: 0x17201f, roughness: 0.82, metalness: 0.01 });
         const matSeatStitch = new THREE.MeshStandardMaterial({ color: 0x9c8251, roughness: 0.72, metalness: 0.08 });
+        const seatMarkerColors = Object.fromEntries(Object.entries({
+            available: '#736353', selected: '#ffe18b', active: '#76cbb9',
+            booked: '#d47380', held: '#eaa34c', unavailable: '#9a96a4'
+        }).map(([key, color]) => [key, new THREE.Color(color).convertSRGBToLinear()]));
         // State colours become linear exactly once, before setColorAt().
         [matSelectedCart, matActivePOV, matOccupied, matArmrest, matSeatInset, matSeatStitch]
             .forEach(material => material.color.convertSRGBToLinear());
@@ -1301,12 +1305,12 @@
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = 128;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#bcb9b0';
+            ctx.fillStyle = '#e4e0d9';
             ctx.fillRect(0, 0, 128, 128);
             for (let p = 0; p < 128; p += 4) {
-                ctx.fillStyle = 'rgba(24, 27, 30, 0.14)';
+                ctx.fillStyle = 'rgba(24, 27, 30, 0.07)';
                 ctx.fillRect(p, 0, 1, 128);
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.09)';
                 ctx.fillRect(0, p + 1, 128, 1);
             }
             const texture = new THREE.CanvasTexture(canvas);
@@ -1352,7 +1356,7 @@
                 materials.forEach(material => {
                     if (material && !keepMaterials.has(material)) {
                         oldMaterials.add(material);
-                        if (material.map && material.map !== screenTexture) oldTextures.add(material.map);
+                        if (material.map && material.map !== screenTexture && material.map !== seatFabricTexture) oldTextures.add(material.map);
                     }
                 });
             });
@@ -1396,9 +1400,10 @@
                     material.color[channel] = THREE.MathUtils.clamp(material.color[channel], 0, 1);
                 });
             };
-            setUpholsteryTint(matStdAvail, seatBaseColor, 2.1);
-            setUpholsteryTint(matVipAvail, trimBaseColor, 1.45);
-            setUpholsteryTint(matReclinerAvail, seatBaseColor, 1.9);
+            const upholsteryColors = seatProfile.colors || architecture.upholstery_colors || visual.upholstery_colors || {};
+            setUpholsteryTint(matStdAvail, upholsteryColors.standard || seatBaseColor, 2.1);
+            setUpholsteryTint(matVipAvail, upholsteryColors.premium || trimBaseColor, 1.45);
+            setUpholsteryTint(matReclinerAvail, upholsteryColors.recliner || seatBaseColor, 1.9);
             const geometry = config.geometry || {};
             const physicalRoom = geometry.room || {};
             const physicalScreen = geometry.screen || {};
@@ -1895,14 +1900,29 @@
             // 4. BUILD STADIUM RISERS & 3D SEATING GRID
             // Soft, bevelled upholstery panels keep the seat silhouette clean
             // at both overview distance and close seat POV.
-            const upholsteryGeo = new THREE.SphereGeometry(1, 16, 10);
+            const upholsteryGeo = new THREE.SphereGeometry(1, 16, 8);
             // A shared superellipsoid gives padding flat centres and rounded edges.
             const padding = upholsteryGeo.attributes.position;
             for (let i=0;i<padding.count;i++) {
                 const rounded = value => Math.sign(value) * Math.pow(Math.abs(value), 0.42);
                 padding.setXYZ(i, rounded(padding.getX(i)), rounded(padding.getY(i)), rounded(padding.getZ(i)));
             }
-            upholsteryGeo.computeVertexNormals();
+            // Analytic superellipsoid normals keep the flat padding smooth at
+            // the sphere's duplicated UV seam and poles (no ribbed highlights).
+            const paddingNormals = upholsteryGeo.attributes.normal;
+            const paddingNormal = new THREE.Vector3();
+            const gradient = value => Math.sign(value) * Math.pow(Math.abs(value), 2 / 0.42 - 1);
+            for (let i = 0; i < padding.count; i++) {
+                paddingNormal.set(gradient(padding.getX(i)), gradient(padding.getY(i)), gradient(padding.getZ(i))).normalize();
+                paddingNormals.setXYZ(i, paddingNormal.x, paddingNormal.y, paddingNormal.z);
+                // Planar face UVs prevent the fabric weave from pinching into
+                // a star at the former sphere poles on cushion tops.
+                const axis = [Math.abs(paddingNormal.x), Math.abs(paddingNormal.y), Math.abs(paddingNormal.z)];
+                const dominant = axis.indexOf(Math.max(...axis));
+                upholsteryGeo.attributes.uv.setXY(i,
+                    ((dominant === 0 ? padding.getZ(i) : padding.getX(i)) + 1)/2,
+                    ((dominant === 1 ? padding.getZ(i) : padding.getY(i)) + 1)/2);
+            }
             const backShape = new THREE.Shape();
             backShape.moveTo(-0.4, 0.02);
             backShape.bezierCurveTo(-0.48, 0.02, -0.49, 0.14, -0.44, 0.22);
@@ -1918,8 +1938,11 @@
                 bevelThickness: 0.045, bevelSize: 0.035, curveSegments: 5
             });
             const backVertices = seatBackGeo.attributes.position;
+            const backFaceNormals = new Map();
             for (let i=0;i<backVertices.count;i++) {
                 const y=backVertices.getY(i);
+                const nz = seatBackGeo.attributes.normal.getZ(i);
+                if (Math.abs(nz) > 0.999) backFaceNormals.set(i, Math.sign(nz));
                 backVertices.setZ(i, backVertices.getZ(i) + 0.10*Math.pow((y-0.58)/0.7,2));
             }
             seatBackGeo.computeVertexNormals();
@@ -1938,6 +1961,12 @@
                 const n=normalSums.get(normalKey(i)).clone().normalize();
                 backNormals.setXYZ(i,n.x,n.y,n.z);
             }
+            // Broad faces need the curvature's analytic normal; averaging the
+            // extrusion's long triangles leaves diagonal patches on rear views.
+            backFaceNormals.forEach((sign, i) => {
+                const n = new THREE.Vector3(0, -sign*0.2*(backVertices.getY(i)-0.58)/0.49, sign).normalize();
+                backNormals.setXYZ(i,n.x,n.y,n.z);
+            });
             // Instanced batches keep seat upholstery, backs, armrests, frames,
             // and cup holders efficient for the largest saved layouts.
             // Instance colors preserve availability, class and cart states.
@@ -1962,12 +1991,19 @@
             const armGeometry = new THREE.SphereGeometry(1, 10, 8);
             const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
             const seatLegMaterial = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.58, metalness: 0.42 });
-            const cupHolderGeometry = new THREE.TorusGeometry(0.038, 0.008, 6, 12).rotateX(Math.PI / 2);
+            // One shared, closed-section molded well: inner bowl, rounded lip,
+            // outer wall and underside. Fewer triangles than the former torus.
+            const cupHolderGeometry = new THREE.LatheGeometry([
+                new THREE.Vector2(0, -0.065), new THREE.Vector2(0.026, -0.065),
+                new THREE.Vector2(0.032, -0.008), new THREE.Vector2(0.036, 0),
+                new THREE.Vector2(0.043, -0.003), new THREE.Vector2(0.038, -0.075),
+                new THREE.Vector2(0, -0.075)
+            ], 10);
             const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.44, metalness: 0.32 });
             const stitchGeometry = new THREE.BoxGeometry(1, 1, 1);
             // Three shared class materials, rather than one material per chair.
             const upholsteryBatches = upholsteryMaterials.map((material, index) => ({
-                cushionInstances: new THREE.InstancedMesh(upholsteryGeo, material, Math.max(1, categoryCapacity[index] * 5)),
+                cushionInstances: new THREE.InstancedMesh(upholsteryGeo, material, Math.max(1, categoryCapacity[index] * 7)),
                 backInstances: new THREE.InstancedMesh(seatBackGeo, material, Math.max(1, categoryCapacity[index] * 2))
             }));
             upholsteryBatches.forEach(batch => {
@@ -1982,7 +2018,12 @@
             const armInstances = new THREE.InstancedMesh(armGeometry, matArmrest, Math.max(1, seatCapacity * 2));
             const legInstances = new THREE.InstancedMesh(seatLegGeometry, seatLegMaterial, Math.max(1, seatCapacity * 3));
             const cupHolderInstances = new THREE.InstancedMesh(cupHolderGeometry, cupHolderMaterial, Math.max(1, seatCapacity * 2));
-            const stitchInstances = new THREE.InstancedMesh(stitchGeometry, matSeatStitch, Math.max(1, seatCapacity * 2));
+            // Seams and state bands share geometry and one colour-instanced
+            // batch. State highlighting adds no draw call to the auditorium.
+            const stitchInstances = new THREE.InstancedMesh(stitchGeometry,
+                new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.72, metalness: 0.08}), Math.max(1, seatCapacity * 4));
+            stitchInstances.setColorAt(0, matSeatStitch.color);
+            const stateInstances = stitchInstances;
             [armInstances, legInstances, cupHolderInstances, stitchInstances].forEach((mesh, index) => {
                 mesh.userData.partKind = ['armrest', 'support', 'cup-holder', 'stitch'][index];
             });
@@ -2036,7 +2077,6 @@
 
             let seatInstanceIndex = 0;
             const upholsteryIndices = Array.from({length:3}, () => ({cushion:0, back:0}));
-            let stitchInstanceIndex = 0;
             rows.forEach((rowLetter, rIdx) => {
                 const rowConfig = config.rowDefs[rIdx];
                 if (!rowConfig) return;
@@ -2099,18 +2139,20 @@
                     const backIndex = upholsteryIndices[category].back;
                     const upholsteryStart = upholsteryIndices[category].cushion;
                     upholsteryIndices[category].back += rowSpan > 1 ? 2 : 1;
-                    upholsteryIndices[category].cushion += (rowSpan > 1 ? 4 : 2) + (isRecliner ? 1 : 0);
+                    const padsPerPosition = isVIP || isRecliner ? 3 : 2;
+                    upholsteryIndices[category].cushion += (rowSpan > 1 ? 2 : 1) * padsPerPosition + (isRecliner ? 1 : 0);
                     const armStart = base * 2;
                     const supportStart = base * 3;
                     const cupStart = base * 2;
-                    const reclineTilt = seatId === activePOVSeatId ? (-0.14 - reclineLevel * 0.22) : -0.14;
+                    const reclineTilt = isRecliner && seatId === activePOVSeatId
+                        ? THREE.MathUtils.degToRad([8,25,45][reclineLevel]) : 0.14;
                     const isWide = rowSpan > 1;
                     const seatWidth = rowSpan * (isRecliner ? 0.46 : (isVIP ? 0.48 : 0.46));
                     const seatHeight = isRecliner ? 0.78 : (isVIP ? 0.73 : 0.67);
                     const seatDepth = isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82);
                     const seat = {
                         id: seatId, row: rowLetter, rowIndex: rIdx, num: sNum,
-                        isOccupied, isVIP, isRecliner, tier, price,
+                        isOccupied, isVIP, isRecliner, tier, price, status: rowConfig.seats[seatId],
                         worldPos: seatGroup.position.clone(),
                         // Keep a consistent adult seated eye height (~1.16 m
                         // above the row base) across standard and recliner
@@ -2125,25 +2167,29 @@
                                 const width=isWide?seatWidth*0.48:seatWidth;
                                 const x=isWide?(side===0?-1:1)*seatWidth*0.25:0;
                                 return [
-                                    part(cushionInstances, upholsteryStart+side*2, [x,0.48,-0.04], [width*0.48,isVIP||isRecliner?0.17:0.13,seatDepth*0.40],0,'cushion'),
-                                    part(cushionInstances, upholsteryStart+side*2+1, [x,1.28,0.30], [width*0.43,isVIP||isRecliner?0.18:0.14,0.12],0,'headrest'),
-                                    part(backInstances,backIndex+side,[x,0.48,0.22],[width,isVIP||isRecliner?seatHeight*1.15:seatHeight,seatDepth],reclineTilt,'back')
+                                    part(cushionInstances, upholsteryStart+side*padsPerPosition, [x,0.48,-0.04], [width*0.48,isVIP||isRecliner?0.17:0.13,seatDepth*0.40],0,'cushion'),
+                                    part(cushionInstances, upholsteryStart+side*padsPerPosition+1, [x,1.28,0.30], [width*0.43,isVIP||isRecliner?0.18:0.14,0.12],0,'headrest'),
+                                    part(backInstances,backIndex+side,[x,0.48,0.22],[width,isVIP||isRecliner?seatHeight*1.15:seatHeight,seatDepth],reclineTilt,'back'),
+                                    ...(padsPerPosition === 3 ? [part(cushionInstances, upholsteryStart+side*padsPerPosition+2,
+                                        [x,0.75,0.17],[width*0.43,0.17,0.09],reclineTilt,'lumbar')] : [])
                                 ];
                             }).flat(),
-                            ...(isRecliner ? [part(cushionInstances,upholsteryStart+(isWide?4:2),[0,0.28,-0.62],[seatWidth*0.44,0.10,0.23],0,'footrest')] : []),
-                            part(armInstances, armStart, [-0.50 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [0.10 * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
-                            part(armInstances, armStart + 1, [0.50 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [0.10 * seatWidth, 0.13 * seatHeight, 0.43 * seatDepth]),
+                            ...(isRecliner ? [part(cushionInstances,upholsteryStart+(isWide?2:1)*padsPerPosition,[0,0.28,-0.62],[seatWidth*0.44,0.10,0.23],0,'footrest')] : []),
+                            part(armInstances, armStart, [-0.48 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [(isWide?0.065:0.115) * seatWidth, (isVIP||isRecliner?0.17:0.13) * seatHeight, 0.43 * seatDepth]),
+                            part(armInstances, armStart + 1, [0.48 * seatWidth, isRecliner ? 0.66 : 0.65, 0.035], [(isWide?0.065:0.115) * seatWidth, (isVIP||isRecliner?0.17:0.13) * seatHeight, 0.43 * seatDepth]),
                             part(legInstances, supportStart, [-0.32 * seatWidth, 0.17, 0.1], [0.065, 0.34, 0.08]),
                             part(legInstances, supportStart + 1, [0.32 * seatWidth, 0.17, 0.1], [0.065, 0.34, 0.08]),
                             part(legInstances, supportStart + 2, [0, 0.08, 0.02], [0.68 * seatWidth, 0.055, 0.075]),
                             ...(seatProfile.cup_holder === false ? [] : [
-                                part(cupHolderInstances, cupStart, [-0.50 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1]),
-                                part(cupHolderInstances, cupStart + 1, [0.50 * seatWidth, isRecliner ? 0.75 : 0.73, 0.045], [1, 1, 1])
+                                part(cupHolderInstances, cupStart, [-0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), -0.12], [1, 1, 1]),
+                                part(cupHolderInstances, cupStart + 1, [0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), -0.12], [1, 1, 1])
                             ]),
                             ...([
-                                part(stitchInstances, stitchInstanceIndex++, [0, 0.43, -0.38], [0.42 * seatWidth, 0.012, 0.012]),
-                                part(stitchInstances, stitchInstanceIndex++, [0, 1.34, 0.34], [0.64 * seatWidth, 0.009, 0.009])
-                            ])
+                                part(stitchInstances, base*4, [0, 0.43, -0.38], [0.42 * seatWidth, 0.012, 0.012]),
+                                part(stitchInstances, base*4+1, [0, 1.34, 0.34], [0.64 * seatWidth, 0.009, 0.009],0,'head-seam')
+                            ]),
+                            part(stateInstances, base*4+2, [0,0.47,-0.04-seatDepth*0.402], [seatWidth*0.72,0.035,0.012],0,'state-front'),
+                            part(stateInstances, base*4+3, [0,1.0,0.44], [seatWidth*0.66,0.035,0.012],reclineTilt,'state-back')
                         ],
                         meshes: [],
                         updateTransforms() {
@@ -2154,6 +2200,8 @@
                     seat.meshes = seat.instanceParts.filter(item => item.mesh===cushionInstances || item.mesh===backInstances);
                     seat.instanceParts.forEach(item => {
                         item.mesh.count = Math.max(item.mesh.count, item.index + 1);
+                        if (item.mesh === stitchInstances) item.mesh.setColorAt(item.index,
+                            item.kind.startsWith('state-') ? seatMarkerColors.available : matSeatStitch.color);
                         writeSeatPart(seat, item);
                     });
                     seat.meshes.forEach(ref => { ref.mesh.userData.instanceSeatIds[ref.index] = seatId; });
@@ -2238,25 +2286,41 @@
         };
         function refreshAllSeatMaterials() {
             seatRegistry.forEach((seat) => {
-                const targetColor = seat.isOccupied ? matOccupied.color
-                    : (selectedSeats.has(seat.id) ? matSelectedCart.color
-                    : (seat.id === activePOVSeatId ? matActivePOV.color
-                    : (seat.isRecliner ? matReclinerAvail.color : (seat.isVIP ? matVipAvail.color : matStdAvail.color))));
+                const categoryColor = seat.isRecliner ? matReclinerAvail.color : (seat.isVIP ? matVipAvail.color : matStdAvail.color);
+                const state = seat.isOccupied ? seat.status : (selectedSeats.has(seat.id) ? 'selected' : (seat.id === activePOVSeatId ? 'active' : 'available'));
+                // Keep the actual fabric hue; booking state has its own narrow
+                // front/rear bands rather than replacing the entire chair.
+                const targetColor = categoryColor.clone();
+                if (seat.isOccupied) targetColor.lerp(matOccupied.color, 0.65);
+                else if (state === 'selected') targetColor.lerp(matSelectedCart.color, 0.16);
+                else if (state === 'active') targetColor.lerp(matActivePOV.color, 0.14);
                 seat.meshes.forEach(ref => ref.mesh.setColorAt(ref.index, targetColor));
+                seat.instanceParts.filter(item => item.kind.startsWith('state-'))
+                    .forEach(item => item.mesh.setColorAt(item.index, seatMarkerColors[state] || seatMarkerColors.unavailable));
                 const level = seat.isRecliner && seat.id===activePOVSeatId ? reclineLevel : 0;
-                const angle = seat.isRecliner ? -THREE.MathUtils.degToRad([8,25,45][level]) : -0.14;
+                // +X rotation moves the back toward local +Z, away from the
+                // screen. Use that same hinge for the headrest and lumbar pad.
+                const angle = seat.isRecliner ? THREE.MathUtils.degToRad([8,25,45][level]) : 0.14;
+                if (seat.transformLevel === level) return;
+                seat.transformLevel = level;
+                const height = (seat.isRecliner ? 0.78*1.15 : (seat.isVIP ? 0.73*1.15 : 0.67))*1.10;
+                const pivotZ = 0.22 - level*0.14;
+                const attach = (item, distance, depth) => {
+                    item.position.y = 0.48 + distance*Math.cos(angle) - depth*Math.sin(angle);
+                    item.position.z = pivotZ + distance*Math.sin(angle) + depth*Math.cos(angle);
+                    item.rotationX = angle;
+                };
                 seat.instanceParts.forEach(item => {
-                    if(item.kind==='back') item.rotationX=angle;
-                    if(item.kind==='headrest') {
-                        const height=0.80;
-                        item.position.y=0.48+height*Math.cos(angle);
-                        item.position.z=0.22-height*Math.sin(angle);
-                        item.rotationX=angle;
-                    }
+                    if(item.kind==='back') { item.rotationX=angle; item.position.z=pivotZ; }
+                    if(item.kind==='headrest') attach(item,height,-0.02);
+                    if(item.kind==='head-seam') attach(item,height-0.06,-0.145);
+                    if(item.kind==='lumbar') attach(item,0.27,-0.07);
+                    if(item.kind==='state-back') attach(item,0.54,seat.isRecliner?0.25:(seat.isVIP?0.24:0.19));
                     if(item.kind==='footrest') {
                         item.position.y=0.28+level*0.10;
-                        item.position.z=-0.62-level*0.07;
-                        item.rotationX=-level*0.08;
+                        item.position.z=-0.36-level*0.05;
+                        item.scale.z=0.18;
+                        item.rotationX=level*0.10;
                     }
                 });
 
@@ -2343,9 +2407,11 @@
                     if (!seatData) continue;
                     const seatButton = document.createElement('button');
                     seatButton.type = 'button';
-                    seatButton.title = `${seatData.isOccupied ? 'Unavailable · ' : ''}Row ${row.label} Seat ${sNum} (${seatData.tier} · ₹${seatData.price})`;
+                    seatButton.title = `${seatData.isOccupied ? seatData.status + ' · ' : ''}Row ${row.label} Seat ${sNum} (${seatData.tier} · ₹${seatData.price})`;
                     let colorClasses = 'bg-rose-900/75 border-rose-500/60 text-rose-100 hover:border-rose-200';
-                    if (seatData.isOccupied) colorClasses = 'occupied bg-slate-800 border-slate-600 text-slate-500 cursor-not-allowed';
+                    if (seatData.status === 'held') colorClasses = 'occupied bg-amber-950 border-amber-500 text-amber-200 cursor-not-allowed';
+                    else if (seatData.status === 'booked') colorClasses = 'occupied bg-rose-950 border-rose-500 text-rose-200 cursor-not-allowed';
+                    else if (seatData.isOccupied) colorClasses = 'occupied bg-slate-800 border-slate-600 text-slate-500 cursor-not-allowed';
                     else if (selectedSeats.has(seatId)) colorClasses = 'bg-[#E4C67F] border-[#F2DFAE] text-slate-950 font-bold shadow-[0_0_9px_rgba(228,198,127,.5)]';
                     else if (seatId === activePOVSeatId) colorClasses = 'bg-[#91CFC1] border-white text-slate-950 font-black shadow-[0_0_9px_rgba(145,207,193,.45)] scale-125 z-10';
                     else if (seatData.isRecliner) colorClasses = 'bg-emerald-900/80 border-emerald-500/70 text-emerald-100';
@@ -2770,7 +2836,7 @@
             if (seat && btn) {
                 const inCart = selectedSeats.has(seat.id);
                 if (seat.isOccupied) {
-                    btn.innerHTML = `<i class="fa-solid fa-ban"></i><span>Seat ${seat.id} is Sold — Hop to Next Seat</span>`;
+                    btn.innerHTML = `<i class="fa-solid fa-ban"></i><span>Seat ${seat.id} ${seat.status === 'held' ? 'is being booked' : 'is unavailable'} — Hop to Next Seat</span>`;
                     btn.className = "w-full py-2.5 rounded-xl font-display font-bold text-xs text-rose-300 bg-rose-950/60 border border-rose-700/50 cursor-not-allowed flex items-center justify-center gap-2";
                 } else if (inCart) {
                     btn.innerHTML = `<i class="fa-solid fa-circle-check"></i><span>Seat ${seat.id} in Cart (₹${seat.price}) • Click to Remove</span>`;
@@ -2816,7 +2882,12 @@
 
         function receiveProjectSelectionState(message) {
             const unavailable = new Set(message.unavailableSeats || []);
-            seatRegistry.forEach(seat => { seat.isOccupied = unavailable.has(seat.id); });
+            const booked = new Set(message.bookedSeats || []);
+            const held = new Set(message.heldSeats || []);
+            seatRegistry.forEach(seat => {
+                seat.isOccupied = unavailable.has(seat.id) || booked.has(seat.id) || held.has(seat.id);
+                seat.status = booked.has(seat.id) ? 'booked' : (held.has(seat.id) ? 'held' : (seat.isOccupied ? 'unavailable' : 'available'));
+            });
             selectedSeats = new Set((message.selectedSeats || []).filter(seatId => {
                 const seat = seatRegistry.get(seatId);
                 return seat && !seat.isOccupied;
@@ -2972,9 +3043,9 @@
                 tooltipEl.style.top = `${clientY}px`;
                 document.getElementById('tooltip-title').textContent = `Row ${seat.row} • Seat ${seat.num}`;
                 const badgeEl = document.getElementById('tooltip-badge');
-                badgeEl.textContent = seat.isOccupied ? 'SOLD' : seat.tier;
+                badgeEl.textContent = seat.isOccupied ? (seat.status === 'held' ? 'HELD' : 'SOLD') : seat.tier;
                 document.getElementById('tooltip-sub').textContent = seat.isOccupied
-                    ? 'Seat already booked'
+                    ? (seat.status === 'held' ? 'Seat is being booked' : 'Seat already booked')
                     : `₹${seat.price} • Hover to preview • Click or tap to view and select this seat`;
 
                 // Lock the tooltip to a screen edge when it would cover the seat.

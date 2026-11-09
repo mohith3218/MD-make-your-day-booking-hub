@@ -1,5 +1,1041 @@
 {
-  "startedAt": "2026-11-09T16:40:32.019Z",
-  "checks": [],
-  "failure": "TypeError: fetch failed"
+  "startedAt": "2026-11-09T17:21:55.920Z",
+  "checks": [
+    {
+      "name": "2D to 3D, exact ID/details/category/price/camera",
+      "state": {
+        "book": {
+          "ids": [
+            "E8"
+          ],
+          "total": 135,
+          "active": "E8"
+        },
+        "preview": {
+          "ids": [
+            "E8"
+          ],
+          "active": "E8",
+          "title": "Row E · Seat 8",
+          "category": "Classic",
+          "price": "₹135",
+          "cameraMode": "seat",
+          "target": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ],
+          "eye": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ]
+        }
+      }
+    },
+    {
+      "name": "Deselect and change category to Prime",
+      "state": {
+        "book": {
+          "ids": [
+            "A8"
+          ],
+          "total": 189,
+          "active": "A8"
+        },
+        "preview": {
+          "ids": [
+            "A8"
+          ],
+          "active": "A8",
+          "title": "Row A · Seat 8",
+          "category": "Prime",
+          "price": "₹189",
+          "cameraMode": "seat",
+          "target": [
+            0.3057376794452238,
+            2.96,
+            18.245635708827894
+          ],
+          "eye": [
+            0.3057376794452238,
+            2.96,
+            18.245635708827894
+          ]
+        }
+      }
+    },
+    {
+      "name": "Mixed category cart prices and no duplicates",
+      "state": {
+        "book": {
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "total": 324,
+          "active": "E8"
+        },
+        "preview": {
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "active": "E8",
+          "title": "Row E · Seat 8",
+          "category": "Classic",
+          "price": "₹135",
+          "cameraMode": "seat",
+          "target": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ],
+          "eye": [
+            -1.5281898581344069,
+            2.24,
+            13.704412276173061
+          ]
+        }
+      }
+    },
+    {
+      "name": "Booked seat blocked in 2D and 3D",
+      "seat": "E1",
+      "mapping": {
+        "seatId": "E1",
+        "found": true,
+        "row": "E",
+        "number": 1,
+        "rowIndex": 4,
+        "category": "Classic",
+        "price": 135,
+        "unavailable": true,
+        "instances": [
+          {
+            "batch": 0,
+            "index": 0,
+            "kind": "cushion",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.726,
+              1.402,
+              13.87
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 1,
+            "kind": "headrest",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.848,
+              1.892,
+              14.124
+            ]
+          },
+          {
+            "batch": 1,
+            "index": 0,
+            "kind": "back",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.819,
+              1.402,
+              14.062
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 128,
+            "kind": "armrest",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.951,
+              1.515,
+              13.829
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 129,
+            "kind": "armrest",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.554,
+              1.515,
+              14.022
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 192,
+            "kind": "support",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.908,
+              1.194,
+              13.91
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 193,
+            "kind": "support",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.643,
+              1.194,
+              14.038
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 194,
+            "kind": "support",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.747,
+              1.134,
+              13.915
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 128,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.896,
+              1.576,
+              13.715
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 129,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.498,
+              1.576,
+              13.908
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 256,
+            "kind": "stitch",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.604,
+              1.368,
+              13.62
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 257,
+            "kind": "head-seam",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.801,
+              1.864,
+              14.026
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 258,
+            "kind": "state-front",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.608,
+              1.395,
+              13.627
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 259,
+            "kind": "state-back",
+            "resolvedSeatId": "E1",
+            "part": "E1",
+            "position": [
+              -6.913,
+              1.742,
+              14.257
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          -6.74,
+          1.08,
+          13.9
+        ]
+      }
+    },
+    {
+      "name": "Held seat blocked in 2D and 3D",
+      "seat": "E2",
+      "mapping": {
+        "seatId": "E2",
+        "found": true,
+        "row": "E",
+        "number": 2,
+        "rowIndex": 4,
+        "category": "Classic",
+        "price": 135,
+        "unavailable": true,
+        "instances": [
+          {
+            "batch": 0,
+            "index": 2,
+            "kind": "cushion",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.107,
+              1.402,
+              13.87
+            ]
+          },
+          {
+            "batch": 0,
+            "index": 3,
+            "kind": "headrest",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.22,
+              1.892,
+              14.127
+            ]
+          },
+          {
+            "batch": 1,
+            "index": 1,
+            "kind": "back",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.193,
+              1.402,
+              14.065
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 130,
+            "kind": "armrest",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.334,
+              1.515,
+              13.837
+            ]
+          },
+          {
+            "batch": 6,
+            "index": 131,
+            "kind": "armrest",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.929,
+              1.515,
+              14.015
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 195,
+            "kind": "support",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.288,
+              1.194,
+              13.916
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 196,
+            "kind": "support",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.018,
+              1.194,
+              14.034
+            ]
+          },
+          {
+            "batch": 7,
+            "index": 197,
+            "kind": "support",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.127,
+              1.134,
+              13.915
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 130,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.282,
+              1.576,
+              13.721
+            ]
+          },
+          {
+            "batch": 8,
+            "index": 131,
+            "kind": "cup-holder",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.878,
+              1.576,
+              13.899
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 260,
+            "kind": "stitch",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.994,
+              1.368,
+              13.615
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 261,
+            "kind": "head-seam",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.176,
+              1.864,
+              14.028
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 262,
+            "kind": "state-front",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -5.998,
+              1.395,
+              13.623
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 263,
+            "kind": "state-back",
+            "resolvedSeatId": "E2",
+            "part": "E2",
+            "position": [
+              -6.28,
+              1.742,
+              14.263
+            ]
+          }
+        ],
+        "mappingValid": true,
+        "errors": [],
+        "worldPosition": [
+          -6.12,
+          1.08,
+          13.9
+        ]
+      }
+    },
+    {
+      "name": "Trusted 3D canvas click to exact 2D seat",
+      "clicked": "B9",
+      "state": {
+        "book": {
+          "ids": [
+            "A8",
+            "E8",
+            "B9"
+          ],
+          "total": 513,
+          "active": "B9"
+        },
+        "preview": {
+          "ids": [
+            "A8",
+            "E8",
+            "B9"
+          ],
+          "active": "B9",
+          "title": "Row B · Seat 9",
+          "category": "Prime",
+          "price": "₹189",
+          "cameraMode": "seat",
+          "target": [
+            0.3054552498827064,
+            2.78,
+            17.095640598274073
+          ],
+          "eye": [
+            0.3054552498827064,
+            2.78,
+            17.095640598274073
+          ]
+        }
+      }
+    },
+    {
+      "name": "Two original Couple IDs select and deselect independently",
+      "ids": [
+        "A1",
+        "A2"
+      ],
+      "state": {
+        "book": {
+          "ids": [
+            "A2"
+          ],
+          "total": 576,
+          "active": "A1"
+        },
+        "preview": {
+          "ids": [
+            "A2"
+          ],
+          "active": "A1",
+          "title": "Row A · Seat 1",
+          "category": "Couple Sofa",
+          "price": "₹576",
+          "cameraMode": "seat",
+          "target": [
+            -3.4766234339030158,
+            2.24,
+            13.709238505319693
+          ],
+          "eye": [
+            -3.4766234339030158,
+            2.24,
+            13.709238505319693
+          ]
+        }
+      },
+      "mapping": [
+        {
+          "seatId": "A1",
+          "found": true,
+          "row": "A",
+          "number": 1,
+          "rowIndex": 0,
+          "category": "Couple Sofa",
+          "price": 576,
+          "unavailable": false,
+          "instances": [
+            {
+              "batch": 0,
+              "index": 0,
+              "kind": "cushion",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.74,
+                1.402,
+                13.812
+              ]
+            },
+            {
+              "batch": 0,
+              "index": 1,
+              "kind": "headrest",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.809,
+                1.892,
+                14.084
+              ]
+            },
+            {
+              "batch": 1,
+              "index": 0,
+              "kind": "back",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.792,
+                1.402,
+                14.018
+              ]
+            },
+            {
+              "batch": 0,
+              "index": 2,
+              "kind": "cushion",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.294,
+                1.402,
+                13.925
+              ]
+            },
+            {
+              "batch": 0,
+              "index": 3,
+              "kind": "headrest",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.363,
+                1.892,
+                14.197
+              ]
+            },
+            {
+              "batch": 1,
+              "index": 1,
+              "kind": "back",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.346,
+                1.402,
+                14.131
+              ]
+            },
+            {
+              "batch": 6,
+              "index": 0,
+              "kind": "armrest",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.96,
+                1.515,
+                13.819
+              ]
+            },
+            {
+              "batch": 6,
+              "index": 1,
+              "kind": "armrest",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.104,
+                1.515,
+                14.036
+              ]
+            },
+            {
+              "batch": 7,
+              "index": 0,
+              "kind": "support",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.831,
+                1.194,
+                13.907
+              ]
+            },
+            {
+              "batch": 7,
+              "index": 1,
+              "kind": "support",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.26,
+                1.194,
+                14.052
+              ]
+            },
+            {
+              "batch": 7,
+              "index": 2,
+              "kind": "support",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.529,
+                1.134,
+                13.916
+              ]
+            },
+            {
+              "batch": 8,
+              "index": 0,
+              "kind": "cup-holder",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.929,
+                1.576,
+                13.696
+              ]
+            },
+            {
+              "batch": 8,
+              "index": 1,
+              "kind": "cup-holder",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.073,
+                1.576,
+                13.913
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 0,
+              "kind": "stitch",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.448,
+                1.368,
+                13.598
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 1,
+              "kind": "head-seam",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.559,
+                1.864,
+                14.036
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 2,
+              "kind": "state-front",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.45,
+                1.395,
+                13.606
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 3,
+              "kind": "state-back",
+              "resolvedSeatId": "A1",
+              "part": "A1",
+              "position": [
+                -3.622,
+                1.742,
+                14.284
+              ]
+            }
+          ],
+          "mappingValid": true,
+          "errors": [],
+          "worldPosition": [
+            -3.525,
+            1.08,
+            13.9
+          ]
+        },
+        {
+          "seatId": "A2",
+          "found": true,
+          "row": "A",
+          "number": 2,
+          "rowIndex": 0,
+          "category": "Couple Sofa",
+          "price": 576,
+          "unavailable": false,
+          "instances": [
+            {
+              "batch": 0,
+              "index": 4,
+              "kind": "cushion",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.507,
+                1.402,
+                13.83
+              ]
+            },
+            {
+              "batch": 0,
+              "index": 5,
+              "kind": "headrest",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.552,
+                1.892,
+                14.108
+              ]
+            },
+            {
+              "batch": 1,
+              "index": 2,
+              "kind": "back",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.541,
+                1.402,
+                14.041
+              ]
+            },
+            {
+              "batch": 0,
+              "index": 6,
+              "kind": "cushion",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.053,
+                1.402,
+                13.905
+              ]
+            },
+            {
+              "batch": 0,
+              "index": 7,
+              "kind": "headrest",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.098,
+                1.892,
+                14.183
+              ]
+            },
+            {
+              "batch": 1,
+              "index": 3,
+              "kind": "back",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.087,
+                1.402,
+                14.115
+              ]
+            },
+            {
+              "batch": 6,
+              "index": 2,
+              "kind": "armrest",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.725,
+                1.515,
+                13.857
+              ]
+            },
+            {
+              "batch": 6,
+              "index": 3,
+              "kind": "armrest",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -1.854,
+                1.515,
+                14
+              ]
+            },
+            {
+              "batch": 7,
+              "index": 3,
+              "kind": "support",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.589,
+                1.194,
+                13.933
+              ]
+            },
+            {
+              "batch": 7,
+              "index": 4,
+              "kind": "support",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.008,
+                1.194,
+                14.029
+              ]
+            },
+            {
+              "batch": 7,
+              "index": 5,
+              "kind": "support",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.288,
+                1.134,
+                13.916
+              ]
+            },
+            {
+              "batch": 8,
+              "index": 2,
+              "kind": "cup-holder",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.705,
+                1.576,
+                13.731
+              ]
+            },
+            {
+              "batch": 8,
+              "index": 3,
+              "kind": "cup-holder",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -1.833,
+                1.576,
+                13.875
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 4,
+              "kind": "stitch",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.234,
+                1.368,
+                13.593
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 5,
+              "kind": "head-seam",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.308,
+                1.864,
+                14.038
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 6,
+              "kind": "state-front",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.236,
+                1.395,
+                13.601
+              ]
+            },
+            {
+              "batch": 9,
+              "index": 7,
+              "kind": "state-back",
+              "resolvedSeatId": "A2",
+              "part": "A2",
+              "position": [
+                -2.349,
+                1.742,
+                14.291
+              ]
+            }
+          ],
+          "mappingValid": true,
+          "errors": [],
+          "worldPosition": [
+            -2.285,
+            1.08,
+            13.9
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Jagadamba 886-seat trusted selection in both directions",
+      "clicked": "N12",
+      "state": {
+        "book": {
+          "ids": [
+            "V12",
+            "N12"
+          ],
+          "total": 288,
+          "active": "N12"
+        },
+        "preview": {
+          "ids": [
+            "V12",
+            "N12"
+          ],
+          "active": "N12",
+          "title": "Row N · Seat 12",
+          "category": "Premium (Lower Balcony)",
+          "price": "₹144",
+          "cameraMode": "seat",
+          "target": [
+            0,
+            6.92,
+            32.3956
+          ],
+          "eye": [
+            0,
+            6.92,
+            32.3956
+          ]
+        }
+      }
+    }
+  ]
 }

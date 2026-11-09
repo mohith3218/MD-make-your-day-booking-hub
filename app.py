@@ -1460,7 +1460,8 @@ def vr_seat_preview(showtime_id):
     geometry_errors = sl.validate_auditorium_geometry(layout)
     if geometry_errors:
         abort(422, description="This screen layout needs correction before the 3D preview can safely render it: " + geometry_errors[0])
-    unavailable = showtime.booked_seat_ids() | showtime.held_seat_ids()
+    booked = showtime.booked_seat_ids()
+    held = showtime.held_seat_ids()
     dynamic = showtime.dynamic_pricing_info
     row_defs = []
     prices = []
@@ -1478,7 +1479,7 @@ def vr_seat_preview(showtime_id):
                 seat_id = f"{row['label']}{number}"
                 if seat_id in blocked:
                     continue
-                seats[seat_id] = 'unavailable' if seat_id in unavailable else 'available'
+                seats[seat_id] = 'booked' if seat_id in booked else ('held' if seat_id in held else 'available')
             row_defs.append({
                 'label': row['label'], 'start': start, 'count': count,
                 'aislesAfter': [int(a) for a in row.get('aisles_after', [])],

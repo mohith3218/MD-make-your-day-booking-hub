@@ -3,64 +3,64 @@
     "key": "jagadamba",
     "samples": [
       {
-        "sceneBuildMs": 158.9,
-        "sceneUsableMs": 944.1,
-        "averageFps": 22.7,
+        "sceneBuildMs": 271.9,
+        "sceneUsableMs": 1421.9,
+        "averageFps": 25.9,
         "drawCalls": 66,
-        "triangles": 3492152,
+        "triangles": 1370272,
         "renderedSeats": 886,
         "geometries": 51,
         "textures": 5,
         "renderQuality": "balanced",
-        "devicePixelRatio": 1.0000000298023224
+        "devicePixelRatio": 1
       },
       {
-        "sceneBuildMs": 158.9,
-        "sceneUsableMs": 944.1,
-        "averageFps": 22.3,
+        "sceneBuildMs": 271.9,
+        "sceneUsableMs": 1421.9,
+        "averageFps": 23.9,
         "drawCalls": 66,
-        "triangles": 3492152,
+        "triangles": 1370272,
         "renderedSeats": 886,
         "geometries": 51,
         "textures": 5,
         "renderQuality": "balanced",
-        "devicePixelRatio": 1.0000000298023224
+        "devicePixelRatio": 1
       },
       {
-        "sceneBuildMs": 158.9,
-        "sceneUsableMs": 944.1,
-        "averageFps": 20.3,
+        "sceneBuildMs": 271.9,
+        "sceneUsableMs": 1421.9,
+        "averageFps": 24.9,
         "drawCalls": 66,
-        "triangles": 3492152,
+        "triangles": 1370272,
         "renderedSeats": 886,
         "geometries": 51,
         "textures": 5,
         "renderQuality": "balanced",
-        "devicePixelRatio": 1.0000000298023224
+        "devicePixelRatio": 1
       },
       {
-        "sceneBuildMs": 158.9,
-        "sceneUsableMs": 944.1,
-        "averageFps": 22.3,
+        "sceneBuildMs": 271.9,
+        "sceneUsableMs": 1421.9,
+        "averageFps": 24.9,
         "drawCalls": 66,
-        "triangles": 3492152,
+        "triangles": 1370272,
         "renderedSeats": 886,
         "geometries": 51,
         "textures": 5,
         "renderQuality": "balanced",
-        "devicePixelRatio": 1.0000000298023224
+        "devicePixelRatio": 1
       },
       {
-        "sceneBuildMs": 158.9,
-        "sceneUsableMs": 944.1,
-        "averageFps": 22.7,
+        "sceneBuildMs": 271.9,
+        "sceneUsableMs": 1421.9,
+        "averageFps": 23.5,
         "drawCalls": 66,
-        "triangles": 3492152,
+        "triangles": 1370272,
         "renderedSeats": 886,
         "geometries": 51,
         "textures": 5,
         "renderQuality": "balanced",
-        "devicePixelRatio": 1.0000000298023224
+        "devicePixelRatio": 1
       }
     ],
     "mapping": [
@@ -76,38 +76,26 @@
         "instances": [
           {
             "batch": 0,
-            "index": 936,
+            "index": 624,
             "kind": "cushion",
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -7.98,
-              0.288,
-              7
+              -7.955,
+              0.322,
+              6.978
             ]
           },
           {
             "batch": 0,
-            "index": 937,
-            "kind": "cushion",
+            "index": 625,
+            "kind": "headrest",
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -8.233,
-              1.059,
-              7.222
-            ]
-          },
-          {
-            "batch": 0,
-            "index": 938,
-            "kind": "cushion",
-            "resolvedSeatId": "PP1",
-            "part": "PP1",
-            "position": [
-              -7.536,
-              0.147,
-              6.611
+              -8.184,
+              0.852,
+              7.179
             ]
           },
           {
@@ -129,9 +117,9 @@
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -8.2,
+              -8.153,
               0.435,
-              6.792
+              6.846
             ]
           },
           {
@@ -141,9 +129,9 @@
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -7.803,
+              -7.85,
               0.435,
-              7.246
+              7.192
             ]
           },
           {
@@ -153,9 +141,9 @@
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -8.164,
+              -8.139,
               0.114,
-              6.915
+              6.943
             ]
           },
           {
@@ -165,9 +153,9 @@
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -7.919,
+              -7.945,
               0.114,
-              7.194
+              7.165
             ]
           },
           {
@@ -189,9 +177,9 @@
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -8.207,
+              -8.159,
               0.489,
-              6.798
+              6.851
             ]
           },
           {
@@ -201,9 +189,33 @@
             "resolvedSeatId": "PP1",
             "part": "PP1",
             "position": [
-              -7.809,
+              -7.856,
               0.489,
-              7.251
+              7.197
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 1724,
+            "kind": "stitch",
+            "resolvedSeatId": "PP1",
+            "part": "PP1",
+            "position": [
+              -7.746,
+              0.288,
+              6.795
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 1725,
+            "kind": "stitch",
+            "resolvedSeatId": "PP1",
+            "part": "PP1",
+            "position": [
+              -8.19,
+              0.898,
+              7.184
             ]
           }
         ],
@@ -227,38 +239,26 @@
         "instances": [
           {
             "batch": 2,
-            "index": 1350,
+            "index": 900,
             "kind": "cushion",
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.48,
-              4.937,
-              24.6
+              2.476,
+              4.971,
+              24.558
             ]
           },
           {
             "batch": 2,
-            "index": 1351,
-            "kind": "cushion",
+            "index": 901,
+            "kind": "headrest",
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.524,
-              5.73,
-              25.032
-            ]
-          },
-          {
-            "batch": 2,
-            "index": 1352,
-            "kind": "cushion",
-            "resolvedSeatId": "V16",
-            "part": "V16",
-            "position": [
-              2.403,
-              4.792,
-              23.841
+              2.515,
+              5.518,
+              24.95
             ]
           },
           {
@@ -280,9 +280,9 @@
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.118,
+              2.228,
               5.089,
-              24.674
+              24.663
             ]
           },
           {
@@ -292,9 +292,9 @@
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.849,
+              2.739,
               5.089,
-              24.6
+              24.611
             ]
           },
           {
@@ -304,9 +304,9 @@
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.266,
+              2.327,
               4.757,
-              24.728
+              24.722
             ]
           },
           {
@@ -316,9 +316,9 @@
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.715,
+              2.654,
               4.757,
-              24.683
+              24.689
             ]
           },
           {
@@ -340,9 +340,9 @@
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.119,
+              2.229,
               5.144,
-              24.684
+              24.673
             ]
           },
           {
@@ -352,9 +352,9 @@
             "resolvedSeatId": "V16",
             "part": "V16",
             "position": [
-              2.85,
+              2.74,
               5.144,
-              24.611
+              24.622
             ]
           },
           {
@@ -402,38 +402,26 @@
         "instances": [
           {
             "batch": 2,
-            "index": 69,
+            "index": 46,
             "kind": "cushion",
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              7.98,
-              10.057,
-              46.65
+              7.973,
+              10.091,
+              46.608
             ]
           },
           {
             "batch": 2,
-            "index": 70,
-            "kind": "cushion",
+            "index": 47,
+            "kind": "headrest",
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              8.053,
-              10.85,
-              47.078
-            ]
-          },
-          {
-            "batch": 2,
-            "index": 71,
-            "kind": "cushion",
-            "resolvedSeatId": "A24",
-            "part": "A24",
-            "position": [
-              7.851,
-              9.912,
-              45.898
+              8.039,
+              10.638,
+              46.996
             ]
           },
           {
@@ -455,9 +443,9 @@
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              7.624,
+              7.733,
               10.208,
-              46.748
+              46.73
             ]
           },
           {
@@ -467,9 +455,9 @@
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              8.348,
+              8.239,
               10.208,
-              46.625
+              46.643
             ]
           },
           {
@@ -479,9 +467,9 @@
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              7.775,
+              7.836,
               9.877,
-              46.793
+              46.782
             ]
           },
           {
@@ -491,9 +479,9 @@
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              8.221,
+              8.16,
               9.877,
-              46.716
+              46.727
             ]
           },
           {
@@ -515,9 +503,9 @@
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              7.626,
+              7.735,
               10.264,
-              46.759
+              46.74
             ]
           },
           {
@@ -527,9 +515,9 @@
             "resolvedSeatId": "A24",
             "part": "A24",
             "position": [
-              8.35,
+              8.241,
               10.264,
-              46.635
+              46.654
             ]
           },
           {
@@ -577,38 +565,26 @@
         "instances": [
           {
             "batch": 0,
-            "index": 1005,
+            "index": 670,
             "kind": "cushion",
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              7.98,
-              0.288,
-              7
+              7.955,
+              0.322,
+              6.978
             ]
           },
           {
             "batch": 0,
-            "index": 1006,
-            "kind": "cushion",
+            "index": 671,
+            "kind": "headrest",
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              8.233,
-              1.059,
-              7.222
-            ]
-          },
-          {
-            "batch": 0,
-            "index": 1007,
-            "kind": "cushion",
-            "resolvedSeatId": "PP24",
-            "part": "PP24",
-            "position": [
-              7.536,
-              0.147,
-              6.611
+              8.184,
+              0.852,
+              7.179
             ]
           },
           {
@@ -630,9 +606,9 @@
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              7.803,
+              7.85,
               0.435,
-              7.246
+              7.192
             ]
           },
           {
@@ -642,9 +618,9 @@
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              8.2,
+              8.153,
               0.435,
-              6.792
+              6.846
             ]
           },
           {
@@ -654,9 +630,9 @@
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              7.919,
+              7.945,
               0.114,
-              7.194
+              7.165
             ]
           },
           {
@@ -666,9 +642,9 @@
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              8.164,
+              8.139,
               0.114,
-              6.915
+              6.943
             ]
           },
           {
@@ -690,9 +666,9 @@
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              7.809,
+              7.856,
               0.489,
-              7.251
+              7.197
             ]
           },
           {
@@ -702,9 +678,33 @@
             "resolvedSeatId": "PP24",
             "part": "PP24",
             "position": [
-              8.207,
+              8.159,
               0.489,
-              6.798
+              6.851
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 1770,
+            "kind": "stitch",
+            "resolvedSeatId": "PP24",
+            "part": "PP24",
+            "position": [
+              7.746,
+              0.288,
+              6.795
+            ]
+          },
+          {
+            "batch": 9,
+            "index": 1771,
+            "kind": "stitch",
+            "resolvedSeatId": "PP24",
+            "part": "PP24",
+            "position": [
+              8.19,
+              0.898,
+              7.184
             ]
           }
         ],
@@ -733,33 +733,21 @@
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -7.98,
-              10.057,
-              46.65
+              -7.973,
+              10.091,
+              46.608
             ]
           },
           {
             "batch": 2,
             "index": 1,
-            "kind": "cushion",
+            "kind": "headrest",
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -8.053,
-              10.85,
-              47.078
-            ]
-          },
-          {
-            "batch": 2,
-            "index": 2,
-            "kind": "cushion",
-            "resolvedSeatId": "A1",
-            "part": "A1",
-            "position": [
-              -7.851,
-              9.912,
-              45.898
+              -8.039,
+              10.638,
+              46.996
             ]
           },
           {
@@ -781,9 +769,9 @@
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -8.348,
+              -8.239,
               10.208,
-              46.625
+              46.643
             ]
           },
           {
@@ -793,9 +781,9 @@
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -7.624,
+              -7.733,
               10.208,
-              46.748
+              46.73
             ]
           },
           {
@@ -805,9 +793,9 @@
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -8.221,
+              -8.16,
               9.877,
-              46.716
+              46.727
             ]
           },
           {
@@ -817,9 +805,9 @@
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -7.775,
+              -7.836,
               9.877,
-              46.793
+              46.782
             ]
           },
           {
@@ -841,9 +829,9 @@
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -8.35,
+              -8.241,
               10.264,
-              46.635
+              46.654
             ]
           },
           {
@@ -853,9 +841,9 @@
             "resolvedSeatId": "A1",
             "part": "A1",
             "position": [
-              -7.626,
+              -7.735,
               10.264,
-              46.759
+              46.74
             ]
           },
           {
@@ -891,6 +879,10 @@
           46.65
         ]
       }
-    ]
+    ],
+    "integrity": {
+      "checked": 886,
+      "errors": []
+    }
   }
 ]
