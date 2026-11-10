@@ -1,0 +1,2960 @@
+[
+  {
+    "key": "couple",
+    "samples": [
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "G1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "G1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "D4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "D4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 13,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G12"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "G12"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "G12"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "B1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "B1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 13,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A3"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 13,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "B6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "B6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "B7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "B7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "C6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "C6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "C7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "C7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "D6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "D6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "D7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "D7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "E6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "E6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "E7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "E7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "F6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "F6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "F7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "F7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "G6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "G6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "G7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "G7"
+      }
+    ]
+  },
+  {
+    "key": "recliner",
+    "samples": [
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "D4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "D4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "A8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "A8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "A1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "A1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "A4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "A4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "A5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "A5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "B4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "B4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "B5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "B5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "C4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "C4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "C5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "C5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "D5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "D5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "E4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "E4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 1,
+        "seatId": "E5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 12,
+        "collisions": [],
+        "level": 2,
+        "seatId": "E5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G5"
+      }
+    ]
+  },
+  {
+    "key": "jagadamba",
+    "samples": [
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "PP1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A24"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "PP24"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "M5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "M6"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Y7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Y8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Y16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Y17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "HH8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "HH9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "HH16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "HH17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "JJ8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "JJ9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "JJ16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "JJ17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "KK8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "KK9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "KK16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "KK17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "LL8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "LL9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "LL16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "LL17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "MM8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "MM9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "MM16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "MM17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "NN8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "NN9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "NN16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "NN17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "PP8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "PP9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "PP16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "PP17"
+      }
+    ]
+  },
+  {
+    "key": "melody",
+    "samples": [
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "HH1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R7"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A26"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG26"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "M8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "M9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "M18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "M19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "N19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "P19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Q19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "R19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "S19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "T19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "U19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "V19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "W19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "X19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "Z19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "AA19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "BB19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "CC19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "DD19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "EE19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "FF19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG9"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG18"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "GG19"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "HH8"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "HH9"
+      }
+    ]
+  },
+  {
+    "key": "inox",
+    "samples": [
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A14"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J20"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A1"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A12"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "A13"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B12"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "B13"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C12"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "C13"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D12"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 11,
+        "collisions": [],
+        "level": 0,
+        "seatId": "D13"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "E17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "F17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "G17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "H17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J16"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "J17"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K14"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "K15"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L4"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L5"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L14"
+      },
+      {
+        "aisleViolations": [],
+        "checkedParts": 10,
+        "collisions": [],
+        "level": 0,
+        "seatId": "L15"
+      }
+    ]
+  }
+]

@@ -15,6 +15,7 @@
         const errors = [];
         if (!seat.instanceParts.length) errors.push('missing-seat-components');
         const expected = new Set();
+        const componentNames = new Set();
         const keyFor = (mesh, index) => `${batches.indexOf(mesh)}:${index}`;
         const instances = seat.instanceParts.map(ref => {
             const batch = batches.indexOf(ref.mesh);
@@ -25,7 +26,14 @@
                 errors.push(`missing-instance:${key}`);
             const resolvedSeatId = ref.mesh.userData.instanceSeatIds[ref.index];
             if (resolvedSeatId !== id) errors.push(`wrong-seat:${key}`);
-            return {batch, index:ref.index, kind:ref.kind || ref.mesh.userData.partKind,
+            const kind = ref.kind || ref.mesh.userData.partKind;
+            const componentName = ref.componentName || `${kind}-${ref.index}`;
+            if (componentNames.has(componentName)) errors.push(`duplicate-component:${componentName}`);
+            componentNames.add(componentName);
+            const named = seat.componentIndices && seat.componentIndices[componentName];
+            if (seat.componentIndices && (!named || named.batch !== batch || named.index !== ref.index))
+                errors.push(`wrong-component-index:${componentName}`);
+            return {batch, index:ref.index, kind, componentName,
                 resolvedSeatId, part:resolvedSeatId};
         });
         batches.forEach((mesh, batch) => {
@@ -44,6 +52,7 @@
         if (occurrences !== 1) errors.push(`seat-id-occurrences:${occurrences}`);
         return {seatId:id, found:true, row:seat.row, number:seat.num, rowIndex:seat.rowIndex,
             category:seat.tier, price:seat.price, unavailable:seat.isOccupied,
+            componentIndices:Object.fromEntries(instances.map(ref=>[ref.componentName,{batch:ref.batch,index:ref.index}])),
             instances, mappingValid:errors.length === 0, errors};
     }
     const api = {inspectMapping, classifySeat};

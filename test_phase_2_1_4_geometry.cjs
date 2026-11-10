@@ -21,7 +21,7 @@ test('recliner back, attached headrest and footrest respond to all three control
  assert.equal(motion.length,3);
  for(let i=0;i<3;i++){
   const back=motion[i].find(p=>p.kind==='back'),head=motion[i].find(p=>p.kind==='headrest');
-  assert.ok(Math.abs(back.angle - [8,25,45][i]*Math.PI/180)<1e-8);
+  assert.ok(Math.abs(back.worldAngle - [8,25,45][i]*Math.PI/180)<1e-6);
   assert.equal(head.angle,back.angle);
  }
  const first=motion[0].find(p=>p.kind==='footrest'),last=motion[2].find(p=>p.kind==='footrest');
@@ -36,6 +36,9 @@ test('booked and held have different markers; deselection restores category upho
  assert.notDeepEqual(colors.selectedMarker.color,colors.booked.color);
  assert.deepEqual(colors.restored,colors.category.map(Math.fround));
  assert.notDeepEqual(colors.selectedUpholstery,colors.restored);
+ assert.deepEqual(colors.hardwareBefore,colors.hardwareRestored);
+ assert.ok(colors.hardwareBefore.length>=7);
+ for(let i=0;i<colors.hardwareBefore.length;i++)assert.notDeepEqual(colors.hardwareBefore[i].color,colors.hardwareSelected[i].color);
  for(const state of [colors.booked,colors.held,colors.selectedMarker])assert.ok(state.mapping.mappingValid);
 });
 
@@ -45,4 +48,13 @@ test('all required auditoriums render under Showtime, Preshow and House lighting
   assert.deepEqual(record.lighting.map(l=>l.mode),['movie','preshow','house']);
   for(const {metrics} of record.lighting){assert.ok(metrics.averageFps>0);assert.ok(metrics.sceneUsableMs>0);}
  }
+});
+
+test('sampled neighbours and every aisle edge have conservative box clearance',()=>{
+ const records=read('clearance.json');assert.equal(records.length,5);
+ for(const record of records){
+  assert.ok(record.samples.length>0);
+  for(const pose of record.samples){assert.deepEqual(pose.collisions,[],`${record.key} ${pose.seatId} level ${pose.level}`);assert.deepEqual(pose.aisleViolations,[]);}
+ }
+ for(const key of ['recliner','couple'])assert.ok(records.find(r=>r.key===key).samples.some(s=>s.level===2));
 });

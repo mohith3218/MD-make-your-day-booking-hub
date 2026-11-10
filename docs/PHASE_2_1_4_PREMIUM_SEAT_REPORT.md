@@ -1,98 +1,123 @@
-# Phase 2.1.4 — Realistic cinema chairs
+# Phase 2.1.4 — Advanced cinema chairs
 
-9 November 2026. Procedural assets for a diploma demonstration, not surveyed replicas of venue furniture.
+10 November 2026. Diploma demonstration; procedural furniture, not surveyed cinema specifications.
 
-## Starting tree and preserved work
+## Audit and scope
 
-The clean local tree already contained substantial Phase 2.1.4 work: rounded padding, extruded curved backs, category scaling, cup rims, shared fabric, compact instance batches, a mapping diagnostic and moving Recliner parts. This continuation inspected the renderer, `seat_layout.py`, `vizag_theaters.py`, screen profiles, shared state helper and previous browser tools before editing. Existing problems included pinched fabric on cushion tops, ribbed/diagonal shading, minimal Premium arm differences, rim-only cup holders, opposite back/headrest tilt calculations and a combined Booked/Held state. The previous report also lacked accepted final FPS measurements.
+Started from clean `main...origin/main`, commit `af30945` (`<seat improve 2 >`). Ran the three requested Git audit commands and inspected the renderer, `seat_layout.py`, `vizag_theaters.py`, screen profiles, shared materials, fabric, component batches, mapping diagnostics and 2D–3D logic. The pre-edit findings and later confirmed defects are recorded in [PHASE_2_1_4_AUDIT.md](PHASE_2_1_4_AUDIT.md).
 
-The auditorium builder, architecture, camera presets, seated eye positions, canonical coordinates, aisles, prices, booking data and database IDs are retained. No dependencies were added. QA uses a fresh SQLite snapshot; the original database and credentials are unchanged.
+The starting implementation already had rounded padding, category proportions, curved backs, molded cups, separate headrests, fabric colour conversion, state bands, compact instance cursors and camera improvements. Those were retained. This continuation fixes missing component names/highlights, excessive tessellation, nonuniform-scale recline errors, row-end/aisle overlaps, pale Premium compensation and seams crossing the sofa gap.
 
-## Geometry and material changes
+No production database IDs, booking records, admin credentials, payment code, venue layouts or theatre dimensions were changed. Python layout and profile modules were inspected and tested, not rewritten. Camera controls, presets, seated eye height and auditorium architecture remain. Chair rotations/proportions now fit their existing centres and row pitch. No dependencies were added.
 
-| Category | Geometry |
+## Implemented geometry
+
+`static/js/cinema-seat-geometry.js` supplies reusable assets to the existing builder. It does not replace the renderer.
+
+| Category | Recognizable geometry |
 |---|---|
-| Standard | Rounded padded pan, curved upholstered front/back, attached headrest, rounded arms, molded cup wells, twin legs and under-seat frame. |
-| Premium | Existing wider/taller proportions, thicker pan/headrest, more substantial arms, plus a separate upholstered lumbar bolster. |
-| Recliner | Extended pan, thick head/lumbar padding, wide arms, cup wells, supporting frame and linked back/headrest/footrest movement. |
-| Couple | Two distinct pans, back panels and headrests inside each existing span-2 sofa, with outer arms and cup wells. |
+| Standard | Rounded thick pan, closed ergonomic upholstered back, attached headrest, rounded arms, cup wells, twin legs and supporting crossbar. |
+| Premium | Wider pan/arms, thicker padding, taller back, larger headrest and a low-profile lumbar roll. |
+| Recliner | Longer pan, separate lumbar/back/head pads, wide arms, cup wells, support frame and raising/extending footrest. |
+| Couple | Two distinct pans, back panels and headrests within each existing sofa, outer arms/cups and separate seams for each visual position. |
 
-Cup holders now use a shared 10-segment lathed bowl with inner wall, lip, exterior and underside, replacing open torus rims with fewer triangles per holder. Premium/Recliner arms have thicker padding without changing seat centres. Shared 16 × 8 padding offsets the added lumbar pads. Analytic padding/back-face normals remove ribbed highlights and diagonal patches. Face-based padding UVs remove the star-shaped fabric pinching at former sphere poles. The head seam follows the headrest.
+The new indexed back uses seven shaped cross-sections, tapered shoulders/crown, lumbar curvature and closed caps: **168 triangles versus 332** for the old extrusion. The shared rounded padding uses **168 versus 224** triangles; arms use 100 versus 140; cups use 96 versus 120. Smooth normals and face-based fabric UVs retain rounded shading and avoid texture pinching. These normalized model dimensions are illustrative, not venue measurements.
 
-The existing 0°, 25°, 45° controls remain. Neutral retains an ergonomic 8° back lean; the other controls use 25° and 45°. Positive local X rotation now moves the back away from the screen, and headrest, lumbar pad, seam and rear state band use the same hinge calculation. At full recline the hinge slides forward by 0.28 local units. Footrest Z changes from −0.36 to −0.46, Y from 0.28 to 0.48, with half-depth 0.18 and a small lifting rotation. These are illustrative coordinates, not venue specifications. Only the active Recliner articulates. Transform caching avoids rewriting every component matrix when cart colours change.
+Row-end chairs previously fanned steeply toward screen centre. Tests found component-box overlaps around those ends. Fan angles are now restrained; Recliners and aisle-edge chairs remain parallel to the aisle. Premium/Recliner class scaling is bounded without moving seat centres, widening aisles or changing bookable positions.
 
-One shared procedural fabric texture is preserved, including during rebuild disposal. A lighter neutral texture base and quieter weave retain more of the configured upholstery colour. Three category-shared PBR materials remain rough fabric, with no emissive upholstery. A trial bump-map pass was removed before final capture to avoid fragment-shader overhead.
+The existing **0°, 25°, 45° controls** remain. The 0° label retains the existing ergonomic 8° neutral lean. Nonuniform group scaling previously made a local 45° back lean approximately 57° in world space. Rotation now compensates that scale; browser matrices measure approximately **8°, 25°, 45°**. Back, headrest, lumbar roll and head seams share the hinge. Restrained forward hinge travel and footrest travel preserve the tested row clearances. This is an illustrative reclining motion, not a simulated mechanical linkage. Existing transform caching is retained.
 
-Colour pipeline: authored sRGB class/state colours convert once to linear; the canvas colour texture uses sRGB encoding; instance colours are linear; output remains sRGB. Tint resets from the authored string on rebuild, avoiding cumulative conversion. Optional `seat_profile.colors`, `architecture.upholstery_colors` or `visual.upholstery_colors` accept separate `standard`, `premium`, `recliner` values; existing seat/trim colours remain fallback values.
+## Implemented materials and identity
 
-## Booking states and identity
+One shared procedural fabric and category-shared rough PBR materials remain. Profile-specific upholstery strings and overrides are preserved. Premium's inherited 1.45 gain was reduced to 0.95 for the fallback gold palette, avoiding the pale yellow compensation seen during inspection; explicit Premium overrides use gain 1. Auditorium lighting/emissive settings were not increased. Upholstery is not made emissive or glossy.
 
-Front/rear instanced bands distinguish gold Selected, jade Active POV, rose Booked and amber Held, with a subdued Available band. Selection adds a small reversible upholstery tint while preserving category fabric. Unavailable upholstery is muted. Flask and parent selection messages now distinguish Booked/Held; the minimap does too. Blocked locations remain non-bookable physical gaps rather than invented chair IDs.
+The existing r128 upholstery pipeline still converts authored sRGB tints once, passes linear instance colours, samples the fabric as an sRGB colour texture, and outputs sRGB. Gains reset from the authored colour on rebuild rather than reconverting already-linear values. Existing procedural weave, planar UVs and roughness are retained.
 
-All components, including lumbar pads, cup wells and state bands, retain `instanceId → seatId` mappings. The read-only diagnostic reports original ID, row, number, category, component batch/index, resolved ID and component position. Whole-screen checks inspect every registered seat and every drawn instance: INOX 200, Sri Melody 774, Jagadamba 886, AAA Screen 1 58 and Mukta A2 Screen 1 78. Detailed samples include front/middle/rear, left/right, Premium and Recliner wherever present.
+Each seat now stores `componentIndices[componentName] = {batch,index}`. Names such as `cushion-1`, `headrest-1`, `armrest-1`, `armrest-2`, `cup-holder-1` and `footrest-1` are independent of slots in other batches. Couple and class-specific parts use their own compact cursors, including variable seam counts. The read-only diagnostic exposes these names and rejects duplicate names or stale named indices, in addition to the existing forward/reverse checks.
 
-**Couple data semantics:** the existing Mukta layout stores each span-2 sofa under one original booking ID. Two visual cushions are not two existing database IDs. That model is preserved. Two adjacent original sofa IDs remain independently selectable/deselectable; no IDs were merged, split or invented.
+Selection now reversibly highlights armrests, cups and support structures as well as every upholstery component and the existing state bands. Booked/Held colours and exclusions remain. Available category colour is restored exactly after deselection. Geometry/material resources are shared; no per-chair materials or meshes were introduced and no new draw-call batch was added.
 
-The Chrome pointer suite checks exact 2D → 3D IDs/details/category/price/camera, deselection, mixed-category cart totals, rejection of Booked/Held seats on both surfaces, canvas raycast → exact 2D highlight, independent selection of two original Couple IDs, and both directions on the full Jagadamba 886-seat page. Raw evidence is `synchronization-results.json`.
+**Couple ID constraint:** the existing Mukta layout stores one original bookable ID per span-2 sofa. Its two visual cushions are not two pre-existing database IDs. That data model was preserved. Two original entries, A1 and A2, were selected together and A1 deselected while A2 remained selected in both views. No IDs were merged, split or invented. Independent booking of the two internal cushions would require a separate data/layout change and is not claimed here.
 
-## Actual browser evidence
+## Automated verification
 
-Installed Chrome 157 runs with a dedicated **headless Chrome** profile, DevTools protocol, localhost Flask and actual WebGL. PNGs are browser screenshots of the existing application renderer, not generated images. QA helpers settle its camera and use its lighting/selection functions; they do not create substitute chairs. Principal viewport: 1600 × 900, Balanced quality, render pixel ratio 1. Additional captures use 1920 × 1080, 1366 × 768 and 390 × 844.
+- **9/9** auditorium/layout geometry tests.
+- **11/11** pure seat-mapping regressions, including independent component indices, duplicate names and stale named indices.
+- **2/2** reusable mesh tests: bounded triangles, finite vertices/normals/UVs, closed indexed back and outward winding.
+- **6/6** assertions over fresh browser output: all drawn mappings, Couple grouping, world-space recline, state/hardware restoration, lighting and clearance.
+- **All 20** existing booking/payment checks passed in their temporary database. Missing SMTP is logged; real ticket email and live payments were not tested.
+- **12** rendered inline JavaScript blocks passed syntax validation. New/shared JavaScript syntax, Python compilation and `git diff --check` passed.
+
+These are distinct from the live browser checks below. The Node browser-output tests read newly saved observations; an older committed artifact was not treated as a fresh browser run.
+
+## Browser-verified work — built-in Codex browser
+
+At the user's request, final verification used the **built-in Codex browser**, with the real Flask app on `127.0.0.1:5014` and actual WebGL. A dedicated SQLite snapshot supplies test-only future shows, one Booked seat and one Held seat. Production data and credentials are not reset.
+
+The initial desktop Chrome attempt encountered a screenshot timeout; it is not final sign-off. Its raw attempt is retained separately. The desktop connector was also corrected to create a replacement tab before closing the last old QA tab. Final evidence is the new `codex-*.jpg` set and Codex-labelled JSON. Earlier PNGs were retained as prior-phase evidence, not presented as this run's final screenshots.
+
+Main measurements/captures use a controlled 1600 × 900 viewport, Balanced quality and approximately 1.0 renderer pixel ratio. Captures use the full CSS viewport to avoid host-DPI clipping. The temporary viewport override was reset afterward. The live Recliner preview is left open in the Codex browser. Camera/lighting helpers only inspect the existing models in the isolated QA view; they do not build replacement scenes or generated evidence.
+
+All **1,996** original entries across five screens passed component-to-ID integrity checks: INOX 200, Sri Melody 774, Jagadamba 886, AAA 58 and Mukta 78. Detailed diagnostic samples cover front/middle/rear, left/right and available categories. Every drawn component must resolve to a registered original ID and its named index.
+
+**Eight real-input scenario groups passed:** exact 2D → 3D ID/category/price, deselection/category changes, mixed-category total without duplicates, Booked exclusion, Held exclusion, actual canvas click → exact 2D highlight, independent original Couple IDs, and both selection directions on Jagadamba's full 886-seat booking page. Tests used Playwright button clicks and scoped canvas pointer input in the Codex browser. They did not replace selection with a fabricated result.
+
+Neighbour/aisle verification covers **419 poses** across the five screens, including every configured aisle-edge entry, representative row/side/category seats and all three supported poses for the included Recliners. A separating-axis test uses transformed component bounding boxes, including affine shear, with a 0.003 scene-unit tolerance. **No box-overlap or aisle-boundary failures** were reported. This is conservative evidence for those tested poses, not an exhaustive guarantee for every administrator-created layout or a mechanical collision simulation.
+
+## Actual performance
+
+| Screen / browser | Build ms | Usable ms | Mean FPS | Calls | Triangles | Seats | Geometries | Textures |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Jagadamba / desktop before | 740.1 | 5851.5 | 17.9 | 66 | 1358800 | 886 | 52 | 5 |
+| inox / Codex final | 679.7 | 7067.6 | 16.8 | 56 | 212868 | 200 | 49–50 | 6 |
+| melody / Codex final | 220.9 | 1388.1 | 20.4 | 58 | 766614 | 774 | 48 | 5 |
+| jagadamba / Codex final | 297.9 | 1484.8 | 19.7 | 66 | 970056 | 886 | 51 | 5 |
+| recliner / Codex final | 60.2 | 861.5 | 21.3 | 58 | 75432 | 58 | 45 | 5 |
+| couple / Codex final | 278.1 | 1049.8 | 21.6 | 58 | 108952 | 78 | 45 | 5 |
+
+The requested historical ~3.5 million triangles / 14.8 FPS was rechecked rather than assumed. The actual starting tree already submitted **1,358,800** triangles. The current Jagadamba overview submits **970,056**, a **28.6% reduction** from that measured starting tree, while retaining all 886 entries and 66 draw calls.
+
+The before sample is desktop Chrome; final samples use the user-requested Codex browser. Consequently FPS and startup timings are observations, **not a controlled same-browser A/B speedup claim**. Principal FPS is the mean of five real readings spaced about 1.1 seconds apart after an eight-second warm-up. The first INOX session included resource-count/startup variation, retained in the raw data. No 60 FPS guarantee is made. Actual 886-seat pointer selection was separately verified.
+
+Settled lighting checks use three readings per mode after a four-second settling interval:
+
+| Screen | Showtime mean FPS | Preshow mean FPS | House mean FPS |
+|---|---:|---:|---:|
+| inox | 22.4 | 20.9 | 21.3 |
+| melody | 20.9 | 20.0 | 19.4 |
+| jagadamba | 21.3 | 22.0 | 22.2 |
+
+One earlier transition reading was 0.9 FPS. It remains in `transitionLighting`; it was not silently replaced or called a stable result. The settled rerun above distinguishes transition/frame-pacing variation from the later sustained readings. Model visibility was inspected in all nine theatre/mode captures without globally brightening the auditorium.
+
+## Saved screenshots and raw evidence
 
 All paths below are inside `docs/screenshots/phase-2.1.4-premium-seats/`:
 
-| Evidence | Actual screenshot(s) |
+| Evidence | Current Codex-browser file |
 |---|---|
-| Standard front / side | `Standard-seat-front-view.png`, `Standard-seat-side-view.png` |
-| Premium | `inox-premium-close.png` |
-| Recliner / controls | `recliner-0.png`, `recliner-1.png`, `recliner-2.png` |
-| Couple | `Couple-seat-close-up.png` |
-| Fabric detail | `Seat-material-details.png` |
-| Selection | `Selected-seat-highlighting.png` |
-| Required theatre overviews | `after-melody-overview.png`, `after-inox-overview.png`, `after-jagadamba-overview.png` |
-| All three lighting modes | `{melody,inox,jagadamba}-{movie,preshow,house}-overview.png` |
-| Front / middle / rear POV | `front-seat-POV.png`, `middle-seat-POV.png`, `rear-seat-POV.png` |
-| Shared 2D/3D selection | `2D-3D-seat-synchronization.png` |
-| Starting-tree comparison | `before-jagadamba-overview.png` |
+| Standard chair | `codex-standard-close.jpg` |
+| Premium chair | `codex-premium-close.jpg` |
+| Recliner at its three controls | `codex-recliner-0.jpg`, `codex-recliner-1.jpg`, `codex-recliner-2.jpg` |
+| Couple seating | `codex-couple-close.jpg` |
+| Seat POV | `codex-seat-pov.jpg` |
+| Selected-chair components | `codex-selected-seat.jpg` |
+| Sri Melody overview | `codex-melody-overview.jpg` |
+| INOX overview | `codex-inox-overview.jpg` |
+| Jagadamba overview | `codex-jagadamba-overview.jpg` |
+| Showtime / Preshow / House | `codex-{melody,inox,jagadamba}-{movie,preshow,house}.jpg` |
+| Selection on the booking page | `codex-2d-3d-synchronization.jpg` |
+| Default-size live preview | `codex-final-preview.jpg` |
+| Measured starting-tree comparison | `desktop-baseline-overview.png` (desktop Chrome, before edits) |
 
-`movie` is the application's Showtime mode. Records include capture timestamp and browser identity. Older Phase 2.1.3 screenshots are not used as current proof.
+`codex-browser-results.json` / `after.json` contain final metrics, component mappings, material restoration, lighting and recliner matrices. `integrity.json`, `clearance.json` and `codex-synchronization-results.json` / `synchronization-results.json` retain the current observed checks. `before.json` is the fresh desktop baseline; `desktop-capture-attempt.json` is a separate non-sign-off attempt. JPEGs are genuine browser captures, not generated images.
 
-## Performance
+## Remaining limits and reproduction
 
-| Screen / pass | Build ms | Usable ms | Mean FPS | Calls | Triangles | Seats | Geometries | Textures |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Jagadamba before | 271.9 | 1421.9 | 24.6 | 66 | 1,370,272 | 886 | 51 | 5 |
-| inox final | 112.3 | 988 | 24.6 | 56 | 297,252 | 200 | 45 | 5 |
-| melody final | 198.8 | 1164.9 | 21.3 | 58 | 1,079,310 | 774 | 48 | 5 |
-| jagadamba final | 237.5 | 1318.9 | 22.8 | 66 | 1,358,800 | 886 | 51 | 5 |
-| recliner final | 160.2 | 884 | 20.2 | 58 | 103,344 | 58 | 45 | 5 |
-| couple final | 80.8 | 741.1 | 22.1 | 58 | 150,040 | 78 | 45 | 5 |
+- Furniture is a low-poly demonstration, not measured venue furniture or an engineering recliner mechanism.
+- Existing Jagadamba balcony decks still obscure some rows from rear overview. All 886 entries/mappings were checked; simultaneous unobstructed visibility is not claimed. Architecture was preserved.
+- Default/narrow browser widths still crowd existing control overlays. Panels can be collapsed; the application UI was not redesigned. No physical touchscreen was tested.
+- The 419-pose clearance check has the scope and tolerance stated above. Unseen custom layouts need their own validation.
+- Browser/machine load and capture overhead affect frame pacing. The measured main FPS and transition variation are reported explicitly.
+- Real SMTP delivery, live payment transactions and production-data mutations were outside this demonstration verification.
 
-Jagadamba final mean FPS was 22.8 versus 24.6 in the starting-tree capture (-7.4%). This measured decrease is recorded rather than claimed as an improvement. Machine load and headless rendering affect the comparison; smooth 60 FPS is not claimed. Build/usable times improved in this capture; draw calls, geometry count and texture count stayed constant, with slightly fewer submitted triangles. The actual 886-seat booking page also passed trusted pointer selection in both directions.
-
-`before.json` measures the actual starting tree of this continuation; `after.json` records final `window.cinewavePreviewMetrics()` readings. Each principal measurement has an eight-second warm-up and five readings about 1.1 seconds apart. FPS is their mean. Lighting records require positive FPS and usable time. Zero-FPS/paused runs are rejected. Scene triangles include auditorium architecture. State bands share the existing seam batch, adding no draw call; no per-seat materials/meshes are introduced. These machine-specific results are not a 60 FPS guarantee.
-
-## Regression checks
-
-- Auditorium/layout geometry: **9/9 passed**.
-- Pure seat-mapping tests: **10/10 passed**.
-- Isolated booking/payment flow: **all 20 checks passed**.
-- Fresh browser-output assertions: **5/5 passed** (all drawn mappings, Couple grouping, Recliner motion, state colours/restoration, three lighting modes).
-- Trusted Chrome pointer input: **8 scenario groups passed**, including independent Couple IDs and Jagadamba 886-seat selection in both directions.
-- Rendered-template JavaScript: **12 inline blocks passed** across five previews and the booking page.
-- Python compilation, standalone JavaScript syntax, and `git diff --check`: **passed**.
-
-The new Booked/Held colour assertion initially failed because a stale QA worker served the old Python payload. Duplicate QA workers were stopped and one fresh snapshot server started before final verification. The failed run is not counted as a pass. Inspection also prompted fabric-UV, normal, attached-seam and Recliner camera-framing fixes.
-
-## Remaining limitations
-
-- These are low-poly demonstration models; upholstery, cups, seams and supporting mechanisms are approximations.
-- Existing Jagadamba balcony decks obscure some rows from rear overview. All 886 entries/components are verified; simultaneous unobstructed visibility is not claimed. Architecture was preserved.
-- Hinge/footrest travel is restrained to the existing seating envelope. No exhaustive mesh collision proof for every custom layout or aisle is claimed.
-- Existing mobile portrait framing and control-overlay crowding remain; no physical touchscreen was tested.
-- Real SMTP delivery and live payment transactions were not exercised. The isolated payment test uses its mock gateway; missing SMTP is logged while booking remains confirmed.
-- Frame rate depends on GPU/driver and load. Successful mappings and still screenshots alone do not establish responsiveness.
-
-## Reproduction
-
-Start one isolated QA server with `.venv/Scripts/python.exe tools/phase_2_1_3_qa.py` and installed Chrome with a dedicated profile and debug port 9214 (Flask port 5014). Run `node tools/test_phase_2_1_4_browser.cjs`, then `node tools/test_phase_2_1_4_browser.cjs integrity`, `node tools/test_phase_2_1_4_sync.cjs`, and `node --test test_phase_2_1_4_geometry.cjs`. Other checks: `node --test test_seat_mapping.cjs`, `.venv/Scripts/python.exe -m unittest test_auditorium_geometry.py`, `.venv/Scripts/python.exe test_flow.py`, and `.venv/Scripts/python.exe tools/check_phase_2_1_3_templates.py`.
+Start one snapshot server with `.venv/Scripts/python.exe tools/phase_2_1_3_qa.py`. Final UI work in this run used the Codex browser's local-development/CDP capability; the standalone Chrome runner remains available for separate runs. Regenerate observations before `node --test test_chair_assets.cjs test_seat_mapping.cjs test_phase_2_1_4_geometry.cjs`. Other checks are `.venv/Scripts/python.exe -m unittest test_auditorium_geometry.py`, `.venv/Scripts/python.exe test_flow.py`, `.venv/Scripts/python.exe tools/check_phase_2_1_3_templates.py`, Python compilation, JavaScript syntax checks and `git diff --check`.

@@ -55,3 +55,16 @@ test('database ID repeated across row definitions is rejected',()=>{
     const f=fixture(); f.rows.push({seats:{A1:'available'}});
     assert.ok(f.inspect().errors.includes('seat-id-occurrences:2'));
 });
+
+test('named component indices are independent of indices in other batches',()=>{
+ const f=fixture();f.seat.instanceParts.forEach((p,i)=>p.componentName='part-'+i);
+ const r=f.inspect();assert.ok(r.mappingValid);
+ assert.equal(Object.keys(r.componentIndices).length,6);
+ for(const ref of r.instances)assert.deepEqual(r.componentIndices[ref.componentName],{batch:ref.batch,index:ref.index});
+ f.seat.componentIndices=JSON.parse(JSON.stringify(r.componentIndices));
+ f.seat.componentIndices['part-0'].index=99;
+ assert.ok(f.inspect().errors.includes('wrong-component-index:part-0'));
+ delete f.seat.componentIndices;
+ f.seat.instanceParts[1].componentName='part-0';
+ assert.ok(f.inspect().errors.includes('duplicate-component:part-0'));
+});

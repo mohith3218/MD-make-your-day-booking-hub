@@ -9,6 +9,7 @@
     <!-- Three.js r128 -->
     <script src="{{ url_for('static', filename='js/three-r128.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/seat-preview-state.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cinema-seat-geometry.js') }}"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -1402,7 +1403,9 @@
             };
             const upholsteryColors = seatProfile.colors || architecture.upholstery_colors || visual.upholstery_colors || {};
             setUpholsteryTint(matStdAvail, upholsteryColors.standard || seatBaseColor, 2.1);
-            setUpholsteryTint(matVipAvail, upholsteryColors.premium || trimBaseColor, 1.45);
+            // Gold trim needs less compensation than dark fabric; the old
+            // 1.45 gain washed Premium padding toward pale yellow in House.
+            setUpholsteryTint(matVipAvail, upholsteryColors.premium || trimBaseColor, upholsteryColors.premium ? 1 : 0.95);
             setUpholsteryTint(matReclinerAvail, upholsteryColors.recliner || seatBaseColor, 1.9);
             const geometry = config.geometry || {};
             const physicalRoom = geometry.room || {};
@@ -1900,73 +1903,8 @@
             // 4. BUILD STADIUM RISERS & 3D SEATING GRID
             // Soft, bevelled upholstery panels keep the seat silhouette clean
             // at both overview distance and close seat POV.
-            const upholsteryGeo = new THREE.SphereGeometry(1, 16, 8);
-            // A shared superellipsoid gives padding flat centres and rounded edges.
-            const padding = upholsteryGeo.attributes.position;
-            for (let i=0;i<padding.count;i++) {
-                const rounded = value => Math.sign(value) * Math.pow(Math.abs(value), 0.42);
-                padding.setXYZ(i, rounded(padding.getX(i)), rounded(padding.getY(i)), rounded(padding.getZ(i)));
-            }
-            // Analytic superellipsoid normals keep the flat padding smooth at
-            // the sphere's duplicated UV seam and poles (no ribbed highlights).
-            const paddingNormals = upholsteryGeo.attributes.normal;
-            const paddingNormal = new THREE.Vector3();
-            const gradient = value => Math.sign(value) * Math.pow(Math.abs(value), 2 / 0.42 - 1);
-            for (let i = 0; i < padding.count; i++) {
-                paddingNormal.set(gradient(padding.getX(i)), gradient(padding.getY(i)), gradient(padding.getZ(i))).normalize();
-                paddingNormals.setXYZ(i, paddingNormal.x, paddingNormal.y, paddingNormal.z);
-                // Planar face UVs prevent the fabric weave from pinching into
-                // a star at the former sphere poles on cushion tops.
-                const axis = [Math.abs(paddingNormal.x), Math.abs(paddingNormal.y), Math.abs(paddingNormal.z)];
-                const dominant = axis.indexOf(Math.max(...axis));
-                upholsteryGeo.attributes.uv.setXY(i,
-                    ((dominant === 0 ? padding.getZ(i) : padding.getX(i)) + 1)/2,
-                    ((dominant === 1 ? padding.getZ(i) : padding.getY(i)) + 1)/2);
-            }
-            const backShape = new THREE.Shape();
-            backShape.moveTo(-0.4, 0.02);
-            backShape.bezierCurveTo(-0.48, 0.02, -0.49, 0.14, -0.44, 0.22);
-            backShape.lineTo(-0.47, 0.88);
-            backShape.bezierCurveTo(-0.5, 1.1, -0.38, 1.24, -0.22, 1.24);
-            backShape.lineTo(0.22, 1.24);
-            backShape.bezierCurveTo(0.38, 1.24, 0.5, 1.1, 0.47, 0.88);
-            backShape.lineTo(0.44, 0.22);
-            backShape.bezierCurveTo(0.49, 0.14, 0.48, 0.02, 0.4, 0.02);
-            backShape.quadraticCurveTo(0, -0.05, -0.4, 0.02);
-            const seatBackGeo = new THREE.ExtrudeGeometry(backShape, {
-                depth: 0.14, bevelEnabled: true, bevelSegments: 2,
-                bevelThickness: 0.045, bevelSize: 0.035, curveSegments: 5
-            });
-            const backVertices = seatBackGeo.attributes.position;
-            const backFaceNormals = new Map();
-            for (let i=0;i<backVertices.count;i++) {
-                const y=backVertices.getY(i);
-                const nz = seatBackGeo.attributes.normal.getZ(i);
-                if (Math.abs(nz) > 0.999) backFaceNormals.set(i, Math.sign(nz));
-                backVertices.setZ(i, backVertices.getZ(i) + 0.10*Math.pow((y-0.58)/0.7,2));
-            }
-            seatBackGeo.computeVertexNormals();
-            // Smooth coincident vertices in the non-indexed extrusion so the
-            // curved fabric face does not expose diagonal triangulation seams.
-            const backNormals = seatBackGeo.attributes.normal;
-            const normalSums = new Map();
-            const normalKey = i => [backVertices.getX(i), backVertices.getY(i), backVertices.getZ(i)]
-                .map(value => value.toFixed(5)).join(',');
-            for (let i=0;i<backVertices.count;i++) {
-                const key=normalKey(i), sum=normalSums.get(key)||new THREE.Vector3();
-                sum.add(new THREE.Vector3().fromBufferAttribute(backNormals,i));
-                normalSums.set(key,sum);
-            }
-            for (let i=0;i<backVertices.count;i++) {
-                const n=normalSums.get(normalKey(i)).clone().normalize();
-                backNormals.setXYZ(i,n.x,n.y,n.z);
-            }
-            // Broad faces need the curvature's analytic normal; averaging the
-            // extrusion's long triangles leaves diagonal patches on rear views.
-            backFaceNormals.forEach((sign, i) => {
-                const n = new THREE.Vector3(0, -sign*0.2*(backVertices.getY(i)-0.58)/0.49, sign).normalize();
-                backNormals.setXYZ(i,n.x,n.y,n.z);
-            });
+            const upholsteryGeo = CinewaveChairGeometry.padding(THREE);
+            const seatBackGeo = CinewaveChairGeometry.backrest(THREE);
             // Instanced batches keep seat upholstery, backs, armrests, frames,
             // and cup holders efficient for the largest saved layouts.
             // Instance colors preserve availability, class and cart states.
@@ -1988,7 +1926,7 @@
             config.rowDefs.forEach(row => {
                 categoryCapacity[categoryIndex(row)] += Object.keys(row.seats).length;
             });
-            const armGeometry = new THREE.SphereGeometry(1, 10, 8);
+            const armGeometry = new THREE.SphereGeometry(1, 10, 6);
             const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
             const seatLegMaterial = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.58, metalness: 0.42 });
             // One shared, closed-section molded well: inner bowl, rounded lip,
@@ -1998,7 +1936,7 @@
                 new THREE.Vector2(0.032, -0.008), new THREE.Vector2(0.036, 0),
                 new THREE.Vector2(0.043, -0.003), new THREE.Vector2(0.038, -0.075),
                 new THREE.Vector2(0, -0.075)
-            ], 10);
+            ], 8);
             const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.44, metalness: 0.32 });
             const stitchGeometry = new THREE.BoxGeometry(1, 1, 1);
             // Three shared class materials, rather than one material per chair.
@@ -2015,13 +1953,20 @@
                 [batch.cushionInstances, batch.backInstances].forEach(mesh =>
                     mesh.setColorAt(0, new THREE.Color(0xffffff)));
             });
-            const armInstances = new THREE.InstancedMesh(armGeometry, matArmrest, Math.max(1, seatCapacity * 2));
+            const armMaterial = matArmrest.clone();
+            armMaterial.color.set(0xffffff);
+            const armInstances = new THREE.InstancedMesh(armGeometry, armMaterial, Math.max(1, seatCapacity * 2));
             const legInstances = new THREE.InstancedMesh(seatLegGeometry, seatLegMaterial, Math.max(1, seatCapacity * 3));
             const cupHolderInstances = new THREE.InstancedMesh(cupHolderGeometry, cupHolderMaterial, Math.max(1, seatCapacity * 2));
+            [armInstances, legInstances, cupHolderInstances].forEach(mesh => {
+                mesh.userData.baseColor = mesh === armInstances ? matArmrest.color.clone() : mesh.material.color.clone();
+                mesh.material.color.set(0xffffff);
+                mesh.setColorAt(0, mesh.userData.baseColor);
+            });
             // Seams and state bands share geometry and one colour-instanced
             // batch. State highlighting adds no draw call to the auditorium.
             const stitchInstances = new THREE.InstancedMesh(stitchGeometry,
-                new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.72, metalness: 0.08}), Math.max(1, seatCapacity * 4));
+                new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.72, metalness: 0.08}), Math.max(1, seatCapacity * 6));
             stitchInstances.setColorAt(0, matSeatStitch.color);
             const stateInstances = stitchInstances;
             [armInstances, legInstances, cupHolderInstances, stitchInstances].forEach((mesh, index) => {
@@ -2077,6 +2022,7 @@
 
             let seatInstanceIndex = 0;
             const upholsteryIndices = Array.from({length:3}, () => ({cushion:0, back:0}));
+            let stitchCursor = 0;
             rows.forEach((rowLetter, rIdx) => {
                 const rowConfig = config.rowDefs[rIdx];
                 if (!rowConfig) return;
@@ -2119,15 +2065,19 @@
                     if (isRecliner || isVIP || rowSpan > 1) {
                         // rowSpan is represented by seatWidth below; applying
                         // it here too made couple seats grow by span squared.
-                        const widthScale = isRecliner ? 1.12 : (isVIP ? 1.07 : 1);
-                        seatGroup.scale.set(widthScale, isRecliner ? 0.72 : (isVIP ? 0.69 : 0.67), isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82));
+                        const widthScale = isRecliner ? 1.06 : (isVIP ? 1.04 : 1);
+                        seatGroup.scale.set(widthScale, isRecliner ? 0.72 : (isVIP ? 0.69 : 0.67), isRecliner || isVIP ? 1 : 0.82);
                     } else {
                         seatGroup.scale.set(1, 0.67, 0.82);
                     }
                     // The seat back is local +Z; the screen is at -Z. Aim the
                     // seat fronts toward the screen and keep the active seat
                     // back behind the seated camera instead of in its sightline.
-                    seatGroup.rotation.y = Math.atan2(seatX, rowZ - screenSurfaceZ);
+                    // Strongly fanning edge chairs toward screen centre made
+                    // arms overlap the next chair. Keep rows nearly parallel,
+                    // and aisle-edge/reclining chairs parallel to the aisle.
+                    seatGroup.rotation.y = isRecliner || aisles.includes(sNum) || aisles.includes(sNum-1)
+                        ? 0 : THREE.MathUtils.clamp(Math.atan2(seatX,rowZ-screenSurfaceZ),-0.06,0.06);
 
                     seatGroup.updateMatrix();
                     seatGroup.updateMatrixWorld(true);
@@ -2147,6 +2097,8 @@
                     const reclineTilt = isRecliner && seatId === activePOVSeatId
                         ? THREE.MathUtils.degToRad([8,25,45][reclineLevel]) : 0.14;
                     const isWide = rowSpan > 1;
+                    const stitchStart = stitchCursor;
+                    stitchCursor += isWide ? 6 : 4;
                     const seatWidth = rowSpan * (isRecliner ? 0.46 : (isVIP ? 0.48 : 0.46));
                     const seatHeight = isRecliner ? 0.78 : (isVIP ? 0.73 : 0.67);
                     const seatDepth = isRecliner ? 1.12 : (isVIP ? 1.06 : 0.82);
@@ -2171,7 +2123,7 @@
                                     part(cushionInstances, upholsteryStart+side*padsPerPosition+1, [x,1.28,0.30], [width*0.43,isVIP||isRecliner?0.18:0.14,0.12],0,'headrest'),
                                     part(backInstances,backIndex+side,[x,0.48,0.22],[width,isVIP||isRecliner?seatHeight*1.15:seatHeight,seatDepth],reclineTilt,'back'),
                                     ...(padsPerPosition === 3 ? [part(cushionInstances, upholsteryStart+side*padsPerPosition+2,
-                                        [x,0.75,0.17],[width*0.43,0.17,0.09],reclineTilt,'lumbar')] : [])
+                                        [x,0.75,0.17],[width*0.43,0.11,0.06],reclineTilt,'lumbar')] : [])
                                 ];
                             }).flat(),
                             ...(isRecliner ? [part(cushionInstances,upholsteryStart+(isWide?2:1)*padsPerPosition,[0,0.28,-0.62],[seatWidth*0.44,0.10,0.23],0,'footrest')] : []),
@@ -2184,12 +2136,16 @@
                                 part(cupHolderInstances, cupStart, [-0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), -0.12], [1, 1, 1]),
                                 part(cupHolderInstances, cupStart + 1, [0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), -0.12], [1, 1, 1])
                             ]),
-                            ...([
-                                part(stitchInstances, base*4, [0, 0.43, -0.38], [0.42 * seatWidth, 0.012, 0.012]),
-                                part(stitchInstances, base*4+1, [0, 1.34, 0.34], [0.64 * seatWidth, 0.009, 0.009],0,'head-seam')
-                            ]),
-                            part(stateInstances, base*4+2, [0,0.47,-0.04-seatDepth*0.402], [seatWidth*0.72,0.035,0.012],0,'state-front'),
-                            part(stateInstances, base*4+3, [0,1.0,0.44], [seatWidth*0.66,0.035,0.012],reclineTilt,'state-back')
+                            ...Array.from({length:isWide?2:1},(_,side)=>{
+                                const x=isWide?(side===0?-1:1)*seatWidth*0.25:0;
+                                const width=isWide?seatWidth*0.48:seatWidth;
+                                return [
+                                    part(stitchInstances,stitchStart+side*2,[x,0.43,-0.38],[0.42*width,0.006,0.006],0,'pan-seam'),
+                                    part(stitchInstances,stitchStart+side*2+1,[x,1.34,0.34],[0.40*width,0.005,0.005],0,'head-seam')
+                                ];
+                            }).flat(),
+                            part(stateInstances, stitchStart+(isWide?4:2), [0,0.47,-0.04-seatDepth*0.402], [seatWidth*0.72,0.035,0.012],0,'state-front'),
+                            part(stateInstances, stitchStart+(isWide?5:3), [0,1.0,0.44], [seatWidth*0.66,0.035,0.012],reclineTilt,'state-back')
                         ],
                         meshes: [],
                         updateTransforms() {
@@ -2197,6 +2153,16 @@
                             this.instanceParts.forEach(item => writeSeatPart(this, item));
                         }
                     };
+                    const componentCounts = new Map();
+                    seat.componentIndices = {};
+                    seat.instanceParts.forEach(item => {
+                        const kind = item.kind || item.mesh.userData.partKind;
+                        const number = (componentCounts.get(kind) || 0) + 1;
+                        componentCounts.set(kind, number);
+                        item.componentName = `${kind}-${number}`;
+                        seat.componentIndices[item.componentName] = {batch: seatInstanceMeshes.indexOf(item.mesh), index: item.index};
+                        if (item.mesh.userData.baseColor) item.mesh.setColorAt(item.index,item.mesh.userData.baseColor);
+                    });
                     seat.meshes = seat.instanceParts.filter(item => item.mesh===cushionInstances || item.mesh===backInstances);
                     seat.instanceParts.forEach(item => {
                         item.mesh.count = Math.max(item.mesh.count, item.index + 1);
@@ -2297,14 +2263,22 @@
                 seat.meshes.forEach(ref => ref.mesh.setColorAt(ref.index, targetColor));
                 seat.instanceParts.filter(item => item.kind.startsWith('state-'))
                     .forEach(item => item.mesh.setColorAt(item.index, seatMarkerColors[state] || seatMarkerColors.unavailable));
+                seat.instanceParts.filter(item => item.mesh.userData.baseColor).forEach(item => {
+                    const color = item.mesh.userData.baseColor.clone();
+                    if (state === 'selected' || state === 'active') color.lerp(seatMarkerColors[state],0.45);
+                    item.mesh.setColorAt(item.index,color);
+                });
                 const level = seat.isRecliner && seat.id===activePOVSeatId ? reclineLevel : 0;
                 // +X rotation moves the back toward local +Z, away from the
                 // screen. Use that same hinge for the headrest and lumbar pad.
-                const angle = seat.isRecliner ? THREE.MathUtils.degToRad([8,25,45][level]) : 0.14;
+                // Compensate nonuniform group scale: 45 degrees must be 45
+                // in the auditorium, rather than a more horizontal 57 degrees.
+                const angle = seat.isRecliner ? Math.atan(Math.tan(THREE.MathUtils.degToRad([8,25,45][level]))
+                    *seat.group.scale.y/seat.group.scale.z) : 0.14;
                 if (seat.transformLevel === level) return;
                 seat.transformLevel = level;
                 const height = (seat.isRecliner ? 0.78*1.15 : (seat.isVIP ? 0.73*1.15 : 0.67))*1.10;
-                const pivotZ = 0.22 - level*0.14;
+                const pivotZ = 0.22 - level*0.21;
                 const attach = (item, distance, depth) => {
                     item.position.y = 0.48 + distance*Math.cos(angle) - depth*Math.sin(angle);
                     item.position.z = pivotZ + distance*Math.sin(angle) + depth*Math.cos(angle);

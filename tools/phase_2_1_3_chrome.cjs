@@ -20,7 +20,7 @@ class ChromeQA {
     call(method, params = {}) {
         const id = ++this.next;
         return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, 20000);
+            const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('CDP timeout: ' + method)); }, method === 'Page.captureScreenshot' ? 45000 : 20000);
             this.pending.set(id, {resolve:value=>{clearTimeout(timer);resolve(value);}, reject:error=>{clearTimeout(timer);reject(error);}});
             this.ws.send(JSON.stringify({id, method, params}));
         });
@@ -36,9 +36,11 @@ class ChromeQA {
     }
     static async connect() {
         const tabs = await (await fetch('http://127.0.0.1:9214/json/list')).json();
+        // In desktop Chrome closing the last tab closes its window/browser.
+        // Create the replacement before removing previous QA targets.
+        const target = await (await fetch('http://127.0.0.1:9214/json/new?http://127.0.0.1:5014/__qa__/', {method:'PUT'})).json();
         for (const tab of tabs.filter(t=>t.type==='page' && t.url.startsWith('http://127.0.0.1:5014/')))
             await fetch('http://127.0.0.1:9214/json/close/' + tab.id);
-        const target = await (await fetch('http://127.0.0.1:9214/json/new?http://127.0.0.1:5014/__qa__/', {method:'PUT'})).json();
         const ws = new WebSocket(target.webSocketDebuggerUrl);
         await new Promise((resolve, reject) => { ws.addEventListener('open', resolve, {once:true}); ws.addEventListener('error', reject, {once:true}); });
         const client = new ChromeQA(ws);
