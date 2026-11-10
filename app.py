@@ -1,7 +1,7 @@
 """
 CineWave - Vizag Movie Ticket Booking
 =====================================
-Backend: Flask + SQLAlchemy (SQLite)
+Backend: Flask + SQLAlchemy (SQLite or Supabase PostgreSQL)
 
 What is new in this version
 ---------------------------
@@ -20,7 +20,7 @@ What is new in this version
 Run:
     pip install -r requirements.txt
     python app.py            ->  http://127.0.0.1:5000
-    On first startup, the admin password is printed once; set ADMIN_PASSWORD to choose it.
+    Set ADMIN_PASSWORD before explicitly seeding a new development database.
 """
 
 import csv
@@ -69,8 +69,8 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
-import payments
 import seat_layout as sl
+from database_config import database_settings
 from vizag_theaters import seed_vizag_theaters
 
 
@@ -99,15 +99,19 @@ def load_local_dotenv():
 
 load_local_dotenv()
 
+# Payment credentials in .env must be loaded before the gateway reads them.
+import payments
+
 app = Flask(__name__)
 APP_ENV = os.environ.get('APP_ENV', 'development').strip().lower()
 app.config['APP_ENV'] = APP_ENV
 # Production must use a stable operator-managed key; development keeps a local fallback.
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or (
     None if APP_ENV == 'production' else secrets.token_hex(32))
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///vizag_movies.db')
+_database_url, _database_options = database_settings()
+app.config['SQLALCHEMY_DATABASE_URI'] = _database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _database_options
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -154,7 +158,7 @@ def validate_production_config():
         missing.append('SECRET_KEY (at least 32 characters)')
     if missing:
         raise RuntimeError('Production configuration is incomplete: ' + ', '.join(missing))
-    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite:'):
+    if db.engine.dialect.name == 'sqlite':
         raise RuntimeError('Production requires PostgreSQL; SQLite is supported for development and tests only.')
 
 
@@ -3326,6 +3330,8 @@ def auto_migrate():
     Adds any newly introduced column to an existing SQLite file so your old
     vizag_movies.db keeps working instead of throwing OperationalError.
     """
+    if db.engine.dialect.name != 'sqlite':
+        raise RuntimeError('Legacy migration is SQLite-only. Run alembic upgrade head for PostgreSQL.')
     insp = inspect(db.engine)
     # These indexes are safe to add to existing installations and speed up the
     # booking history, pending-booking and expired-hold paths.
@@ -3555,24 +3561,29 @@ def seed_sample_movies():
 
 def init_db():
     with app.app_context():
+        if db.engine.dialect.name != 'sqlite' or APP_ENV == 'production':
+            from database_health import check_database
+            health = check_database(db.engine, db.metadata)
+            if not health['ok']:
+                raise RuntimeError('Database is unavailable or schema is outdated. Run alembic upgrade head; '
+                                   'use python database_health.py for diagnostics.')
+            return
         db.create_all()
         auto_migrate()
         seed_vizag_theaters(db, Theater, Screen)
         seed_sample_movies()
 
         admin_user = User.query.filter_by(username='admin').first()
-        admin_password = 'mohith_admin_3116'
         if not admin_user:
+            admin_password = os.environ.get('ADMIN_PASSWORD')
+            if not admin_password:
+                raise RuntimeError('Set ADMIN_PASSWORD to create the initial local administrator. '
+                                   'Existing administrator credentials are never changed.')
             admin_user = User(username='admin', email='admin@cinewave.com', is_admin=True)
             admin_user.set_password(admin_password)
             db.session.add(admin_user)
             db.session.commit()
             create_wallet(admin_user, balance=10000)
-        else:
-            admin_user.is_admin = True
-            admin_user.set_password(admin_password)
-            db.session.commit()
-        print(f"Admin login: username=admin password={admin_password}")
 
         # make sure every existing account has a wallet with the signup bonus
         for u in User.query.all():

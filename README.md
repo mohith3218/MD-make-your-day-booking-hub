@@ -10,9 +10,9 @@ pip install -r requirements.txt
 python app.py           # http://127.0.0.1:5000
 ```
 
-On a fresh database, the app creates an `admin` account and prints its one-time password in the startup console. Set `ADMIN_PASSWORD` before first startup to choose the password yourself. Set `SECRET_KEY` to a long random value to keep sessions valid across restarts. For an HTTPS deployment, also set `SESSION_COOKIE_SECURE=1`. Flask debug mode is off by default; set `FLASK_DEBUG=1` only for local development. Existing databases keep their current admin password; change any old demo password before deployment.
+On a fresh local database, set `ADMIN_PASSWORD` before first startup to create the admin account. Passwords are never printed and existing credentials are preserved. Set `SECRET_KEY` to a long random value to keep sessions valid across restarts. For an HTTPS deployment, also set `SESSION_COOKIE_SECURE=1`. Flask debug mode is off by default; set `FLASK_DEBUG=1` only for local development.
 Your old `vizag_movies.db` keeps working — `auto_migrate()` adds the new columns on startup.
-If you'd rather start clean, delete `instance/vizag_movies.db` and run again.
+Keep the original database and its backups. For Supabase PostgreSQL configuration, versioned schema migrations and safe data transfer, see [the Supabase setup guide](docs/SUPABASE_SETUP.md) and [migration verification report](docs/SUPABASE_DATABASE_MIGRATION_REPORT.md).
 
 ### Email verification and ticket delivery
 

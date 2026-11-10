@@ -1,12 +1,12 @@
 /* Shared procedural chair assets; works with the locally bundled Three r128. */
 (function(root) {
     'use strict';
-    function padding(THREE) {
-        const geometry = new THREE.SphereGeometry(1, 12, 8);
+    function roundedPadding(THREE, widthSegments, heightSegments, exponent) {
+        const geometry = new THREE.SphereGeometry(1, widthSegments, heightSegments);
         const p = geometry.attributes.position, n = geometry.attributes.normal;
         const uv = geometry.attributes.uv, normal = new THREE.Vector3();
-        const rounded = v => Math.sign(v) * Math.pow(Math.abs(v), 0.48);
-        const gradient = v => Math.sign(v) * Math.pow(Math.abs(v), 2 / 0.48 - 1);
+        const rounded = v => Math.sign(v) * Math.pow(Math.abs(v), exponent);
+        const gradient = v => Math.sign(v) * Math.pow(Math.abs(v), 2 / exponent - 1);
         for (let i = 0; i < p.count; i++) {
             const x = rounded(p.getX(i)), y = rounded(p.getY(i)), z = rounded(p.getZ(i));
             p.setXYZ(i, x, y, z);
@@ -18,15 +18,18 @@
         }
         return geometry;
     }
-    function backrest(THREE) {
+    function padding(THREE, detail = 'near') {
+        return roundedPadding(THREE, detail === 'far' ? 8 : 12, detail === 'far' ? 6 : 8, 0.64);
+    }
+    function backrest(THREE, detail = 'near') {
         // Seven rounded cross-sections give a tapered crown, shoulder wings
         // and a lumbar curve. Indexed vertices replace the dense extrusion.
         const rings = [
             [0.02,0.35,0.055], [0.10,0.45,0.095], [0.30,0.47,0.105],
-            [0.60,0.48,0.105], [0.90,0.47,0.10], [1.14,0.42,0.085], [1.24,0.28,0.045]
+            [0.60,0.48,0.105], [0.90,0.47,0.10], [1.14,0.42,0.085], [1.24,0.30,0.045]
         ];
-        const segments = 12, positions = [], uvs = [], indices = [];
-        const soft = v => Math.sign(v)*Math.pow(Math.abs(v),0.55);
+        const segments = detail === 'far' ? 8 : 12, positions = [], uvs = [], indices = [];
+        const soft = v => Math.sign(v)*Math.pow(Math.abs(v),0.72);
         rings.forEach(([y,width,depth], row) => {
             for (let j = 0; j < segments; j++) {
                 const angle = j*Math.PI*2/segments;
@@ -57,7 +60,33 @@
         geometry.computeBoundingBox();geometry.computeBoundingSphere();
         return geometry;
     }
-    const api = {padding,backrest};
+    function armrest(THREE, detail = 'near') {
+        if (detail === 'far') return roundedPadding(THREE,8,4,0.42).scale(1,1,0.95);
+        // Rounded console with a real opening for the separately instanced
+        // cup well. Same normalized envelope as the previous armrest.
+        const shape = new THREE.Shape(), a=0.98, r=0.36;
+        shape.moveTo(-a+r,-a);shape.lineTo(a-r,-a);
+        shape.quadraticCurveTo(a,-a,a,-a+r);shape.lineTo(a,a-r);
+        shape.quadraticCurveTo(a,a,a-r,a);shape.lineTo(-a+r,a);
+        shape.quadraticCurveTo(-a,a,-a,a-r);shape.lineTo(-a,-a+r);
+        shape.quadraticCurveTo(-a,-a,-a+r,-a);
+        const opening = new THREE.Path();
+        opening.absellipse(0,-0.42,0.68,0.10,0,Math.PI*2,true);
+        shape.holes.push(opening);
+        const g=new THREE.ExtrudeGeometry(shape,{depth:2,bevelEnabled:true,bevelSize:0.02,bevelThickness:0.08,bevelSegments:1,curveSegments:3});
+        g.rotateX(Math.PI/2);g.translate(0,1,0);g.scale(1,1/1.08,0.95);
+        g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();
+        return g;
+    }
+    function cupHolder(THREE, detail = 'near') {
+        return new THREE.LatheGeometry([
+            new THREE.Vector2(0,-0.065),new THREE.Vector2(0.026,-0.065),
+            new THREE.Vector2(0.032,-0.008),new THREE.Vector2(0.036,0),
+            new THREE.Vector2(0.043,-0.003),new THREE.Vector2(0.038,-0.075),
+            new THREE.Vector2(0,-0.075)
+        ],detail === 'far' ? 6 : 8);
+    }
+    const api = {padding,backrest,armrest,cupHolder};
     if (typeof module === 'object' && module.exports) module.exports=api;
     else root.CinewaveChairGeometry=api;
 })(typeof window === 'object' ? window : globalThis);

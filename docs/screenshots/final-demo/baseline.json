@@ -1,0 +1,80 @@
+{
+  "commit": "27d2201",
+  "browser": "Codex built-in browser",
+  "viewport": [
+    1600,
+    900
+  ],
+  "lighting": "house",
+  "quality": "balanced",
+  "activation": "13 bringToFront/1100 ms cycles; last 5 readings",
+  "samples": [
+    {
+      "averageFps": 23.6,
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 53,
+      "geometries": 67,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 187.9,
+      "sceneUsableMs": 928,
+      "textures": 7,
+      "triangles": 967642
+    },
+    {
+      "averageFps": 24.3,
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 53,
+      "geometries": 67,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 187.9,
+      "sceneUsableMs": 928,
+      "textures": 7,
+      "triangles": 967642
+    },
+    {
+      "averageFps": 19.2,
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 53,
+      "geometries": 67,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 187.9,
+      "sceneUsableMs": 928,
+      "textures": 7,
+      "triangles": 967642
+    },
+    {
+      "averageFps": 23.5,
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 53,
+      "geometries": 67,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 187.9,
+      "sceneUsableMs": 928,
+      "textures": 7,
+      "triangles": 967642
+    },
+    {
+      "averageFps": 22.2,
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 53,
+      "geometries": 67,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 187.9,
+      "sceneUsableMs": 928,
+      "textures": 7,
+      "triangles": 967642
+    }
+  ],
+  "frameTimes": [
+    169077.19999999995,
+    170399.19999999995,
+    171823.8999999999,
+    173065.19999999995,
+    174264.8999999999
+  ]
+}

@@ -1,0 +1,62 @@
+[
+  {
+    "key": "jagadamba",
+    "sameMapping": true,
+    "farIntegrity": {
+      "checked": 886,
+      "errors": []
+    },
+    "nearIntegrity": {
+      "checked": 886,
+      "errors": []
+    }
+  },
+  {
+    "key": "inox",
+    "sameMapping": true,
+    "farIntegrity": {
+      "checked": 200,
+      "errors": []
+    },
+    "nearIntegrity": {
+      "checked": 200,
+      "errors": []
+    }
+  },
+  {
+    "key": "melody",
+    "sameMapping": true,
+    "farIntegrity": {
+      "checked": 774,
+      "errors": []
+    },
+    "nearIntegrity": {
+      "checked": 774,
+      "errors": []
+    }
+  },
+  {
+    "key": "recliner",
+    "sameMapping": true,
+    "farIntegrity": {
+      "checked": 58,
+      "errors": []
+    },
+    "nearIntegrity": {
+      "checked": 58,
+      "errors": []
+    }
+  },
+  {
+    "key": "couple",
+    "sameMapping": true,
+    "farIntegrity": {
+      "checked": 78,
+      "errors": []
+    },
+    "nearIntegrity": {
+      "checked": 78,
+      "errors": []
+    }
+  }
+]

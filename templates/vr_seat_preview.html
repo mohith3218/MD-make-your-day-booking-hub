@@ -290,6 +290,61 @@
         #dom-auditorium-fallback .fallback-recliner { background:linear-gradient(145deg,#4c9b83,#16493e); height:clamp(10px,1.5vh,16px); }
         #dom-auditorium-fallback .fallback-unavailable { background:#353944; opacity:.56; }
         @media (max-width:640px) { #dom-auditorium-fallback { padding-top:100px; } #dom-auditorium-fallback .fallback-bowl { width:98vw; } }
+
+        #btn-mobile-options { display:none; }
+        #inspection-banner { display:none; position:fixed; z-index:28; top:78px; left:50%; transform:translateX(-50%); max-width:calc(100vw - 32px); padding:7px 12px; border:1px solid #bca46c; border-radius:12px; background:rgba(12,16,23,.94); color:#edd9a6; font-size:11px; text-align:center; }
+        #inspection-banner select, #inspection-banner button { margin-left:8px; padding:4px 6px; background:#242c37; color:#fff; border-radius:6px; }
+        body.seat-inspection #inspection-banner { display:block; }
+        body.seat-inspection #look-hint { display:none; }
+        #btn-inspection-mode[aria-pressed="true"] { background:rgba(201,168,76,.2);border-color:#c9a84c;color:#f1d88f; }
+        @media(max-width:1180px) {
+            #preview-camera-controls { flex-wrap:nowrap; overflow-x:auto; max-width:100%; }
+            #preview-camera-controls > * { flex-shrink:0; }
+            #preview-identity { max-width:480px; }
+            #preview-identity p:last-child { max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+            #inspection-banner { top:140px; }
+            body.seat-inspection #metrics-panel, body.seat-inspection #minimap-drawer { top:202px; }
+        }
+        @media(max-width:760px) {
+            header.fixed { display:flex;flex-direction:column;align-items:stretch;left:8px;right:8px;top:8px;gap:6px; }
+            #preview-identity { position:relative;width:100%;max-width:none!important;min-height:52px;padding:7px 9px;justify-self:stretch; }
+            #preview-identity > div:first-child { max-width:calc(100% - 62px);min-width:0; }
+            #preview-identity .rounded-full, #preview-identity p:last-child { display:none; }
+            #preview-identity p { max-width:calc(100vw - 128px)!important; }
+            #active-theater-sub { font-size:9px; }
+            #btn-mobile-options { display:block;position:absolute;right:8px;top:11px;min-height:34px; }
+            #preview-camera-controls { width:100%;justify-self:stretch;min-height:42px;max-width:100%;padding:4px;gap:4px;scrollbar-width:thin; }
+            #preview-camera-controls .neo-btn { min-height:32px;padding:6px 8px;font-size:10px; }
+            #preview-display-controls { display:none;position:absolute;top:106px;right:0;z-index:36;max-width:100%;flex-wrap:wrap;padding:8px; }
+            body.preview-options-open #preview-display-controls { display:flex; }
+            #preview-display-controls span { display:inline; }
+            body.preview-options-open #metrics-panel, body.preview-options-open #minimap-drawer { visibility:hidden; }
+            #metrics-panel, #minimap-drawer { top:118px;bottom:auto;left:8px;right:8px;width:auto;max-height:44dvh;overflow:auto;padding:8px;border-radius:12px;z-index:31; }
+            #metrics-panel.details-collapsed { right:auto;width:calc(50vw - 12px);max-height:48px;overflow:hidden; }
+            #metrics-panel.details-collapsed #metric-tier-badge { display:none; }
+            #minimap-drawer.map-collapsed { left:auto;width:calc(50vw - 12px);max-height:48px;overflow:hidden; }
+            #minimap-drawer.map-collapsed button[onclick="jumpToSweetSpot()"] { display:none; }
+            #minimap-drawer.map-collapsed h2 { max-width:106px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px;letter-spacing:.02em; }
+            #metrics-panel > div:first-child, #minimap-drawer > div:first-child { min-height:30px;margin-bottom:0; }
+            #seat-details-toggle, #minimap-toggle { min-width:30px;min-height:30px; }
+            body.preview-details-open #minimap-drawer, body.preview-map-open #metrics-panel { visibility:hidden; }
+            #minimap-grid { max-height:30dvh;overflow:auto; }
+            #minimap-grid > div { min-width:max-content; }
+            #preview-dock { left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));width:auto;max-width:none;transform:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 8px;padding:8px;border-radius:14px; }
+            #preview-dock > div:first-child { grid-column:1;grid-row:1/3;gap:4px; }
+            #preview-dock > .h-10 { display:none; }
+            #preview-dock > div:nth-child(3) { grid-column:2;grid-row:1;min-width:0;max-width:130px; }
+            #dock-seat-tier, #dock-exit-readout { display:none; }
+            #btn-dock-exit { grid-column:2;grid-row:2;justify-content:center;padding:4px;min-height:25px; }
+            #btn-dock-exit span { display:inline;font-size:9px; }
+            #btn-book-selected { grid-column:3;grid-row:1/3;padding:7px;min-width:66px;min-height:52px; }
+            #btn-seat-left, #btn-seat-right { width:36px;height:44px; }
+            #btn-row-front, #btn-row-back { width:44px;height:25px; }
+            #inspection-banner { top:112px;left:8px;right:8px;transform:none;max-width:none;font-size:9px;padding:5px; }
+            #inspection-banner select, #inspection-banner button { margin-left:3px;padding:3px; }
+            body.seat-inspection #metrics-panel, body.seat-inspection #minimap-drawer { top:174px; }
+            body.preview-options-open #inspection-banner { visibility:hidden; }
+        }
     </style>
 </head>
 <body class="relative w-screen h-screen overflow-hidden select-none{% if embedded %} preview-embedded{% endif %}">
@@ -346,7 +401,7 @@
     <!-- TOP BAR: BRAND, CURRENT THEATER, TRAILER SCENE & CAMERA MODES -->
     <header class="fixed top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         <!-- Brand + current auditorium -->
-        <div class="neo-panel px-3.5 py-2 rounded-2xl flex flex-wrap items-center gap-3 pointer-events-auto">
+        <div id="preview-identity" class="neo-panel px-3.5 py-2 rounded-2xl flex flex-wrap items-center gap-3 pointer-events-auto">
             <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#C9A84C] to-amber-200 flex items-center justify-center shadow-[0_0_15px_rgba(201,168,76,0.4)]">
                     <i class="fa-solid fa-film text-slate-950 text-base"></i>
@@ -371,10 +426,11 @@
                 <i class="fa-solid fa-building-columns text-[#C9A84C] text-xs"></i>
             <span class="text-[9px] font-bold uppercase tracking-wider text-slate-300">{{ screen_type }}</span>
             </div>
+            <button id="btn-mobile-options" type="button" class="neo-btn rounded-lg px-2 py-2 text-xs" onclick="togglePreviewOptions()" aria-expanded="false" aria-controls="preview-display-controls">More</button>
         </div>
 
         <!-- Center Camera & Screen Projection Controls -->
-        <div class="neo-panel p-1.5 rounded-2xl flex flex-wrap items-center gap-1.5 pointer-events-auto">
+        <div id="preview-camera-controls" class="neo-panel p-1.5 rounded-2xl flex flex-wrap items-center gap-1.5 pointer-events-auto">
             <button id="btn-pov-mode" onclick="setCameraMode('seat')" class="neo-btn active px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5" title="First-Person Eye-Level Seat View">
                 <i class="fa-solid fa-eye"></i>
                 <span>Seat POV</span>
@@ -383,6 +439,7 @@
                 <i class="fa-solid fa-helicopter"></i>
                 <span class="hidden sm:inline">Full theater</span>
             </button>
+            <button id="btn-inspection-mode" type="button" onclick="setCameraPreset('inspection')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs" aria-pressed="false" title="Optional cutaway view of every seating level">Inspect levels</button>
             <button id="btn-screen-mode" onclick="setCameraPreset('screen')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs text-slate-200" title="Screen-centered auditorium view"><i class="fa-solid fa-tv"></i></button>
             <button onclick="setCameraPreset('left')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs text-cyan-200" title="View from the left side wall"><i class="fa-solid fa-arrow-left"></i></button>
             <button onclick="setCameraPreset('right')" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs text-cyan-200" title="View from the right side wall"><i class="fa-solid fa-arrow-right"></i></button>
@@ -411,7 +468,7 @@
         </div>
 
         <!-- Right Optics: FOV, Lighting & VR Stereo -->
-        <div class="neo-panel px-3 py-2 rounded-2xl flex items-center gap-2.5 pointer-events-auto">
+        <div id="preview-display-controls" class="neo-panel px-3 py-2 rounded-2xl flex items-center gap-2.5 pointer-events-auto">
             <div class="hidden xl:flex items-center gap-2">
                 <span class="text-[11px] font-medium text-slate-400">
                     FOV <strong id="fov-label" class="text-amber-300">65°</strong>
@@ -433,6 +490,12 @@
         </div>
     </header>
 
+    <div id="inspection-banner" role="status">
+        <span id="inspection-caption">Cutaway inspection · architecture temporarily hidden</span>
+        <label class="sr-only" for="inspection-level">Inspect seating level</label>
+        <select id="inspection-level" onchange="frameInspectionLevel()" aria-label="Inspect seating level"><option value="all">All levels</option></select>
+        <button type="button" onclick="setCameraMode('overview')">Return to auditorium</button>
+    </div>
     <!-- Interactive Instruction Pill -->
     <div id="look-hint" class="fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-500">
         <div class="px-4 py-1.5 rounded-full bg-slate-950/85 border border-cyan-500/30 backdrop-blur-md text-[11px] text-slate-200 flex items-center gap-2 shadow-2xl">
@@ -534,7 +597,7 @@
     </aside>
 
     <!-- CENTER-BOTTOM FLOATING NEOMORPHIC 4-WAY SEAT HOPPER & EXIT WAY DOCK -->
-    <div class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 neo-panel rounded-3xl px-4 py-2.5 flex items-center gap-3 sm:gap-5 pointer-events-auto border border-cyan-500/30 shadow-[0_10px_35px_rgba(0,0,0,0.9)]">
+    <div id="preview-dock" class="fixed bottom-3 left-1/2 -translate-x-1/2 z-30 neo-panel rounded-3xl px-4 py-2.5 flex items-center gap-3 sm:gap-5 pointer-events-auto border border-cyan-500/30 shadow-[0_10px_35px_rgba(0,0,0,0.9)]">
         <!-- 4-Way Directional Seat-Hopping Arrow Pad -->
         <div class="flex items-center gap-1.5">
             <button id="btn-seat-left" onclick="stepSeat(0, -1)" class="neo-btn w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white hover:text-cyan-400" title="Move to Left Side Seat (Left Arrow Key)">
@@ -600,7 +663,7 @@
                 <button onclick="jumpToSweetSpot()" class="neo-btn px-2 py-0.5 rounded-lg text-[10px] font-semibold text-amber-300" title="Jump to Best Acoustic Seat">
                     <i class="fa-solid fa-crown mr-1"></i>Best view
                 </button>
-                <button onclick="toggleMinimapCollapse()" class="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded-lg neo-btn">
+                <button id="minimap-toggle" type="button" aria-label="Collapse seat map" aria-expanded="true" aria-controls="minimap-body" onclick="toggleMinimapCollapse()" class="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded-lg neo-btn">
                     <i id="minimap-toggle-icon" class="fa-solid fa-chevron-down"></i>
                 </button>
             </div>
@@ -761,6 +824,11 @@
         // Dynamic Seat State Registry
         const seatRegistry = new Map(); // 'E8' -> seat metadata + 3D group & meshes
         let seatInstanceMeshes = [];
+        let seatGeometryVariants = [];
+        let chairDetail = 'near';
+        let inspectionActive = false;
+        let inspectionFog = null;
+        let inspectionFar = 0;
         let selectedSeats = new Set();
         let activePOVSeatId = currentAudi.defaultSeat;
         let activeRowIdx = 4;
@@ -787,10 +855,7 @@
                 loadVizagAuditorium('project');
                 // Keep the auditorium readable on phone-sized screens. Both
                 // panels stay available through their compact toggle buttons.
-                if (window.matchMedia('(max-width: 640px)').matches) {
-                    toggleSeatDetailsCollapse();
-                    toggleMinimapCollapse();
-                }
+                applyResponsivePreviewLayout();
                 camera.position.copy(cameraTargetPos);
                 startAnimationLoop();
             } catch (error) {
@@ -875,6 +940,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.dataset.maxFps = String(fps);
             if (dustParticles) dustParticles.visible = renderQuality !== 'low' && !reducedMotion;
+            updateSeatDetailForView();
         }
         setRenderQuality(renderQuality);
         let animationFrameId = 0;
@@ -1232,7 +1298,8 @@
             // seen at a steeper angle without exceeding the lens limit.
             const portraitBias = THREE.MathUtils.clamp((1.12 - aspect) / 0.82, 0, 1);
             const responsiveCamera = overviewBaseCamera.clone();
-            responsiveCamera.y = Math.min(auditoriumRoomHeight - 0.45,
+            // Leave clearance below the suspended ceiling and projector housing.
+            responsiveCamera.y = Math.min(auditoriumRoomHeight * 0.82,
                 responsiveCamera.y + auditoriumRoomHeight * 0.3 * portraitBias);
             const responsiveTarget = auditoriumCenterTarget.clone();
             responsiveTarget.y = Math.max(0.35,
@@ -1286,7 +1353,7 @@
         // Soft upholstery palette: velvet, brass, and deep jade; selection and
         // the active point of view remain distinct from seat class colors.
             const matStdAvail = new THREE.MeshStandardMaterial({ color: 0x4a2029, emissive: 0x080204, roughness: 0.78, metalness: 0.01 });
-            const matVipAvail = new THREE.MeshStandardMaterial({ color: 0x69502f, emissive: 0x080603, roughness: 0.76, metalness: 0.01 });
+            const matVipAvail = new THREE.MeshStandardMaterial({ color: 0x69502f, emissive: 0x080603, roughness: 0.86, metalness: 0.01 });
             const matReclinerAvail = new THREE.MeshStandardMaterial({ color: 0x205247, emissive: 0x030b08, roughness: 0.8, metalness: 0.01 });
         const matSelectedCart = new THREE.MeshStandardMaterial({ color: 0xf0d58a, emissive: 0x38270b, roughness: 0.38, metalness: 0.08 });
         const matActivePOV = new THREE.MeshStandardMaterial({ color: 0x76cbb9, emissive: 0x16443a, roughness: 0.38, metalness: 0.04 });
@@ -1348,6 +1415,8 @@
             const keepMaterials = new Set([matStdAvail, matVipAvail, matReclinerAvail,
                 matSelectedCart, matActivePOV, matOccupied, matArmrest, matSeatInset, matSeatStitch]);
             const oldGeometries = new Set();
+            seatGeometryVariants.forEach(v=>{oldGeometries.add(v.near);oldGeometries.add(v.far);});
+            seatGeometryVariants = [];
             const oldMaterials = new Set();
             const oldTextures = new Set();
             auditoriumGroup.traverse(object => {
@@ -1405,7 +1474,13 @@
             setUpholsteryTint(matStdAvail, upholsteryColors.standard || seatBaseColor, 2.1);
             // Gold trim needs less compensation than dark fabric; the old
             // 1.45 gain washed Premium padding toward pale yellow in House.
-            setUpholsteryTint(matVipAvail, upholsteryColors.premium || trimBaseColor, upholsteryColors.premium ? 1 : 0.95);
+            setUpholsteryTint(matVipAvail, upholsteryColors.premium || trimBaseColor, upholsteryColors.premium ? 1 : 0.38);
+            if (!upholsteryColors.premium) {
+                // Architectural brass is only a fallback, not a fabric profile.
+                // Mute it toward bronze without changing configured upholstery.
+                const luminance = matVipAvail.color.r*0.2126 + matVipAvail.color.g*0.7152 + matVipAvail.color.b*0.0722;
+                matVipAvail.color.lerp(new THREE.Color(luminance,luminance,luminance),0.18);
+            }
             setUpholsteryTint(matReclinerAvail, upholsteryColors.recliner || seatBaseColor, 1.9);
             const geometry = config.geometry || {};
             const physicalRoom = geometry.room || {};
@@ -1580,6 +1655,7 @@
             floorMesh.rotation.x = -Math.PI / 2;
             floorMesh.position.set(0, 0, hallCenterZ);
             auditoriumGroup.add(floorMesh);
+            const inspectionStart = auditoriumGroup.children.length;
 
             const ceilingGeo = new THREE.PlaneGeometry(hallHalfWidth * 2, hallDepth);
             const ceilingMat = new THREE.MeshStandardMaterial({ color: ceilingColor, roughness: 0.96, side: THREE.DoubleSide });
@@ -1900,6 +1976,7 @@
                 });
             });
 
+            auditoriumGroup.children.slice(inspectionStart).forEach(object=>{object.userData.inspectionOccluder=true;});
             // 4. BUILD STADIUM RISERS & 3D SEATING GRID
             // Soft, bevelled upholstery panels keep the seat silhouette clean
             // at both overview distance and close seat POV.
@@ -1926,17 +2003,12 @@
             config.rowDefs.forEach(row => {
                 categoryCapacity[categoryIndex(row)] += Object.keys(row.seats).length;
             });
-            const armGeometry = new THREE.SphereGeometry(1, 10, 6);
+            const armGeometry = CinewaveChairGeometry.armrest(THREE);
             const seatLegGeometry = new THREE.BoxGeometry(1, 1, 1);
             const seatLegMaterial = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.58, metalness: 0.42 });
             // One shared, closed-section molded well: inner bowl, rounded lip,
             // outer wall and underside. Fewer triangles than the former torus.
-            const cupHolderGeometry = new THREE.LatheGeometry([
-                new THREE.Vector2(0, -0.065), new THREE.Vector2(0.026, -0.065),
-                new THREE.Vector2(0.032, -0.008), new THREE.Vector2(0.036, 0),
-                new THREE.Vector2(0.043, -0.003), new THREE.Vector2(0.038, -0.075),
-                new THREE.Vector2(0, -0.075)
-            ], 8);
+            const cupHolderGeometry = CinewaveChairGeometry.cupHolder(THREE);
             const cupHolderMaterial = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.44, metalness: 0.32 });
             const stitchGeometry = new THREE.BoxGeometry(1, 1, 1);
             // Three shared class materials, rather than one material per chair.
@@ -1979,6 +2051,15 @@
                 mesh.userData.instanceSeatIds = [];
             });
             auditoriumGroup.add(...seatInstanceMeshes);
+            const distantPadding=CinewaveChairGeometry.padding(THREE,'far');
+            const distantBack=CinewaveChairGeometry.backrest(THREE,'far');
+            seatGeometryVariants = upholsteryBatches.flatMap(batch=>[
+                {mesh:batch.cushionInstances,near:upholsteryGeo,far:distantPadding},
+                {mesh:batch.backInstances,near:seatBackGeo,far:distantBack}
+            ]).concat([
+                {mesh:armInstances,near:armGeometry,far:CinewaveChairGeometry.armrest(THREE,'far')},
+                {mesh:cupHolderInstances,near:cupHolderGeometry,far:CinewaveChairGeometry.cupHolder(THREE,'far')}
+            ]);
             interactiveSeatMeshes.push(...upholsteryBatches.flatMap(batch => [batch.cushionInstances, batch.backInstances]));
 
             const riserGeometry = new THREE.BoxGeometry(hallHalfWidth * 1.92, 1, 1);
@@ -1990,6 +2071,7 @@
             const riserInstances = riserMaterials.map(material => {
                 const mesh = new THREE.InstancedMesh(riserGeometry, material, Math.max(1, config.rowDefs.length));
                 mesh.count = 0;
+                mesh.userData.inspectionOccluder = true;
                 auditoriumGroup.add(mesh);
                 return mesh;
             });
@@ -2120,10 +2202,10 @@
                                 const x=isWide?(side===0?-1:1)*seatWidth*0.25:0;
                                 return [
                                     part(cushionInstances, upholsteryStart+side*padsPerPosition, [x,0.48,-0.04], [width*0.48,isVIP||isRecliner?0.17:0.13,seatDepth*0.40],0,'cushion'),
-                                    part(cushionInstances, upholsteryStart+side*padsPerPosition+1, [x,1.28,0.30], [width*0.43,isVIP||isRecliner?0.18:0.14,0.12],0,'headrest'),
+                                    part(cushionInstances, upholsteryStart+side*padsPerPosition+1, [x,1.28,0.30], [width*0.36,isVIP||isRecliner?0.13:0.11,0.065],0,'headrest'),
                                     part(backInstances,backIndex+side,[x,0.48,0.22],[width,isVIP||isRecliner?seatHeight*1.15:seatHeight,seatDepth],reclineTilt,'back'),
                                     ...(padsPerPosition === 3 ? [part(cushionInstances, upholsteryStart+side*padsPerPosition+2,
-                                        [x,0.75,0.17],[width*0.43,0.11,0.06],reclineTilt,'lumbar')] : [])
+                                        [x,0.75,0.17],[width*0.43,0.085,0.045],reclineTilt,'lumbar')] : [])
                                 ];
                             }).flat(),
                             ...(isRecliner ? [part(cushionInstances,upholsteryStart+(isWide?2:1)*padsPerPosition,[0,0.28,-0.62],[seatWidth*0.44,0.10,0.23],0,'footrest')] : []),
@@ -2133,8 +2215,8 @@
                             part(legInstances, supportStart + 1, [0.32 * seatWidth, 0.17, 0.1], [0.065, 0.34, 0.08]),
                             part(legInstances, supportStart + 2, [0, 0.08, 0.02], [0.68 * seatWidth, 0.055, 0.075]),
                             ...(seatProfile.cup_holder === false ? [] : [
-                                part(cupHolderInstances, cupStart, [-0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), -0.12], [1, 1, 1]),
-                                part(cupHolderInstances, cupStart + 1, [0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), -0.12], [1, 1, 1])
+                                part(cupHolderInstances, cupStart, [-0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), 0.035-0.42*0.95*0.43*seatDepth], [(isWide?0.065:0.115)*seatWidth*0.82/0.043,1,0.95*0.43*seatDepth*0.112/0.043]),
+                                part(cupHolderInstances, cupStart + 1, [0.48 * seatWidth, isRecliner ? 0.79 : (isVIP ? 0.78 : 0.74), 0.035-0.42*0.95*0.43*seatDepth], [(isWide?0.065:0.115)*seatWidth*0.82/0.043,1,0.95*0.43*seatDepth*0.112/0.043])
                             ]),
                             ...Array.from({length:isWide?2:1},(_,side)=>{
                                 const x=isWide?(side===0?-1:1)*seatWidth*0.25:0;
@@ -2197,6 +2279,8 @@
             });
             auditoriumBuildDurationMs = performance.now() - buildStartedAt;
             applyArchitecturalLightingMode();
+            updateSeatDetailForView();
+            populateInspectionLevels();
         }
 
         window.cinewavePreviewMetrics = () => ({
@@ -2209,6 +2293,8 @@
             geometries: renderer.info.memory.geometries,
             textures: renderer.info.memory.textures,
             renderQuality,
+            chairDetail,
+            inspection: cameraMode === 'inspection',
             devicePixelRatio: renderer.getPixelRatio()
         });
         window.cinewavePreviewDiagnostics = () => {
@@ -2277,7 +2363,7 @@
                     *seat.group.scale.y/seat.group.scale.z) : 0.14;
                 if (seat.transformLevel === level) return;
                 seat.transformLevel = level;
-                const height = (seat.isRecliner ? 0.78*1.15 : (seat.isVIP ? 0.73*1.15 : 0.67))*1.10;
+                const height = (seat.isRecliner ? 0.78*1.15 : (seat.isVIP ? 0.73*1.15 : 0.67))*1.05;
                 const pivotZ = 0.22 - level*0.21;
                 const attach = (item, distance, depth) => {
                     item.position.y = 0.48 + distance*Math.cos(angle) - depth*Math.sin(angle);
@@ -2286,9 +2372,9 @@
                 };
                 seat.instanceParts.forEach(item => {
                     if(item.kind==='back') { item.rotationX=angle; item.position.z=pivotZ; }
-                    if(item.kind==='headrest') attach(item,height,-0.02);
-                    if(item.kind==='head-seam') attach(item,height-0.06,-0.145);
-                    if(item.kind==='lumbar') attach(item,0.27,-0.07);
+                    if(item.kind==='headrest') attach(item,height,0.02);
+                    if(item.kind==='head-seam') attach(item,height-0.025,-0.048);
+                    if(item.kind==='lumbar') attach(item,0.27,-0.025);
                     if(item.kind==='state-back') attach(item,0.54,seat.isRecliner?0.25:(seat.isVIP?0.24:0.19));
                     if(item.kind==='footrest') {
                         item.position.y=0.28+level*0.10;
@@ -2603,6 +2689,9 @@
         }
 
         function setCameraPreset(preset) {
+            if (preset === 'inspection') {
+                cameraMode='inspection';updateCameraModeButtons();frameInspectionLevel();return;
+            }
             if (preset === 'overview') return setCameraMode('overview');
             if (preset === 'reset') return setCameraMode('overview');
             if (preset === 'seat') return setCameraMode('seat');
@@ -2652,7 +2741,60 @@
             }
         }
 
+        function updateSeatDetailForView() {
+            const distant = ['overview','birdseye','inspection'].includes(cameraMode) && renderQuality !== 'high';
+            chairDetail = distant ? 'far' : 'near';
+            seatGeometryVariants.forEach(v=>{const geometry=distant?v.far:v.near;if(v.mesh.geometry!==geometry)v.mesh.geometry=geometry;});
+        }
+
+        function populateInspectionLevels() {
+            const select=document.getElementById('inspection-level');
+            select.replaceChildren(new Option('All levels','all'));
+            const levels=new Map();
+            currentAudi.rowDefs.forEach(row=>levels.set(row.level_id||'main',row.level_id||'main'));
+            const names=new Map((currentAudi.geometry?.levels||[]).map(l=>[l.id,l.name||l.id]));
+            levels.forEach((_,id)=>select.add(new Option(names.get(id)||id,id)));
+        }
+
+        function applyInspectionMode() {
+            const active=cameraMode==='inspection';
+            if(active!==inspectionActive){
+                if(active){inspectionFog=scene.fog;inspectionFar=camera.far;scene.fog=null;}
+                else {scene.fog=inspectionFog;camera.far=inspectionFar;camera.updateProjectionMatrix();}
+                inspectionActive=active;
+            }
+            document.body.classList.toggle('seat-inspection',active);
+            auditoriumGroup.children.forEach(object=>{
+                if(!object.userData.inspectionOccluder)return;
+                if(active){if(object.userData.inspectionVisible===undefined)object.userData.inspectionVisible=object.visible;object.visible=false;}
+                else if(object.userData.inspectionVisible!==undefined){object.visible=object.userData.inspectionVisible;delete object.userData.inspectionVisible;}
+            });
+        }
+
+        function frameInspectionLevel() {
+            const level=document.getElementById('inspection-level').value;
+            const seats=[...seatRegistry.values()].filter(seat=>level==='all'||(currentAudi.rowDefs[seat.rowIndex].level_id||'main')===level);
+            if(!seats.length)return;
+            const min=new THREE.Vector3(Math.min(...seats.map(s=>s.worldPos.x))-0.7,Math.min(...seats.map(s=>s.worldPos.y)),Math.min(...seats.map(s=>s.worldPos.z))-0.8);
+            const max=new THREE.Vector3(Math.max(...seats.map(s=>s.worldPos.x))+0.7,Math.max(...seats.map(s=>s.worldPos.y))+1.25,Math.max(...seats.map(s=>s.worldPos.z))+0.8);
+            const center=min.clone().add(max).multiplyScalar(0.5),direction=new THREE.Vector3(0.65,0.9,1).normalize();
+            const forward=direction.clone().negate(),right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize(),up=new THREE.Vector3().crossVectors(right,forward);
+            const tangent=Math.tan(THREE.MathUtils.degToRad(31)),aspect=Math.max(0.25,container.clientWidth/container.clientHeight);
+            let distance=3;
+            for(const x of [min.x,max.x])for(const y of [min.y,max.y])for(const z of [min.z,max.z]){
+                const p=new THREE.Vector3(x,y,z).sub(center);
+                distance=Math.max(distance,Math.abs(p.dot(right))/(tangent*aspect)-p.dot(forward),Math.abs(p.dot(up))/tangent-p.dot(forward));
+            }
+            distance=distance*1.10+1;
+            setCameraFieldOfView(62);camera.far=Math.max(camera.far,distance+max.distanceTo(min)+30);camera.updateProjectionMatrix();
+            cameraTargetPos.copy(center).addScaledVector(direction,distance);desiredLookAtTarget.copy(center);
+            targetYawOffset=targetPitchOffset=0;
+            document.getElementById('inspection-caption').textContent=`Cutaway inspection · ${level==='all'?'all levels':level} · ${seats.length} seats · architecture temporarily hidden`;
+        }
+
         function updateCameraModeButtons() {
+            applyInspectionMode();updateSeatDetailForView();
+            document.getElementById('btn-inspection-mode').setAttribute('aria-pressed',String(cameraMode==='inspection'));
             document.getElementById('btn-pov-mode').classList.toggle('active', cameraMode === 'seat');
             document.getElementById('btn-overview-mode').classList.toggle('active', cameraMode === 'overview');
             document.getElementById('btn-screen-mode').classList.toggle('active', cameraMode === 'screen');
@@ -3299,7 +3441,9 @@
 
         let seatDetailsCollapsed = false;
         function toggleSeatDetailsCollapse() {
+            if(innerWidth<=760 && seatDetailsCollapsed && !minimapCollapsed)toggleMinimapCollapse();
             seatDetailsCollapsed = !seatDetailsCollapsed;
+            document.body.classList.toggle('preview-details-open',!seatDetailsCollapsed);
             const panel = document.getElementById('metrics-panel');
             panel.classList.toggle('details-collapsed', seatDetailsCollapsed);
             const button = document.getElementById('seat-details-toggle');
@@ -3311,10 +3455,27 @@
 
         let minimapCollapsed = false;
         function toggleMinimapCollapse() {
+            if(innerWidth<=760 && minimapCollapsed && !seatDetailsCollapsed)toggleSeatDetailsCollapse();
             minimapCollapsed = !minimapCollapsed;
+            document.body.classList.toggle('preview-map-open',!minimapCollapsed);
+            document.getElementById('minimap-drawer').classList.toggle('map-collapsed',minimapCollapsed);
+            document.getElementById('minimap-toggle').setAttribute('aria-expanded',String(!minimapCollapsed));
+            document.getElementById('minimap-toggle').setAttribute('aria-label',minimapCollapsed?'Expand seat map':'Collapse seat map');
             document.getElementById('minimap-body').classList.toggle('hidden', minimapCollapsed);
             document.getElementById('minimap-toggle-icon').className =
                 minimapCollapsed ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+        }
+
+        let wasCompactPreview = false;
+        function applyResponsivePreviewLayout() {
+            const compact=innerWidth<=760;
+            if(compact&&!wasCompactPreview){if(!seatDetailsCollapsed)toggleSeatDetailsCollapse();if(!minimapCollapsed)toggleMinimapCollapse();}
+            wasCompactPreview=compact;
+            if(!compact){document.body.classList.remove('preview-options-open');document.getElementById('btn-mobile-options').setAttribute('aria-expanded','false');}
+        }
+        function togglePreviewOptions() {
+            const open=document.body.classList.toggle('preview-options-open');
+            document.getElementById('btn-mobile-options').setAttribute('aria-expanded',String(open));
         }
 
         function openBookingConfirmation() {
@@ -3361,8 +3522,10 @@
                 return;
             }
             const frameGap = now - lastFrameAt;
-            lastFrameAt = now;
-            const delta = Math.min(Math.max(frameGap / 1000, clock.getDelta()), 0.05);
+            // Retain fractional frame time instead of turning a 30 FPS cap
+            // into a lower refresh-rate divisor on a 60 Hz display.
+            lastFrameAt = now - (frameGap % (1000 / maxFps));
+            const delta = Math.min(clock.getDelta(), 0.05);
             const elapsed = clock.elapsedTime;
             const cameraBlend = 1 - Math.exp(-6 * delta);
             const rotationBlend = 1 - Math.exp(-8 * delta);
@@ -3403,6 +3566,8 @@
             quatOffset.setFromEuler(eulerRot);
             camera.quaternion.copy(quatBase).multiply(quatOffset);
 
+            updateSeatDetailForView();
+            if((cameraMode==='inspection')!==inspectionActive)applyInspectionMode();
             // 5. Render Scene (Single View or VR Cardboard Stereo Split-Screen)
             if (!isVRStereo) {
                 renderer.render(scene, camera);
@@ -3445,6 +3610,8 @@
             camera.aspect = (isVRStereo ? w / 2 : w) / h;
             if (cameraMode === 'overview') applyOverviewFieldOfView();
             else if (cameraMode === 'birdseye') applyBirdseyeFraming();
+            else if (cameraMode === 'inspection') frameInspectionLevel();
+            applyResponsivePreviewLayout();
             camera.updateProjectionMatrix();
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, renderQuality === 'high' ? 1.75 : (renderQuality === 'balanced' ? 1.5 : 1)));
         });

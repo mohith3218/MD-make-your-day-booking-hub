@@ -3,8 +3,9 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const base='docs/screenshots/phase-2.1.4-premium-seats/';
-const read=name=>JSON.parse(fs.readFileSync(base+name,'utf8'));
+const path=require('node:path');
+const base=process.env.CINEWAVE_BROWSER_RESULTS_DIR || 'docs/screenshots/phase-2.1.4-premium-seats/';
+const read=name=>JSON.parse(fs.readFileSync(path.join(base,name),'utf8'));
 test('all drawn chair components resolve to real canonical seat IDs',()=>{
  const screens=read('integrity.json');assert.equal(screens.length,5);
  for(const screen of screens){assert.ok(screen.integrity.checked>0);assert.deepEqual(screen.integrity.errors,[]);}

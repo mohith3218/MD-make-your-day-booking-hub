@@ -1,0 +1,89 @@
+{
+  "browser": "Codex built-in browser",
+  "viewport": [
+    1600,
+    900
+  ],
+  "quality": "balanced",
+  "lighting": "house",
+  "activation": "13 bringToFront/1100 ms cycles; last 5 readings",
+  "samples": [
+    {
+      "averageFps": 30.2,
+      "chairDetail": "far",
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 66,
+      "geometries": 55,
+      "inspection": false,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 259.9,
+      "sceneUsableMs": 3582.4,
+      "textures": 6,
+      "triangles": 581432
+    },
+    {
+      "averageFps": 30,
+      "chairDetail": "far",
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 66,
+      "geometries": 55,
+      "inspection": false,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 259.9,
+      "sceneUsableMs": 3582.4,
+      "textures": 6,
+      "triangles": 581432
+    },
+    {
+      "averageFps": 24.9,
+      "chairDetail": "far",
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 66,
+      "geometries": 55,
+      "inspection": false,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 259.9,
+      "sceneUsableMs": 3582.4,
+      "textures": 6,
+      "triangles": 581432
+    },
+    {
+      "averageFps": 25.9,
+      "chairDetail": "far",
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 66,
+      "geometries": 55,
+      "inspection": false,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 259.9,
+      "sceneUsableMs": 3582.4,
+      "textures": 6,
+      "triangles": 581432
+    },
+    {
+      "averageFps": 29.2,
+      "chairDetail": "far",
+      "devicePixelRatio": 1.0000000298023224,
+      "drawCalls": 66,
+      "geometries": 55,
+      "inspection": false,
+      "renderQuality": "balanced",
+      "renderedSeats": 886,
+      "sceneBuildMs": 259.9,
+      "sceneUsableMs": 3582.4,
+      "textures": 6,
+      "triangles": 581432
+    }
+  ],
+  "frameTimes": [
+    187166.6666666693,
+    188300.00000000297,
+    189633.3333333366,
+    190833.3333333369,
+    192100.0000000038
+  ]
+}

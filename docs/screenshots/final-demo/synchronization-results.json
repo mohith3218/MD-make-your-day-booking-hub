@@ -1,0 +1,333 @@
+{
+  "checks": [
+    {
+      "name": "Standard 2D → 3D exact ID",
+      "state": {
+        "book": {
+          "active": "E8",
+          "ids": [
+            "E8"
+          ],
+          "total": 135
+        },
+        "preview": {
+          "active": "E8",
+          "ids": [
+            "E8"
+          ],
+          "mode": "seat",
+          "price": "₹135",
+          "title": "Row E · Seat 8"
+        }
+      }
+    },
+    {
+      "name": "Standard deselection",
+      "state": {
+        "book": {
+          "active": "E8",
+          "ids": [],
+          "total": 0
+        },
+        "preview": {
+          "active": "E8",
+          "ids": [],
+          "mode": "seat",
+          "price": "₹135",
+          "title": "Row E · Seat 8"
+        }
+      }
+    },
+    {
+      "name": "Premium 2D → 3D",
+      "state": {
+        "book": {
+          "active": "A8",
+          "ids": [
+            "A8"
+          ],
+          "total": 189
+        },
+        "preview": {
+          "active": "A8",
+          "ids": [
+            "A8"
+          ],
+          "mode": "seat",
+          "price": "₹189",
+          "title": "Row A · Seat 8"
+        }
+      }
+    },
+    {
+      "name": "Mixed-category cart",
+      "state": {
+        "book": {
+          "active": "E8",
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "total": 324
+        },
+        "preview": {
+          "active": "E8",
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "mode": "seat",
+          "price": "₹135",
+          "title": "Row E · Seat 8"
+        }
+      }
+    },
+    {
+      "name": "Booked 2D disabled + actual 3D blocked",
+      "state": {
+        "book": {
+          "active": "E8",
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "total": 324
+        },
+        "preview": {
+          "active": "E8",
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "mode": "qa-detail",
+          "price": "₹135",
+          "title": "Row E · Seat 8"
+        }
+      }
+    },
+    {
+      "name": "Held 2D disabled + actual 3D blocked",
+      "state": {
+        "book": {
+          "active": "E8",
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "total": 324
+        },
+        "preview": {
+          "active": "E8",
+          "ids": [
+            "A8",
+            "E8"
+          ],
+          "mode": "qa-detail",
+          "price": "₹135",
+          "title": "Row E · Seat 8"
+        }
+      }
+    },
+    {
+      "name": "Actual 3D raycast → matching 2D ID",
+      "state": {
+        "book": {
+          "active": "B9",
+          "ids": [
+            "A8",
+            "E8",
+            "B9"
+          ],
+          "total": 513
+        },
+        "preview": {
+          "active": "B9",
+          "ids": [
+            "A8",
+            "E8",
+            "B9"
+          ],
+          "mode": "seat",
+          "price": "₹189",
+          "title": "Row B · Seat 9"
+        }
+      }
+    },
+    {
+      "name": "Original Couple IDs select independently",
+      "state": {
+        "book": {
+          "active": "A2",
+          "ids": [
+            "A1",
+            "A2"
+          ],
+          "total": 1152
+        },
+        "preview": {
+          "active": "A2",
+          "ids": [
+            "A1",
+            "A2"
+          ],
+          "mode": "seat",
+          "price": "₹576",
+          "title": "Row A · Seat 2"
+        }
+      }
+    },
+    {
+      "name": "Couple deselection preserves other original ID",
+      "state": {
+        "book": {
+          "active": "A1",
+          "ids": [
+            "A2"
+          ],
+          "total": 576
+        },
+        "preview": {
+          "active": "A1",
+          "ids": [
+            "A2"
+          ],
+          "mode": "seat",
+          "price": "₹576",
+          "title": "Row A · Seat 1"
+        }
+      }
+    },
+    {
+      "name": "recliner 2D → 3D",
+      "state": {
+        "book": {
+          "active": "A1",
+          "ids": [
+            "A1"
+          ],
+          "total": 266
+        },
+        "preview": {
+          "active": "A1",
+          "ids": [
+            "A1"
+          ],
+          "mode": "seat",
+          "price": "₹265.5",
+          "title": "Row A · Seat 1"
+        }
+      }
+    },
+    {
+      "name": "recliner actual 3D → 2D",
+      "state": {
+        "book": {
+          "active": "F5",
+          "ids": [
+            "A1",
+            "F5"
+          ],
+          "total": 425
+        },
+        "preview": {
+          "active": "F5",
+          "ids": [
+            "A1",
+            "F5"
+          ],
+          "mode": "seat",
+          "price": "₹159.3",
+          "title": "Row F · Seat 5"
+        }
+      }
+    },
+    {
+      "name": "jagadamba 2D → 3D",
+      "state": {
+        "book": {
+          "active": "V12",
+          "ids": [
+            "V12"
+          ],
+          "total": 144
+        },
+        "preview": {
+          "active": "V12",
+          "ids": [
+            "V12"
+          ],
+          "mode": "seat",
+          "price": "₹144",
+          "title": "Row V · Seat 12"
+        }
+      }
+    },
+    {
+      "name": "jagadamba actual 3D → 2D",
+      "state": {
+        "book": {
+          "active": "N12",
+          "ids": [
+            "V12",
+            "N12"
+          ],
+          "total": 288
+        },
+        "preview": {
+          "active": "N12",
+          "ids": [
+            "V12",
+            "N12"
+          ],
+          "mode": "seat",
+          "price": "₹144",
+          "title": "Row N · Seat 12"
+        }
+      }
+    },
+    {
+      "name": "Mobile 390×844 Standard booking selection",
+      "state": {
+        "book": {
+          "active": "E8",
+          "ids": [
+            "E8"
+          ],
+          "total": 135
+        },
+        "preview": {
+          "active": "E8",
+          "ids": [
+            "E8"
+          ],
+          "mode": "seat",
+          "price": "₹135",
+          "title": "Row E · Seat 8"
+        }
+      }
+    },
+    {
+      "name": "Mobile actual 3D canvas → 2D exact ID",
+      "state": {
+        "book": {
+          "active": "A8",
+          "ids": [
+            "E8",
+            "A8"
+          ],
+          "total": 324
+        },
+        "preview": {
+          "active": "A8",
+          "ids": [
+            "E8",
+            "A8"
+          ],
+          "mode": "seat",
+          "price": "₹189",
+          "title": "Row A · Seat 8"
+        }
+      }
+    }
+  ]
+}

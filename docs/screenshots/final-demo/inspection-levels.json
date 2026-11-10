@@ -1,0 +1,33 @@
+{
+  "levelResults": [
+    {
+      "allFocusedCentersInFrustum": true,
+      "caption": "Cutaway inspection · all levels · 886 seats · architecture temporarily hidden",
+      "focusedSeats": 886,
+      "level": "all",
+      "totalSeats": 886
+    },
+    {
+      "allFocusedCentersInFrustum": true,
+      "caption": "Cutaway inspection · upper-balcony · 274 seats · architecture temporarily hidden",
+      "focusedSeats": 274,
+      "level": "upper-balcony",
+      "totalSeats": 886
+    },
+    {
+      "allFocusedCentersInFrustum": true,
+      "caption": "Cutaway inspection · lower-balcony · 276 seats · architecture temporarily hidden",
+      "focusedSeats": 276,
+      "level": "lower-balcony",
+      "totalSeats": 886
+    },
+    {
+      "allFocusedCentersInFrustum": true,
+      "caption": "Cutaway inspection · stalls · 336 seats · architecture temporarily hidden",
+      "focusedSeats": 336,
+      "level": "stalls",
+      "totalSeats": 886
+    }
+  ],
+  "restored": true
+}

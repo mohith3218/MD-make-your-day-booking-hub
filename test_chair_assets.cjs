@@ -21,3 +21,24 @@ test('backrest is a closed indexed surface with outward faces and ergonomic dept
  assert.ok(volume>0,'winding must face outward');
  assert.ok(g.boundingBox.max.y>1.2&&g.boundingBox.max.z-g.boundingBox.min.z>0.15);
 });
+
+test('overview assets reduce triangles inside the full-detail component envelope',()=>{
+ for(const kind of ['padding','backrest','armrest','cupHolder']){
+  const near=assets[kind](THREE),far=assets[kind](THREE,'far');
+  const triangles=g=>(g.index?g.index.count:g.attributes.position.count)/3;
+  assert.ok(triangles(far)<triangles(near),kind);
+  near.computeBoundingBox();far.computeBoundingBox();
+  for(const axis of ['x','y','z']){
+   assert.ok(far.boundingBox.min[axis]>=near.boundingBox.min[axis]-1e-5,kind);
+   assert.ok(far.boundingBox.max[axis]<=near.boundingBox.max[axis]+1e-5,kind);
+  }
+ }
+});
+
+test('full-detail armrest has an open recessed cup position and a supporting top',()=>{
+ const mesh=new THREE.Mesh(assets.armrest(THREE),new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
+ mesh.updateMatrixWorld(true);
+ const ray=x=>new THREE.Raycaster(new THREE.Vector3(x,3,-0.42),new THREE.Vector3(0,-1,0)).intersectObject(mesh);
+ assert.equal(ray(0).length,0,'cup opening must pass through the padded arm');
+ assert.ok(ray(0.9).length>0,'foam must remain beside the well');
+});

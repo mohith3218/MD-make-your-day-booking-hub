@@ -1,0 +1,44 @@
+{
+  "viewport": [
+    390,
+    844
+  ],
+  "mapState": {
+    "detailsCollapsed": true,
+    "height": 371.3541870117187,
+    "mapCollapsed": false,
+    "overflow": false
+  },
+  "detailsState": {
+    "detailsCollapsed": false,
+    "height": 371.3541870117187,
+    "mapCollapsed": true
+  },
+  "optionsState": {
+    "open": true,
+    "width": 300.9895935058594
+  },
+  "mobileSelection": {
+    "standaloneMapFocus": "A1; cart changes require the booking parent",
+    "booking": {
+      "book": {
+        "active": "A8",
+        "ids": [
+          "E8",
+          "A8"
+        ],
+        "total": 324
+      },
+      "preview": {
+        "active": "A8",
+        "ids": [
+          "E8",
+          "A8"
+        ],
+        "mode": "seat",
+        "price": "₹189",
+        "title": "Row A · Seat 8"
+      }
+    }
+  }
+}

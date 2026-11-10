@@ -1,0 +1,25 @@
+{
+  "allProjected": true,
+  "hidden": 39,
+  "levels": [
+    {
+      "id": "all",
+      "label": "All levels"
+    },
+    {
+      "id": "upper-balcony",
+      "label": "Upper Balcony"
+    },
+    {
+      "id": "lower-balcony",
+      "label": "Lower Balcony"
+    },
+    {
+      "id": "stalls",
+      "label": "First Class"
+    }
+  ],
+  "mode": "inspection",
+  "seats": 886,
+  "restored": true
+}

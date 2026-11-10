@@ -1,0 +1,22 @@
+{
+  "book": {
+    "active": "B9",
+    "ids": [
+      "A8",
+      "E8",
+      "B9"
+    ],
+    "total": 513
+  },
+  "preview": {
+    "active": "B9",
+    "ids": [
+      "A8",
+      "E8",
+      "B9"
+    ],
+    "mode": "seat",
+    "price": "₹189",
+    "title": "Row B · Seat 9"
+  }
+}

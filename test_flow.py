@@ -17,21 +17,36 @@ from datetime import date, timedelta
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-os.environ.pop('RAZORPAY_KEY_ID', None)
+for _key in ('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET',
+             'SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'TMDB_API_KEY'):
+    os.environ[_key] = ''
+os.environ['ADMIN_PASSWORD'] = 'isolated-test-admin-password'
 # Keep this integration test isolated from the app's local or
 # deployment database, even when DATABASE_URL is present in the shell.
 _test_instance = Path(__file__).resolve().parent / 'instance'
 _test_instance.mkdir(exist_ok=True)
 _test_dir = tempfile.TemporaryDirectory(prefix='flow-', dir=_test_instance)
 os.environ['DATABASE_URL'] = 'sqlite:///' + (Path(_test_dir.name) / 'flow.db').as_posix()
+os.environ['TEST_DATABASE_URL'] = os.environ['DATABASE_URL']
 os.environ['APP_ENV'] = 'testing'
 
 import app as A
 
 
 def main():
+    from sqlalchemy.engine import make_url
+    assert A.app.config['APP_ENV'] == 'testing'
+    assert Path(make_url(A.app.config['SQLALCHEMY_DATABASE_URI']).database).resolve() == Path(_test_dir.name, 'flow.db').resolve()
     A.app.config['WTF_CSRF_ENABLED'] = False
     A.init_db()
+
+    with A.app.app_context():
+        original_admin_hash = A.User.query.filter_by(username='admin').one().password_hash
+        counts = (A.Theater.query.count(), A.Screen.query.count())
+    A.init_db()
+    with A.app.app_context():
+        assert A.User.query.filter_by(username='admin').one().password_hash == original_admin_hash
+        assert (A.Theater.query.count(), A.Screen.query.count()) == counts
 
     with A.app.app_context():
         # movie + showtime on INOX Varun Beach Screen 1 (the recliner audi)
@@ -56,7 +71,7 @@ def main():
         A.db.session.add_all([A.Wallet(user_id=u1.id, balance=2000),
                               A.Wallet(user_id=u2.id, balance=2000)])
         A.db.session.commit()
-        show_id, sid = st.id, screen.id
+        show_id, sid, fixture_movie_id = st.id, screen.id, m.id
         print(f"screen '{screen.full_name}' has {screen.total_seats} seats "
               f"in classes: {screen.classes_summary}")
 
@@ -70,6 +85,27 @@ def main():
 
     login(c1, 'mohith')
     login(c2, 'rahul')
+
+    # Required auditorium routes use their own persisted screen layouts.
+    with A.app.app_context():
+        examples = []
+        for theater_term, screen_term in [('Melody', None), ('Varun Beach', 'Screen 5'), ('Jagadamba', '70MM')]:
+            query = A.Screen.query.join(A.Theater).filter(A.Theater.name.contains(theater_term))
+            if screen_term:
+                query = query.filter(A.Screen.name.contains(screen_term))
+            screen = query.first()
+            assert screen is not None, theater_term
+            show = A.Showtime(movie_id=fixture_movie_id, screen_id=screen.id, theater=screen.theater.name,
+                              show_date=date.today() + timedelta(days=1), show_time='6:30 PM')
+            A.db.session.add(show)
+            A.db.session.flush()
+            examples.append((show.id, screen.theater.name))
+        A.db.session.commit()
+    for example_id, theater_name in examples:
+        assert c1.get(f'/book/{example_id}').status_code == 200
+        preview = c1.get(f'/book/{example_id}/vr-preview')
+        assert preview.status_code == 200 and theater_name in preview.get_data(as_text=True)
+    print('Required three auditorium seat maps and 3D preview routes OK')
 
     # ---- 1. seat map renders with real rows -------------------------------
     r = c1.get(f'/book/{show_id}')
@@ -289,13 +325,13 @@ def main():
     # ---- 11. wallet recharge approval flow -------------------------------
     c1.post('/wallet/recharge', data={'amount': 500}, follow_redirects=True)
     admin = A.app.test_client()
-    # Authenticate the isolated fixture without coupling the business-flow
-    # checks to an operator's admin password or changing any credentials.
+    # Exercise actual password authentication against the isolated fixture.
     with A.app.app_context():
         admin_id = A.User.query.filter_by(username='admin').one().id
+    response = admin.post('/login', data={'username': 'admin', 'password': os.environ['ADMIN_PASSWORD']})
+    assert response.status_code == 302
     with admin.session_transaction() as admin_session:
-        admin_session['_user_id'] = str(admin_id)
-        admin_session['_fresh'] = True
+        assert admin_session['_user_id'] == str(admin_id)
     with A.app.app_context():
         req_id = A.RechargeRequest.query.filter_by(status='PENDING').one().id
     admin.post(f'/admin/recharges/{req_id}/approve', follow_redirects=True)
