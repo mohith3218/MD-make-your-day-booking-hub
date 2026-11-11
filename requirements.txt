@@ -6,3 +6,6 @@ Flask-Login>=0.6
 requests>=2.31
 qrcode[pil]>=7.4          # e-ticket QR code
 razorpay>=1.4             # only needed for live payments; mock mode works without it
+psycopg[binary]>=3.1
+
+python-dotenv>=0.21  # loads .env for Flask CLI

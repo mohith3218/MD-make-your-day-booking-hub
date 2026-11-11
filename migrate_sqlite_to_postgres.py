@@ -1,7 +1,9 @@
-"""Back up SQLite, then copy and verify all application rows atomically.
+"""Back up SQLite, then copy and verify application rows atomically.
 
-Target schema must already be at Alembic head. Empty targets and exact reruns
-are accepted; any other existing data is rejected without merging or overwriting.
+Target schema must already be at Alembic head.
+Each table must either be empty or exactly match its SQLite source.
+Existing matching records are preserved; missing records are inserted.
+Conflicting or partial records are rejected without overwriting.
 """
 import argparse
 from contextlib import closing
@@ -72,36 +74,129 @@ def read_snapshot(backup, metadata):
 def transfer(engine, metadata, data):
     health = check_database(engine, metadata)
     if not health['ok']:
-        raise MigrationError('Target is unavailable or not at schema head. Run database_health.py.')
+        raise MigrationError(
+            'Target is unavailable or not at schema head. '
+            'Run database_health.py.'
+        )
+
     report = {}
+
     with engine.begin() as conn:
         if engine.dialect.name == 'postgresql':
             conn.execute(text('SELECT pg_advisory_xact_lock(740621110)'))
-            quoted = ', '.join(conn.dialect.identifier_preparer.format_table(t) for t in metadata.sorted_tables)
-            conn.execute(text('LOCK TABLE ' + quoted + ' IN ACCESS EXCLUSIVE MODE'))
-        target = {t.name: conn.execute(select(t).order_by(*t.primary_key.columns)).mappings().all()
-                  for t in metadata.sorted_tables}
-        existing = any(target.values())
-        if existing and any(digest(target[name]) != digest(rows) for name, rows in data.items()):
-            raise MigrationError('Target contains different records. Use a fresh database; no records changed.')
+
+            quoted = ', '.join(
+                conn.dialect.identifier_preparer.format_table(t)
+                for t in metadata.sorted_tables
+            )
+            conn.execute(
+                text('LOCK TABLE ' + quoted + ' IN ACCESS EXCLUSIVE MODE')
+            )
+
+        # Inspect existing records in every application table.
+        target = {
+            t.name: conn.execute(
+                select(t).order_by(*t.primary_key.columns)
+            ).mappings().all()
+            for t in metadata.sorted_tables
+        }
+
+        # Reject conflicting or partially populated tables.
+        # Matching tables are preserved; empty tables can be populated.
         for table in metadata.sorted_tables:
-            rows = data[table.name]
-            if not existing and rows:
-                for offset in range(0, len(rows), 500):
-                    conn.execute(table.insert(), [dict(row) for row in rows[offset:offset + 500]])
-            copied = conn.execute(select(table).order_by(*table.primary_key.columns)).mappings().all()
-            if len(rows) != len(copied) or digest(rows) != digest(copied):
-                raise MigrationError('Verification failed; transaction rolled back: ' + table.name)
-            report[table.name] = {'source': len(rows), 'target': len(copied), 'content_verified': True}
-        if not existing and engine.dialect.name == 'postgresql':
+            source_rows = data[table.name]
+            target_rows = target[table.name]
+
+            if target_rows and digest(target_rows) != digest(source_rows):
+                raise MigrationError(
+                    'Target table contains different or partial records: '
+                    + table.name
+                    + '. No records changed.'
+                )
+
+        # Insert only into empty tables.
+        for table in metadata.sorted_tables:
+            source_rows = data[table.name]
+            target_rows = target[table.name]
+
+            if not target_rows and source_rows:
+                for offset in range(0, len(source_rows), 500):
+                    conn.execute(
+                        table.insert(),
+                        [
+                            dict(row)
+                            for row in source_rows[offset:offset + 500]
+                        ]
+                    )
+
+            # Verify the final contents of every table.
+            copied = conn.execute(
+                select(table).order_by(*table.primary_key.columns)
+            ).mappings().all()
+
+            if (
+                len(source_rows) != len(copied)
+                or digest(source_rows) != digest(copied)
+            ):
+                raise MigrationError(
+                    'Verification failed; transaction rolled back: '
+                    + table.name
+                )
+
+            report[table.name] = {
+                'source': len(source_rows),
+                'target': len(copied),
+                'content_verified': True,
+                'action': (
+                    'preserved_existing'
+                    if target_rows
+                    else 'inserted'
+                    if source_rows
+                    else 'empty'
+                )
+            }
+
+        # Explicit imported IDs do not automatically advance PostgreSQL
+        # SERIAL sequences. Synchronize every ID sequence with actual data.
+        if engine.dialect.name == 'postgresql':
             for table in metadata.sorted_tables:
-                # Explicit IDs do not advance PostgreSQL SERIAL sequences.
+                if 'id' not in table.columns:
+                    continue
+
                 quoted = conn.dialect.identifier_preparer.format_table(table)
-                sequence = conn.scalar(text("SELECT pg_get_serial_sequence(:table_name, 'id')"), {'table_name': quoted})
+
+                sequence = conn.scalar(
+                    text(
+                        "SELECT pg_get_serial_sequence(:table_name, 'id')"
+                    ),
+                    {'table_name': quoted}
+                )
+
                 if sequence:
-                    maximum = max((row['id'] for row in data[table.name]), default=0)
-                    conn.execute(text('SELECT setval(CAST(:sequence AS regclass), :value, :called)'),
-                                 {'sequence': sequence, 'value': max(1, maximum), 'called': maximum > 0})
+                    maximum = conn.scalar(
+                        select(table.c.id).order_by(table.c.id.desc()).limit(1)
+                    )
+
+                    if maximum is None:
+                        conn.execute(
+                            text(
+                                'SELECT setval(CAST(:sequence AS regclass), '
+                                ':value, false)'
+                            ),
+                            {'sequence': sequence, 'value': 1}
+                        )
+                    else:
+                        conn.execute(
+                            text(
+                                'SELECT setval(CAST(:sequence AS regclass), '
+                                ':value, true)'
+                            ),
+                            {
+                                'sequence': sequence,
+                                'value': maximum
+                            }
+                        )
+
     return report
 
 

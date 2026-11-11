@@ -41,6 +41,8 @@ class MigrationTests(unittest.TestCase):
             conn.execute(db.metadata.tables['theater'].insert(), dict(id=91, name='Fixture venue'))
             conn.execute(db.metadata.tables['screen'].insert(), dict(id=128, theater_id=91,
                          name='Fixture screen', layout_json='{"wall":{"left":"custom"},"confidence":"estimated"}'))
+            conn.execute(db.metadata.tables['movie'].insert(), dict(id=17, title='Fixture movie',
+                         description='Migration test fixture', duration=120))
         before = self.source.read_bytes()
         self.backup = backup_source(self.source, self.folder / 'backups')
         self.assertEqual(before, self.source.read_bytes())
@@ -66,6 +68,39 @@ class MigrationTests(unittest.TestCase):
             self.assertTrue(user['is_admin'])
             self.assertEqual(user['password_hash'], self.password_hash)
             self.assertTrue(check_password_hash(user['password_hash'], 'fixture-password'))
+
+    def test_preserves_matching_existing_tables_and_inserts_empty_tables(self):
+        theater = db.metadata.tables['theater']
+        screen = db.metadata.tables['screen']
+
+        # Pre-populate the target with exact copies of source theater and screen.
+        with self.engine.begin() as conn:
+            conn.execute(theater.insert(), [dict(row) for row in self.data['theater']])
+            conn.execute(screen.insert(), [dict(row) for row in self.data['screen']])
+
+        report = transfer(self.engine, db.metadata, self.data)
+
+        self.assertEqual(report['theater']['action'], 'preserved_existing')
+        self.assertEqual(report['screen']['action'], 'preserved_existing')
+
+        self.assertEqual(report['movie']['action'], 'inserted')
+        self.assertEqual(report['user']['action'], 'inserted')
+
+        self.assertTrue(
+            all(item['content_verified'] for item in report.values())
+        )
+
+        # Exact rerun must remain safe.
+        second_report = transfer(self.engine, db.metadata, self.data)
+
+        self.assertEqual(
+            second_report['theater']['action'],
+            'preserved_existing'
+        )
+        self.assertEqual(
+            second_report['screen']['action'],
+            'preserved_existing'
+        )
 
     def test_conflicting_target_is_never_overwritten(self):
         transfer(self.engine, db.metadata, self.data)

@@ -70,8 +70,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 import seat_layout as sl
-from database_config import database_settings
+from dotenv import load_dotenv  # load .env early
+load_dotenv()  # Ensure environment variables are available before any config
 from vizag_theaters import seed_vizag_theaters
+from theatre_service import TheatreService
 
 
 def load_local_dotenv():
@@ -108,10 +110,22 @@ app.config['APP_ENV'] = APP_ENV
 # Production must use a stable operator-managed key; development keeps a local fallback.
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or (
     None if APP_ENV == 'production' else secrets.token_hex(32))
-_database_url, _database_options = database_settings()
-app.config['SQLALCHEMY_DATABASE_URI'] = _database_url
+# Primary database configuration
+from database_config import database_settings
+
+# Keep local development on SQLite even when .env contains the
+# production Supabase DATABASE_URL. Testing uses its isolated test URL.
+database_env = dict(os.environ)
+if APP_ENV == 'development':
+    database_env['DATABASE_URL'] = 'sqlite:///vizag_movies.db'
+if APP_ENV == 'production' and not database_env.get('DATABASE_URL'):
+    raise RuntimeError(
+        'Production requires DATABASE_URL pointing to Supabase PostgreSQL.'
+    )
+database_url, database_engine_options = database_settings(database_env)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _database_options
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = database_engine_options
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -3024,6 +3038,89 @@ def screen_classes(screen_id):
                                 for c in screen.layout.get('classes', [])]})
 
 
+# ── Supabase Theatre API ──────────────────────────────────────────────────────
+# These endpoints read exclusively from Supabase PostgreSQL via TheatreService.
+# They are the authoritative source for theatre listing data in the frontend.
+# All other routes (booking, seat-selection, analytics) continue to use the
+# SQLite ORM so that cross-table joins remain on a single engine.
+
+@app.route('/api/theatres')
+def api_theatres():
+    """
+    Return all theatres from Supabase as JSON.
+    Falls back to SQLite if Supabase is unavailable.
+    Response: { source: "supabase"|"sqlite", theatres: [...] }
+    """
+    service = TheatreService.get()
+    if service:
+        try:
+            data = service.all_theatres_with_screens()
+            return jsonify({'source': 'supabase', 'count': len(data), 'theatres': data})
+        except Exception as exc:
+            app.logger.warning("TheatreService.all_theatres_with_screens failed: %s", exc)
+    # Fallback: SQLite ORM
+    theaters = Theater.query.order_by(Theater.name).all()
+    data = [{'id': t.id, 'name': t.name, 'location': t.location,
+             'city': t.city, 'address': t.address,
+             'screens': [{'id': s.id, 'name': s.name, 'screen_type': s.screen_type}
+                         for s in t.screens]}
+            for t in theaters]
+    return jsonify({'source': 'sqlite', 'count': len(data), 'theatres': data})
+
+
+@app.route('/api/theatres/<int:theatre_id>')
+def api_theatre_detail(theatre_id):
+    """
+    Return one theatre with its screens from Supabase.
+    Falls back to SQLite ORM.
+    """
+    service = TheatreService.get()
+    if service:
+        try:
+            theatre = service.theatre_by_id(theatre_id)
+            if theatre:
+                theatre['screens'] = service.screens_for_theatre(theatre_id)
+                return jsonify({'source': 'supabase', 'theatre': theatre})
+        except Exception as exc:
+            app.logger.warning("TheatreService.theatre_by_id failed: %s", exc)
+    # Fallback: SQLite ORM
+    t = Theater.query.get_or_404(theatre_id)
+    return jsonify({'source': 'sqlite', 'theatre': {
+        'id': t.id, 'name': t.name, 'location': t.location,
+        'city': t.city, 'address': t.address,
+        'screens': [{'id': s.id, 'name': s.name, 'screen_type': s.screen_type,
+                     'layout_json': s.layout_json}
+                    for s in t.screens]
+    }})
+
+
+@app.route('/api/theatres/<int:theatre_id>/screens/<int:screen_id>/layout')
+def api_screen_layout(theatre_id, screen_id):
+    """
+    Return one screen's layout_json from Supabase.
+    Used by the 3D preview and seat-selection clients to fetch the authoritative layout.
+    Falls back to SQLite ORM.
+    """
+    service = TheatreService.get()
+    if service:
+        try:
+            screen = service.screen_by_id(screen_id)
+            if screen and screen.get('theater_id') == theatre_id:
+                return jsonify({'source': 'supabase', 'screen': screen})
+        except Exception as exc:
+            app.logger.warning("TheatreService.screen_by_id failed: %s", exc)
+    # Fallback: SQLite ORM
+    screen = Screen.query.filter_by(id=screen_id, theater_id=theatre_id).first_or_404()
+    return jsonify({'source': 'sqlite', 'screen': {
+        'id': screen.id, 'theater_id': screen.theater_id,
+        'name': screen.name, 'screen_type': screen.screen_type,
+        'layout_json': screen.layout_json,
+        'theater_name': screen.theater.name,
+        'theater_location': screen.theater.location,
+    }})
+
+
+
 @app.route('/admin/recharges')
 @login_required
 def admin_recharges():
@@ -3561,12 +3658,20 @@ def seed_sample_movies():
 
 def init_db():
     with app.app_context():
-        if db.engine.dialect.name != 'sqlite' or APP_ENV == 'production':
+        # Production guard: ensure schema is healthy before serving traffic.
+        if APP_ENV == 'production':
+            if db.engine.dialect.name != 'postgresql':
+                raise RuntimeError(
+                    'Production must use PostgreSQL. SQLite startup is not allowed.'
+                )
             from database_health import check_database
             health = check_database(db.engine, db.metadata)
             if not health['ok']:
-                raise RuntimeError('Database is unavailable or schema is outdated. Run alembic upgrade head; '
-                                   'use python database_health.py for diagnostics.')
+                raise RuntimeError(
+                    'Database is unavailable or schema is outdated. '
+                    'Run alembic upgrade head; '
+                    'use python database_health.py for diagnostics.'
+                )
             return
         db.create_all()
         auto_migrate()

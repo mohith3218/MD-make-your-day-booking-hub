@@ -1,5 +1,7 @@
 """Backend-only connection configuration shared by Flask and migration tools."""
 import os
+from dotenv import load_dotenv  # Ensure .env is read as soon as this module loads
+load_dotenv()
 from pathlib import Path
 
 from sqlalchemy.engine import make_url
@@ -7,6 +9,11 @@ from sqlalchemy.exc import ArgumentError
 
 
 def database_settings(environ=None):
+    """Return (url, options) for SQLAlchemy based on environment.
+    This function now ensures the driver is normalized to ``postgresql+psycopg``
+    and loads ``.env`` early via ``load_dotenv`` (imported at top of the file).
+    """
+
     env = os.environ if environ is None else environ
     raw = env.get('DATABASE_URL') or 'sqlite:///vizag_movies.db'
     try:
