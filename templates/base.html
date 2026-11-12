@@ -19,11 +19,30 @@
     .cine-hero { background-image: radial-gradient(ellipse at 76% 38%, rgba(201,168,76,.16), transparent 34%), radial-gradient(ellipse at 86% 73%, rgba(22,108,132,.14), transparent 39%), linear-gradient(118deg, transparent 38%, rgba(201,168,76,.035) 49%, transparent 60%), linear-gradient(90deg, rgba(13,13,13,.96) 0%, rgba(13,13,13,.78) 42%, rgba(13,13,13,.2) 100%), linear-gradient(0deg, #0d0d0d 0%, transparent 35%), url('/static/images/cinewave-hero.jpg'); background-size: cover; background-position: center; }
     .cine-card { background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); border: 1px solid rgba(201,168,76,.14); }
     .cine-card:hover { border-color: rgba(201,168,76,.44); box-shadow: 0 14px 40px rgba(0,0,0,.28); }
-    .glass-card { background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); border-color: rgba(201,168,76,.16); }
     [class*="bg-[#C9A84C]"] { color: #15130d !important; }
     input:focus, select:focus, textarea:focus { --tw-ring-color: rgba(201,168,76,.55); }
     ::selection { background: rgba(201,168,76,.35); color: #fff; }
     .glass-card { background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); backdrop-filter: blur(12px); border: 1px solid rgba(201,168,76,.16); }
+    :root { --cine-radius: 1rem; --cine-border: rgba(201,168,76,.16); }
+    .cine-stat { min-width: 0; border-radius: var(--cine-radius); font-variant-numeric: tabular-nums; }
+    .cine-stat > p:first-child { color: #94a3b8; font-size: 11px; }
+    .cine-stat > p:nth-child(2) { overflow-wrap: anywhere; }
+    .cine-empty { padding: 2.5rem 1.5rem; text-align: center; border-radius: var(--cine-radius); }
+    .cine-empty-icon { display: grid; place-items: center; width: 3rem; height: 3rem; margin: 0 auto 1rem; border-radius: 50%; background: rgba(201,168,76,.1); color: var(--cine-gold-light); }
+    .cine-notice { display: flex; align-items: flex-start; gap: .75rem; padding: 1rem; border: 1px solid var(--cine-border); border-radius: var(--cine-radius); background: rgba(201,168,76,.07); color: #f0d78c; font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+    .cine-table-scroll { overflow-x: auto; }
+    .cine-table-scroll table { min-width: 360px; font-variant-numeric: tabular-nums; }
+    .cine-table-scroll th:nth-last-child(-n+2), .cine-table-scroll td:nth-last-child(-n+2) { text-align: right; white-space: nowrap; }
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cine-gold); outline-offset: 3px; }
+    .cine-skip { position: fixed; top: .5rem; left: .5rem; z-index: 100; padding: .75rem 1rem; border-radius: .75rem; background: var(--cine-gold-light); color: #111; transform: translateY(-150%); }
+    .cine-skip:focus { transform: translateY(0); }
+    @media (max-width: 900px) {
+      .cine-header-inner { height: auto; min-height: 5rem; flex-wrap: wrap; padding-top: .75rem; padding-bottom: .75rem; }
+      .cine-nav { flex-wrap: wrap; row-gap: .75rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #app-body, #app-body a, #app-body button, #app-body img { transition: none !important; }
+    }
     .screen-glow { box-shadow: 0 15px 30px -5px rgba(201,168,76,0.4); }
     .seat { width: 26px; height: 26px; border-radius: 6px 6px 3px 3px; font-size: 10px; line-height: 1; }
     .seat-wide { width: 58px; }
@@ -143,6 +162,8 @@
       border-color: #cbd5e1 !important;
       color: #475569 !important;
     }
+    body.light-mode .cine-notice { color: #70531a; background: #fff8e5; border-color: #d5bd80; }
+    body.light-mode .cine-empty-icon { color: #70531a; }
     body.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
       border-color: #e2e8f0 !important;
     }
@@ -150,9 +171,10 @@
   {% block head %}{% endblock %}
 </head>
 <body id="app-body" class="bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
+  <a class="cine-skip" href="#main-content">Skip to content</a>
 
   <header class="sticky top-0 z-50 glass-card border-b border-slate-800/50">
-    <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
+    <div class="cine-header-inner max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
       <a href="{{ url_for('home') }}" class="flex items-center space-x-3 shrink-0">
         <div id="site-logo-mark" class="w-10 h-10 bg-gradient-to-tr from-amber-500 to-yellow-200 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
           <i class="fa-solid fa-film text-slate-950 text-lg"></i>
@@ -160,9 +182,9 @@
         <span class="text-2xl font-black tracking-wider cine-brand">MD CINEWAVE</span>
       </a>
 
-      <div class="flex items-center gap-3 sm:gap-5 text-sm">
+      <nav aria-label="Main navigation" class="cine-nav flex items-center gap-3 sm:gap-5 text-sm">
         <!-- Theme Toggle Button -->
-        <button id="theme-toggle" onclick="toggleTheme()" class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 hover:bg-slate-700 flex items-center justify-center text-amber-400 transition" title="Toggle Light/Dark Mode">
+        <button id="theme-toggle" onclick="toggleTheme()" aria-label="Use light theme" aria-pressed="false" class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 hover:bg-slate-700 flex items-center justify-center text-amber-400 transition" title="Toggle Light/Dark Mode">
           <i class="fa-solid fa-moon text-sm" id="theme-icon"></i>
         </button>
 
@@ -188,16 +210,16 @@
           <a href="{{ url_for('login') }}" class="font-semibold text-slate-300 hover:text-white">Login</a>
           <a href="{{ url_for('register') }}" class="px-4 py-2 cine-primary hover:bg-amber-300 font-semibold rounded-xl transition shadow-lg shadow-amber-600/20">Register</a>
         {% endif %}
-      </div>
+      </nav>
     </div>
   </header>
 
-  <main class="flex-1 w-full">
+  <main id="main-content" tabindex="-1" class="flex-1 w-full">
     <div class="max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6">
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           {% for m in messages %}
-            <div class="p-3 rounded-xl bg-[#C9A84C]/10 border border-[#C9A84C]/30 text-[#C9A84C] text-sm">{{ m }}</div>
+            <div role="status" class="cine-notice"><i aria-hidden="true" class="fa-solid fa-circle-info mt-1"></i><span>{{ m }}</span></div>
           {% endfor %}
         {% endif %}
       {% endwith %}
@@ -214,6 +236,9 @@
     function applyTheme(isLight) {
       const body = document.getElementById('app-body');
       const icon = document.getElementById('theme-icon');
+      const toggle = document.getElementById('theme-toggle');
+      toggle.setAttribute('aria-pressed', String(isLight));
+      toggle.setAttribute('aria-label', isLight ? 'Use dark theme' : 'Use light theme');
       if (isLight) {
         body.classList.add('light-mode');
         icon.classList.remove('fa-moon');
@@ -227,15 +252,12 @@
 
     function toggleTheme() {
       const isLight = !document.getElementById('app-body').classList.contains('light-mode');
-      localStorage.setItem('cinewave_theme', isLight ? 'light' : 'dark');
       applyTheme(isLight);
+      try { localStorage.setItem('cinewave_theme', isLight ? 'light' : 'dark'); } catch { /* Theme still works when storage is disabled. */ }
     }
 
     // Load theme on startup
-    const savedTheme = localStorage.getItem('cinewave_theme');
-    if (savedTheme === 'light') {
-      applyTheme(true);
-    }
+    try { applyTheme(localStorage.getItem('cinewave_theme') === 'light'); } catch { applyTheme(false); }
   </script>
 
   {% block scripts %}{% endblock %}

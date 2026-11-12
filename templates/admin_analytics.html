@@ -1,14 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Analytics · MD CineWave{% endblock %}
+{% block head %}
+<style>
+  .revenue-chart { display: flex; gap: .5rem; align-items: flex-end; height: 184px; padding-top: 8px; border-bottom: 1px solid rgba(148,163,184,.25); }
+  .revenue-day { display: flex; flex: 1 0 42px; flex-direction: column; align-items: center; justify-content: flex-end; gap: .5rem; height: 100%; border-radius: .5rem .5rem 0 0; }
+  .revenue-day:focus-visible { outline: 2px solid var(--cine-gold); outline-offset: -2px; }
+  .revenue-bar { width: 100%; max-width: 64px; border-radius: 5px 5px 0 0; background: linear-gradient(to top, #705c29, var(--cine-gold-light)); }
+  .revenue-bar-zero { background: #475569; }
+  .revenue-label { color: #94a3b8; font-size: 10px; white-space: nowrap; }
+  .revenue-detail { min-height: 1.5rem; font-size: 12px; color: #cbd5e1; font-variant-numeric: tabular-nums; }
+  body.light-mode .revenue-label, body.light-mode .revenue-detail { color: #334155; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-3">
   <h1 class="text-2xl font-black text-white flex items-center gap-2">
     <i class="fa-solid fa-chart-line text-[#C9A84C]"></i> Analytics
   </h1>
-  <div class="flex items-center gap-2 text-xs">
+  <nav aria-label="Analytics period and export" class="flex flex-wrap items-center gap-2 text-xs">
     {% for d, label in [(7, '7 days'), (30, '30 days'), (90, '90 days'), (0, 'All time')] %}
       <a href="{{ url_for('admin_analytics', days=d) if d else url_for('admin_analytics') }}"
+         {% if days == d %}aria-current="page"{% endif %}
          class="px-3 py-1.5 rounded-xl font-semibold transition {% if days == d %}bg-[#C9A84C] text-white{% else %}bg-slate-800 hover:bg-slate-700 text-slate-200{% endif %}">
         {{ label }}
       </a>
@@ -17,23 +30,23 @@
        class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition ml-1">
       <i class="fa-solid fa-file-csv mr-1"></i>Export CSV
     </a>
-  </div>
+  </nav>
 </div>
 <p class="text-xs text-slate-500">
   {% if days %}Window: last {{ days }} days{% else %}Window: all time{% endif %}
-  · paid_at decides the revenue window · occupancy counts confirmed seats on future shows
+  · booking date filters KPIs; payment date groups the daily trend · occupancy counts confirmed seats on future shows
 </p>
 
 <!-- KPI cards -->
 <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
   {% for label, value, icon, color in [
       ('Revenue', '₹%.0f'|format(a.paid.amount), 'fa-indian-rupee-sign', 'text-emerald-400'),
-      ('Tickets sold', a.paid.count, 'fa-ticket', 'text-sky-400'),
-      ('Avg ticket', '₹%.0f'|format(a.avg_ticket), 'fa-chart-simple', 'text-violet-400'),
+      ('Paid bookings', a.paid.count, 'fa-ticket', 'text-sky-400'),
+      ('Avg booking', '₹%.0f'|format(a.avg_ticket), 'fa-chart-simple', 'text-violet-400'),
       ('Active buyers', a.active_buyers, 'fa-users', 'text-amber-400'),
       ('Loss rate', '%.1f%%'|format(a.cancel_rate), 'fa-ban', 'text-amber-400'),
       ('Occupancy', '%.1f%%'|format(a.occupancy_overall), 'fa-chair', 'text-[#C9A84C]')] %}
-    <div class="glass-card rounded-2xl p-4">
+    <div class="glass-card cine-stat p-4">
       <p class="text-[10px] uppercase tracking-wider text-slate-500">{{ label }}</p>
       <p class="text-xl font-black text-white mt-1">{{ value }}</p>
       <i class="fa-solid {{ icon }} {{ color }} text-xs mt-2"></i>
@@ -43,23 +56,27 @@
 
 <!-- Revenue trend -->
 <section class="glass-card rounded-2xl p-6 space-y-4">
-  <div class="flex items-center justify-between">
+  <div class="flex flex-wrap gap-2 items-center justify-between">
     <h2 class="text-lg font-bold text-white">Revenue trend</h2>
     <span class="text-xs text-slate-400">₹{{ '%.2f'|format(a.trend_total) }} in window</span>
   </div>
   {% if a.trend %}
     {% set max_val = a.trend_max if a.trend_max > 0 else 1 %}
-    <div class="flex items-end gap-1.5 h-40">
+    <p class="text-xs text-slate-400">Daily revenue · peak ₹{{ '%.2f'|format(a.trend_max) }} · scroll to explore dates</p>
+    <div class="overflow-x-auto pb-2" role="region" aria-label="Daily revenue chart" tabindex="0">
+    <div class="revenue-chart">
       {% for t in a.trend %}
-        {% set h = ((t.amount / max_val) * 100) | round | int %}
-        <div class="flex-1 flex flex-col items-center justify-end gap-1 group min-w-0"
-             title="{{ t.label }} — ₹{{ '%.2f'|format(t.amount) }} · {{ t.tickets }} tickets">
-          <div class="w-full rounded-t-md bg-gradient-to-t from-[#C9A84C]/40 to-[#C9A84C] {% if t.amount == 0 %}bg-slate-800 from-slate-800 to-slate-800{% endif %}"
-               style="height: {{ [h, 2] | max }}px;"></div>
-          <span class="text-[8px] text-slate-500 truncate w-full text-center">{{ t.label }}</span>
+        {% set bar_height = ((t.amount / max_val) * 140) | round | int %}
+        {% set detail = t.label ~ ' — ₹' ~ ('%.2f'|format(t.amount)) ~ ' · ' ~ t.tickets ~ ' paid bookings' %}
+        <div class="revenue-day" tabindex="0" aria-label="{{ detail }}" data-detail="{{ detail }}" title="{{ detail }}">
+          <div aria-hidden="true" class="revenue-bar{% if t.amount == 0 %} revenue-bar-zero{% endif %}" style="height: {{ [bar_height, 2] | max }}px;"></div>
+          <span class="revenue-label" aria-hidden="true">{{ t.label }}</span>
         </div>
       {% endfor %}
     </div>
+    </div>
+    <p id="revenue-detail" class="revenue-detail" aria-live="polite">Focus, tap or hover over a date for its revenue and booking count.</p>
+    {% if a.trend_total == 0 %}<p class="text-sm text-slate-400">No paid revenue recorded in this daily trend yet.</p>{% endif %}
   {% else %}
     <p class="text-sm text-slate-500">Daily trend is available for the 7 / 30 / 90-day views.</p>
   {% endif %}
@@ -67,9 +84,9 @@
 
 <div class="grid lg:grid-cols-2 gap-6">
   <!-- Top movies -->
-  <section class="glass-card rounded-2xl p-6 space-y-3">
+  <section class="glass-card rounded-2xl p-6 space-y-3 min-w-0">
     <h2 class="text-lg font-bold text-white">Top movies</h2>
-    <table class="w-full text-left text-xs text-slate-300">
+    <div class="cine-table-scroll" role="region" aria-label="Top movies" tabindex="0"><table class="w-full text-left text-xs text-slate-300">
       <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
         <tr><th class="p-3">#</th><th class="p-3">Movie</th><th class="p-3">Bookings</th><th class="p-3">Revenue</th></tr>
       </thead>
@@ -85,13 +102,13 @@
           <tr><td colspan="4" class="p-3 text-slate-500">No paid bookings in this window yet.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
+    </table></div>
   </section>
 
   <!-- Top theatres -->
-  <section class="glass-card rounded-2xl p-6 space-y-3">
+  <section class="glass-card rounded-2xl p-6 space-y-3 min-w-0">
     <h2 class="text-lg font-bold text-white">Top theatres</h2>
-    <table class="w-full text-left text-xs text-slate-300">
+    <div class="cine-table-scroll" role="region" aria-label="Top theatres" tabindex="0"><table class="w-full text-left text-xs text-slate-300">
       <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
         <tr><th class="p-3">#</th><th class="p-3">Theatre</th><th class="p-3">Bookings</th><th class="p-3">Revenue</th></tr>
       </thead>
@@ -110,7 +127,7 @@
           <tr><td colspan="4" class="p-3 text-slate-500">No paid bookings in this window yet.</td></tr>
         {% endfor %}
       </tbody>
-    </table>
+    </table></div>
   </section>
 </div>
 
@@ -121,7 +138,7 @@
     {% for m in a.pay_split %}
       {% set pct = (100 * m.amount / a.pay_total) | round | int if a.pay_total else 0 %}
       <div>
-        <div class="flex justify-between text-xs mb-1">
+        <div class="flex flex-wrap gap-1 justify-between text-xs mb-1">
           <span class="font-semibold text-slate-200 capitalize">{{ m.method }}</span>
           <span class="text-slate-400">₹{{ '%.0f'|format(m.amount) }} · {{ m.count }} txn · {{ pct }}%</span>
         </div>
@@ -146,8 +163,8 @@
           {% if h.pct >= 70 %}{% set bar = 'bg-amber-500' %}
           {% elif h.pct >= 40 %}{% set bar = 'bg-amber-400' %}
           {% else %}{% set bar = 'bg-sky-500' %}{% endif %}
-          <div class="flex items-center gap-3 text-xs">
-            <div class="w-40 shrink-0 min-w-0">
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-3 text-xs">
+            <div class="w-full sm:w-40 shrink-0 min-w-0">
               <p class="font-semibold text-white truncate">{{ h.showtime.movie.title }}</p>
               <p class="text-[10px] text-slate-500 truncate">{{ h.showtime.theater }} · {{ h.showtime.screen_label }} · {{ h.showtime.show_date.strftime('%d %b') }} {{ h.showtime.show_time }}</p>
             </div>
@@ -163,4 +180,15 @@
     {% endif %}
   </section>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const revenueDetail = document.getElementById('revenue-detail');
+  document.querySelectorAll('.revenue-day').forEach(day => {
+    const showDetail = () => { revenueDetail.textContent = day.dataset.detail; };
+    day.addEventListener('focus', showDetail);
+    day.addEventListener('pointerenter', showDetail);
+    day.addEventListener('click', showDetail);
+  });
+</script>
 {% endblock %}

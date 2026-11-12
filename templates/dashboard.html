@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="flex items-center justify-between gap-3">
-  <h1 class="text-2xl font-black text-white">My Bookings</h1>
+  <div><h1 class="text-2xl font-black text-white">My Bookings</h1><p class="text-xs text-slate-400 mt-1">Your tickets and pending reservations in one place.</p></div>
   <a href="{{ url_for('wallet_page') }}" class="text-xs text-slate-400 hover:text-white">Wallet ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
 </div>
 
@@ -41,8 +41,10 @@
     {% endfor %}
   </div>
 {% else %}
-  <div class="glass-card rounded-2xl p-10 text-center space-y-4">
-    <p class="text-slate-400">You have no bookings yet.</p>
+  <div class="glass-card cine-empty space-y-4">
+    <span class="cine-empty-icon" aria-hidden="true"><i class="fa-solid fa-ticket text-xl"></i></span>
+    <h2 class="text-xl text-white">Your next movie awaits</h2>
+    <p class="text-sm text-slate-400">Your tickets will appear here after you reserve seats.</p>
     <a href="{{ url_for('home') }}" class="inline-block px-6 py-2.5 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">Browse movies</a>
   </div>
 {% endif %}

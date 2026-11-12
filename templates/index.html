@@ -146,7 +146,7 @@
         <div data-moods="{{ movie.moods|join(',') }}" class="movie-card group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700 relative">
           <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
             {% if movie.poster %}
-              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
             {% else %}
               <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
                 <i class="fa-solid fa-film text-4xl"></i>
@@ -196,7 +196,7 @@
         <div data-moods="{{ movie.moods|join(',') }}" class="movie-card group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-purple-500/50 relative">
           <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
             {% if movie.poster %}
-              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
             {% else %}
               <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
                 <i class="fa-solid fa-film text-4xl"></i>
@@ -249,7 +249,7 @@
         <div class="group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700 relative">
           <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
             {% if movie.poster %}
-              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
             {% else %}
               <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
                 <i class="fa-solid fa-film text-4xl"></i>
@@ -296,7 +296,7 @@
         <div class="group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-purple-500/50 relative">
           <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
             {% if movie.poster %}
-              <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
             {% else %}
               <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
                 <i class="fa-solid fa-film text-4xl"></i>
