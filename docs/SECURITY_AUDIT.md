@@ -1,31 +1,26 @@
-# Security audit
+# Security notes: demo-only application
 
-**Reviewed:** 2026-11-04
+Updated 12 November 2026. No real-money payment integration remains.
 
-## Findings
+- Production requires PostgreSQL and a private SECRET_KEY of at least 32 characters.
+  Secure session cookies, HSTS and existing authorization checks remain in place.
+- Demo payments are disabled by default in production. Explicitly enable them with
+  DEMO_PAYMENTS_ENABLED=true. All checkout methods and wallet credits are virtual.
+- Orders and responses are generated locally. Response HMACs use the private app
+  secret and bind both order and payment IDs. Unknown external order types, wrong
+  owners, invalid amounts/methods and forged responses are rejected.
+- The generic compatibility callback accepts only demo fields and stored demo orders.
+  No external callback SDK, live verification API or webhook endpoint remains.
+- Booking ownership, seat locks, expiry and unique sold-seat constraints are retained.
+  Completed-booking callbacks cannot turn an existing success into a failure.
+- New demo payment records carry demo=true and settled=false metadata. The existing
+  PAID/CAPTURED workflow states do not represent bank settlement. Tickets, QR codes,
+  email notices and exported rows identify demo records.
+- No database history is rewritten. Existing gateway values remain readable, but
+  historical external orders cannot be simulated or newly confirmed.
 
-- When gateway keys were missing, mock checkout was selected without an environment boundary.
-- The TMDb API key had a committed source-code fallback.
-- A payment callback verified the Razorpay HMAC but did not retrieve the payment from Razorpay to confirm captured status, order, amount and currency.
-- Seat and wallet payment completion needed stronger duplicate-request handling.
-- Flask sessions used HTTP-only and SameSite cookies, but production cookie enforcement and response security headers were incomplete.
-
-## Implemented
-
-- Mock order creation, signature acceptance and simulation are restricted to `APP_ENV=development` or `testing`. Production fails closed without live gateway settings.
-- Production requests require a stable 32-character secret, PostgreSQL URL, Razorpay key ID/secret and webhook secret. Production sessions use secure cookies and HTTPS Strict-Transport-Security is emitted.
-- Razorpay callback signatures are followed by a server-side payment fetch. Confirmation requires the matching order, captured status, INR currency and expected paise amount.
-- Webhooks accept only `payment.captured` events with matching order, captured status, currency and amount. Booking state prevents repeat confirmation.
-- Added common content-type, framing, referrer and permissions headers; cleared the session before login.
-- Removed the hard-coded TMDb key fallback; TMDb access now requires `TMDB_API_KEY`.
-- Added a 50 MiB request size limit and ignored `.env` files remain excluded by `.gitignore`.
-
-## Remaining risks and work
-
-- CSRF protection and distributed login/payment rate limiting are not implemented.
-- Payment amounts and wallet balances still use floating-point database columns; a migration to integer paise and an idempotent financial ledger is required.
-- Razorpay refund execution, webhook event-ID persistence, password reset controls and upload content sniffing require a dedicated review.
-- Production validation was not performed against live gateway credentials or a deployed HTTPS/PostgreSQL stack.
-- Repository history was not scanned for leaked active credentials; operators should review/rotate any credential previously committed.
-
-This is a code review summary, not a security certification.
+Existing limitations outside this focused task: CSRF protection and distributed
+rate limiting are not implemented; monetary display calculations retain the old
+Float columns and rounding; password reset and upload content validation need
+separate review. Repository history and untracked binary backups are not rewritten.
+No remote deployment, real SMTP delivery or live database test is claimed.

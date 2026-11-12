@@ -1,33 +1,82 @@
-# Production deployment guide
+# Render Free deployment: one Flask service, demo payments only
 
-**Status:** Configuration gates are present; a production deployment is not yet ready to launch.
+The same Python Web Service serves Flask routes, Jinja templates and static Three.js
+assets. There is no separate frontend project and no real-money payment provider.
+No deployment or account configuration has been performed by this change.
 
-## Required settings
+## Render service settings
 
-Set these in the deployment secret manager (never commit them):
+- Runtime: Python; repository root as the working directory; instance type: Free.
+- Build command: `pip install -r requirements.txt`
+- Start command: `gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 app:app`
+- Render assigns PORT and an onrender.com URL after a successful deployment.
 
-- `APP_ENV=production`
-- `SECRET_KEY` with at least 32 random characters
-- `DATABASE_URL` for PostgreSQL
-- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
-- SMTP settings for ticket delivery, and `TMDB_API_KEY` if movie metadata lookup is used
+Gunicorn loads `gunicorn.conf.py` from the working directory. Its production
+preflight validates the private session key and runs the existing read-only
+PostgreSQL schema/connectivity health check. An unhealthy database stops startup.
+It never creates tables, migrates, seeds, resets users or changes existing data.
 
-Production requests fail closed when required database, session or payment configuration is absent. Secure session cookies and HSTS are enabled automatically. Mock payments are unavailable in production.
+## Required environment variables
 
-## Database and schema changes
+```dotenv
+APP_ENV=production
+DATABASE_URL=<existing private Supabase PostgreSQL Session pooler URI>
+DATABASE_SSLMODE=require
+SECRET_KEY=<private random value of at least 32 characters>
+DEMO_PAYMENTS_ENABLED=true
+```
 
-SQLite remains the local default. Production currently requires a PostgreSQL URL, but this repository does not yet contain an Alembic baseline or reviewed upgrade scripts. Do not point production at this version until a migration baseline is created and tested against a copy of the actual database.
+Store the real DATABASE_URL and SECRET_KEY only in Render's environment settings.
+Use the existing pooler connection from Supabase Connect; encode its password
+correctly and preserve TLS. Do not paste credentials into tracked files or logs.
+The true demo setting is required to offer checkout; omitting it or setting false
+keeps the production website available but blocks all demo payment/recharge routes.
+Secure session cookies and HSTS stay enabled. No provider secrets are required.
 
-For a safe future migration: take a verified backup; restore it to a staging PostgreSQL instance; generate and review schema migrations; verify row counts and booking/payment relationships; run regression and concurrency suites; then schedule a controlled production cutover with a tested rollback/restore procedure. Never run `db.drop_all()` against customer data.
+Optional: `TMDB_API_KEY` for movie import and cast lookup. It is unnecessary for
+browsing stored movies. ADMIN_PASSWORD is not required for existing production
+accounts. The development-only SQLite seeder is never used in production.
 
-`test_flow.py` forces its own ignored `instance/test_flow.db` database before importing the app.
+## Protect the existing database
 
-## Operational requirements still open
+Do not run init/reseed/transfer scripts or an automatic migration as a build step.
+Existing IDs, users, movies, theatres, layouts, bookings, wallet values and payment
+history stay intact. This change needs no schema migration. Alembic remains at
+`20261110_01`; `python database_health.py` is read-only. If health reports a schema
+mismatch, back up and investigate against the existing baseline before any separately
+approved database change. Do not blindly run a baseline over populated tables.
 
-- Add PostgreSQL driver and tested pool sizing for the deployment worker count.
-- Configure HTTPS at the trusted ingress, restricted hostnames, process supervision and log retention.
-- Add encrypted, access-restricted backups and rehearse point-in-time restore.
-- Add Alembic migrations, health/metrics monitoring, alerting and a background job runner for email/report work.
-- Validate Razorpay production and webhook credentials using gateway sandbox/staging before accepting payments.
+Only a fresh local development database may be created using `python app.py` and
+an explicitly supplied ADMIN_PASSWORD. Development deliberately uses SQLite even
+if a private Supabase URL is present. Tests assign fresh disposable SQLite files.
 
-No deployment, backup restore, live payment or throughput test has been performed in this workspace.
+## Demo transaction meaning
+
+Choose simulated UPI, card or netbanking, then simulate success/failure. Wallet and
+split payments use virtual credits. No network gateway is contacted, no sensitive
+payment fields are collected and no real funds move. New payment metadata includes
+`demo=true` and `settled=false`. Legacy PAID/CAPTURED states preserve booking logic;
+they are not financial settlement claims. Demo tickets/QR codes/email and CSV
+exports identify their demo meaning. Historical external records are preserved
+and cannot be completed by the simulator.
+
+## Free-tier limitations and remaining checks
+
+- Free services have an ephemeral filesystem: do not store application data in
+  SQLite in production. Uploaded trailers/reference photos stored on disk are not
+  durable across restarts/redeploys. Already-committed static 3D assets remain part
+  of each build. Durable upload storage is outside this focused change.
+- Render Free blocks outbound SMTP ports 25, 465 and 587. Existing web registration
+  creates demo accounts immediately; it does not send an OTP in the current route.
+  Optional ticket emails will fail with standard SMTP there; on-screen e-tickets
+  and QR downloads continue working. Email transport changes are not included.
+- Free services may spin down when idle and take time to wake. No availability or
+  hardware-performance guarantee is made for an academic demo.
+- An actual Linux/Gunicorn deployment, Supabase connectivity, database schema
+  health, login using existing users and browser/WebGL checks remain to be verified.
+  Local tests must never use the real Supabase database.
+
+References: [Render Flask deployment](https://render.com/docs/deploy-flask),
+[Gunicorn configuration and hooks](https://gunicorn.org/reference/settings/),
+[Free service limits](https://render.com/docs/free),
+[SMTP restrictions](https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports).

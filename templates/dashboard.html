@@ -25,7 +25,7 @@
 
         <div class="text-left md:text-right space-y-2 shrink-0">
           <div>
-            <p class="text-[11px] text-slate-400">{{ 'Total paid' if b.status == 'PAID' else 'Amount' }}</p>
+            <p class="text-[11px] text-slate-400">{{ 'Demo amount' if b.payment and b.payment.is_demo else 'Recorded amount' }}</p>
             <p class="text-xl font-black text-white">₹{{ '%.2f'|format(b.total_amount) }}</p>
             <p class="text-[10px] text-slate-500">{{ b.booked_at.strftime('%d %b %Y, %I:%M %p') }}</p>
           </div>

@@ -16,13 +16,11 @@ Keep the original database and its backups. For Supabase PostgreSQL configuratio
 
 ### Email verification and ticket delivery
 
-New registrations require a verified email address. The app emails a six-digit OTP,
-valid for 10 minutes, and limits each code to five attempts with a 60-second resend
-cooldown. A confirmed payment automatically emails the ticket details and QR image.
-If delivery fails after payment, the booking stays confirmed and the ticket page
-offers a resend action.
+Current demo registration creates accounts immediately; the existing verification
+helpers are retained. Confirmed demo bookings generate an on-screen ticket and QR
+marked DEMO. Optional email delivery failure never undoes the booking.
 
-Configure an SMTP service before enabling registration. Copy `.env.example` to
+Configure SMTP only if ticket email delivery is needed. Copy `.env.example` to
 `.env`, then fill in the real settings for your mail provider. The app loads this
 file at startup; restart the server after editing it. For Gmail, use a Google
 App Password rather than your normal account password. Keep `.env` private and
@@ -34,14 +32,13 @@ notepad .env
 ```
 
 Use port `587` with `SMTP_USE_SSL=0` for STARTTLS, or an implicit TLS port such as
-`465` with `SMTP_USE_SSL=1`. Existing accounts are preserved as verified during
-database migration; new accounts must complete OTP verification before they can
-sign in.
+`465` with `SMTP_USE_SSL=1`. Existing accounts are preserved during database migration. The current demo
+registration route creates accounts immediately without sending an OTP.
 
 Verify everything at once:
 
 ```bash
-python test_flow.py     # 15 checks: seat map, locks, wallet, gateway, refunds, expiry, analytics, cast
+python test_flow.py     # isolated booking, demo payment, wallet, split, refund and analytics checks
 ```
 
 ## 2. Files
@@ -51,11 +48,11 @@ python test_flow.py     # 15 checks: seat map, locks, wallet, gateway, refunds, 
 | `app.py` | Your app, extended (models + all routes) |
 | `seat_layout.py` | Seat layout engine — turns layout JSON into a seat grid |
 | `vizag_theaters.py` | 8 real Vizag theatres, 22 screens, ~4,995 seats |
-| `payments.py` | Razorpay + sandbox gateway, fee/GST math, signature checks |
+| `payments.py` | Local demo simulator, fee/GST math, private response signatures |
 | `test_flow.py` | End-to-end test of the whole booking + payment flow |
 | `templates/base.html` | Shared shell (header, wallet balance, flash messages) |
 | `templates/book.html` | New seat map |
-| `templates/checkout.html`, `pay_mock.html`, `pay_razorpay.html`, `ticket.html` | Payment flow + e-ticket |
+| `templates/checkout.html`, `pay_mock.html`, `ticket.html` | Payment flow + e-ticket |
 | `templates/wallet.html`, `admin_recharges.html`, `admin_bookings.html` | Wallet & admin |
 | `templates/screens.html`, `add_screen.html`, `edit_layout.html` | Seating arrangement admin |
 | `app_original_backup.py` | Your original file, untouched, just in case |
@@ -146,8 +143,8 @@ The initial Visakhapatnam profiles include an identified Main Screen reference f
 select seats
   → SeatLock (8 min hold)  +  Booking(status=PENDING)
   → /checkout            wallet OR UPI / card / netbanking
-  → gateway order        Razorpay order OR sandbox order (amounts in paise)
-  → signature verified   HMAC-SHA256 of "order_id|payment_id"
+  → gateway order        local DEMO order (amounts in paise; no settlement)
+  → signature verified   private HMAC-SHA256 demo response signature
   → BookedSeat rows committed, status=PAID, lock released
   → /ticket/<ref>        e-ticket + QR
 ```
@@ -158,24 +155,25 @@ Money math, all in `payments.py`:
 tickets (sum of seat prices)
 + convenience fee  ₹20 per seat
 + GST              18% of the fee
-= amount charged
+= simulated amount
 ```
 
-Three payment methods:
+DEMO — No real money is charged or transferred. Wallet balances are virtual,
+UPI/card/netbanking are simulations, and generated demo tickets are not valid for
+admission. No card numbers, UPI PINs or bank credentials are collected.
 
-- **Wallet** — uses the `Wallet` / `WalletTransaction` / `RechargeRequest` models you'd
-  already defined but never wired up. Users request a recharge, admin approves it at
-  **Admin → Recharges**, balance credits instantly. **Every new account now starts with
-  ₹500 welcome balance** (`WELCOME_WALLET_BALANCE` in `app.py`), recorded as a wallet transaction.
-- **Razorpay** — real Razorpay Checkout. Set the keys and it switches over automatically:
-  ```bash
-  export RAZORPAY_KEY_ID=rzp_test_xxxxxxxx
-  export RAZORPAY_KEY_SECRET=yyyyyyyy
-  export RAZORPAY_WEBHOOK_SECRET=zzzzzzzz   # optional, enables /pay/webhook
-  ```
-- **Sandbox** — no keys, no problem. Creates a real order record, returns a signed
-  response and verifies the signature exactly like live mode, plus a
-  "Simulate a failed payment" button. Good for demoing to your reviewer.
+- **Wallet:** existing virtual credits, recharge approval and refund calculations.
+- **Demo simulator:** choose UPI/card/netbanking, then simulate success or failure.
+  Orders and signed responses are created locally; no payment gateway is contacted.
+- **Squad Pay:** participants simulate their shares using authenticated accounts.
+
+Local development and testing enable the simulator by default unless explicitly
+disabled. Production disables it by default. Set `DEMO_PAYMENTS_ENABLED=true` to
+allow the hosted academic demo. Internal `PAID`/`CAPTURED` states preserve the
+booking workflow; they do not represent real financial settlement. New payment
+metadata records `demo=true` and `settled=false`; CSV rows identify demo amounts.
+
+For one-service Render Free hosting, see [the deployment guide](docs/PRODUCTION_DEPLOYMENT_GUIDE.md).
 
 ### Why it can't double-book
 
@@ -197,10 +195,9 @@ Three payment methods:
 | `GET /api/showtime/<id>/availability` | Live seat status (polled by the seat page) |
 | `GET /checkout/<reference>` | Order summary, fees, hold countdown |
 | `POST /pay/wallet/<reference>` | Pay from wallet |
-| `POST /pay/gateway/<reference>` | Create Razorpay/sandbox order |
+| `POST /pay/gateway/<reference>` | Create a local demo order |
 | `POST /pay/callback` | Verify signature, confirm booking |
 | `POST /pay/simulate/<reference>` | Sandbox success/failure |
-| `POST /pay/webhook` | Razorpay webhook (survives a closed tab) |
 | `POST /booking/<reference>/cancel` | Release held seats |
 | `GET /ticket/<reference>` + `/qr.png` | E-ticket and QR |
 | `GET /wallet`, `POST /wallet/recharge` | Wallet + recharge request |

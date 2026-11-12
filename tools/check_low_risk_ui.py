@@ -20,8 +20,8 @@ os.environ.update(APP_ENV='testing', DATABASE_URL=database_url,
                   TEST_DATABASE_URL=database_url,
                   ADMIN_PASSWORD='isolated-ui-test-password',
                   SECRET_KEY='isolated-ui-test-session-key', SESSION_COOKIE_SECURE='0')
-for key in ('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET',
-            'SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'TMDB_API_KEY'):
+os.environ['DEMO_PAYMENTS_ENABLED'] = 'true'
+for key in ('SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'TMDB_API_KEY'):
     os.environ[key] = ''
 
 import app as A

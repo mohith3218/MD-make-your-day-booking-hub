@@ -10,7 +10,7 @@
 
 ## Implemented
 
-- Added small focused payment helpers for mock-mode policy and server-side Razorpay payment-detail retrieval.
+- Added small focused payment helpers for demo-mode policy and local signed payment simulation.
 - Added normalized seat-hold persistence while preserving the existing booking/lock interfaces.
 - Isolated `test_flow.py` to `instance/test_flow.db`, so the destructive test setup cannot drop a configured local or deployment database.
 - Added a simultaneous hold regression check to the flow script.

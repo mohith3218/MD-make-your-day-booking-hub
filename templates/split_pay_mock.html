@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Sandbox Split Share · {{ booking.reference }}{% endblock %}
+{% block title %}DEMO Split Share · {{ booking.reference }}{% endblock %}
 
 {% block content %}
 <div class="max-w-md mx-auto glass-card rounded-3xl p-7 sm:p-8 space-y-6 border border-indigo-400/20">
   <div class="text-center space-y-2">
-    <p class="text-[10px] uppercase tracking-[.2em] text-indigo-300 font-bold">Sandbox · Squad Pay</p>
+    <p class="text-[10px] uppercase tracking-[.2em] text-indigo-300 font-bold">DEMO — No real money is charged · Squad Pay</p>
     <h1 class="text-3xl text-white">₹{{ '%.2f'|format(contribution.amount) }}</h1>
     <p class="text-xs text-slate-400">{{ movie.title }} · seats {{ booking.seats }}</p>
     <p class="text-[10px] text-slate-500">Share {{ contribution.share_index }} of {{ booking.seat_list|length }} · {{ user.username }}</p>
@@ -13,11 +13,11 @@
   <div class="rounded-2xl border border-white/10 bg-black/25 p-4 space-y-2 text-[11px] text-slate-400">
     <div class="flex justify-between gap-3"><span>Order ID</span><span class="font-mono text-slate-200 break-all text-right">{{ order.order_id }}</span></div>
     <div class="flex justify-between"><span>Amount</span><span class="font-mono text-slate-200">{{ order.amount_paise }} paise</span></div>
-    <div class="flex justify-between"><span>Method</span><span class="uppercase text-slate-200">Sandbox</span></div>
+    <div class="flex justify-between"><span>Method</span><span class="uppercase text-slate-200">DEMO</span></div>
   </div>
 
   <form method="POST" action="{{ url_for('simulate_split_payment', token=booking.split_token, contribution_id=contribution.id) }}" class="space-y-3">
-    <button type="submit" name="outcome" value="success" class="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-950/40 hover:bg-indigo-500">Pay my share · ₹{{ '%.2f'|format(contribution.amount) }}</button>
+    <button type="submit" name="outcome" value="success" class="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-950/40 hover:bg-indigo-500">Simulate my share · ₹{{ '%.2f'|format(contribution.amount) }}</button>
     <button type="submit" name="outcome" value="fail" class="w-full rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-700">Simulate a failed payment</button>
   </form>
   <p class="text-center text-[10px] leading-relaxed text-slate-500">Sandbox only. This simulates a signed payment response and does not charge real money.</p>

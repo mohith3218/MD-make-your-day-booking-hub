@@ -80,8 +80,8 @@ until application verification is complete. Never delete the original SQLite fil
 
 ## Run and verify
 
-Use `APP_ENV=development` for the academic demo; mock payments remain restricted to
-development/testing. PostgreSQL startup checks the schema and never seeds or resets
+Use `APP_ENV=development` for local SQLite, or `APP_ENV=production` with
+`DEMO_PAYMENTS_ENABLED=true` for the hosted demo. Production startup checks the schema and never seeds or resets
 the migrated administrator. Run `python app.py`, sign in using the existing admin
 and customer passwords, inspect the catalogue and history, then perform a demo
 booking and payment. Check Sri Melody, INOX Varun Beach Screen 5 and Jagadamba 70MM
@@ -89,8 +89,9 @@ seat maps and interactive 3D previews in a browser.
 
 SMTP and payment settings remain in `.env.example`. Configure SMTP for actual OTP
 and ticket email delivery. For a production deployment, existing validation also
-requires a stable secret (at least 32 characters), PostgreSQL and live Razorpay keys
-including a webhook secret; demo payments are disabled there.
+requires a stable secret (at least 32 characters) and PostgreSQL. Set
+`DEMO_PAYMENTS_ENABLED=true` explicitly to enable demo checkout in production.
+No payment provider secrets are used. See the Render deployment guide for commands.
 
 ```powershell
 python test_database_migration.py

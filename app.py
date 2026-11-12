@@ -14,7 +14,7 @@ What is new in this version
 2. FULL PAYMENT FLOW
    select seats -> seats locked for 8 min -> checkout (wallet / UPI / card)
    -> gateway order -> signature verification -> seats committed -> e-ticket.
-   Razorpay when keys are set, sandbox simulator otherwise.
+   DEMO only: no real money is charged or transferred.
    Wallet, recharge requests and admin approval are now wired up.
 
 Run:
@@ -101,7 +101,7 @@ def load_local_dotenv():
 
 load_local_dotenv()
 
-# Payment credentials in .env must be loaded before the gateway reads them.
+# Load local demo configuration before importing payment helpers.
 import payments
 
 app = Flask(__name__)
@@ -163,9 +163,6 @@ def validate_production_config():
     required = {
         'SECRET_KEY': app.config.get('SECRET_KEY'),
         'DATABASE_URL': os.environ.get('DATABASE_URL'),
-        'RAZORPAY_KEY_ID': os.environ.get('RAZORPAY_KEY_ID'),
-        'RAZORPAY_KEY_SECRET': os.environ.get('RAZORPAY_KEY_SECRET'),
-        'RAZORPAY_WEBHOOK_SECRET': os.environ.get('RAZORPAY_WEBHOOK_SECRET'),
     }
     missing = [name for name, value in required.items() if not value]
     if app.config.get('SECRET_KEY') and len(app.config['SECRET_KEY']) < 32:
@@ -179,6 +176,15 @@ def validate_production_config():
 @app.before_request
 def enforce_production_configuration():
     validate_production_config()
+
+
+@app.before_request
+def enforce_demo_payment_setting():
+    if (request.endpoint in {'pay_with_wallet', 'pay_gateway', 'payment_callback',
+                            'simulate', 'start_split_payment', 'simulate_split_payment',
+                            'wallet_recharge', 'handle_recharge'}
+            and not payments.mock_payments_enabled()):
+        abort(403, description='Demo payments are disabled. No real payment is available.')
 
 
 @app.after_request
@@ -759,7 +765,7 @@ class SeatHold(db.Model):
 class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('booking.id'), nullable=False)
-    gateway = db.Column(db.String(30), default='mock')      # razorpay | mock | wallet
+    gateway = db.Column(db.String(30), default='mock')      # demo or historical gateway value
     order_id = db.Column(db.String(80), nullable=True)
     payment_id = db.Column(db.String(80), nullable=True)
     signature = db.Column(db.String(200), nullable=True)
@@ -772,6 +778,11 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (db.Index('ix_payment_order_id', 'order_id'),)
+
+    @property
+    def is_demo(self):
+        """Classify stored values without rewriting history or changing the schema."""
+        return self.gateway in {'mock', 'mock-split', 'wallet'}
 
 
 class SplitContribution(db.Model):
@@ -1002,23 +1013,27 @@ def dispatch_ticket_delivery(booking):
     qr_payload = (f'CINEWAVE|{booking.reference}|{movie_title}|{showtime.theater}|'
                   f'{showtime.show_date}|{showtime.show_time}|{booking.seats}')
     message = EmailMessage()
-    message['Subject'] = f'Your MD CineWave ticket: {movie_title} ({booking.reference})'
+    demo = bool(booking.payment and booking.payment.is_demo)
+    notice = 'DEMO — No real money charged. Not valid for theatre admission.\n\n' if demo else ''
+    if demo:
+        qr_payload = 'DEMO|' + qr_payload
+    message['Subject'] = ('DEMO — ' if demo else '') + f'Your MD CineWave ticket: {movie_title} ({booking.reference})'
     message['From'] = app.config['SMTP_FROM_EMAIL']
     message['To'] = user.email
     message.set_content(
-        f'Your booking is confirmed.\n\nMovie: {movie_title}\nTheatre: {showtime.theater}\n'
+        notice + f'Your booking is confirmed.\n\nMovie: {movie_title}\nTheatre: {showtime.theater}\n'
         f'Screen: {showtime.screen_label}\nDate: {date_text}\nTime: {showtime.show_time}\n'
         f'Seats: {booking.seats}\nBooking reference: {booking.reference}\n\n'
-        'The attached QR code is your entry pass. Please show it at the theatre.'
+        + ('The attached QR code is a demonstration only.' if demo else 'The attached QR code is your entry pass.')
     )
     safe_title = html.escape(movie_title)
     message.add_alternative(
-        f'<html><body><h2>Booking confirmed</h2><p><b>{safe_title}</b></p>'
+        f'<html><body><p>{html.escape(notice)}</p><h2>Booking confirmed</h2><p><b>{safe_title}</b></p>'
         f'<p>{html.escape(showtime.theater)} · {html.escape(showtime.screen_label)}</p>'
         f'<p>{html.escape(date_text)} at {html.escape(showtime.show_time)}</p>'
         f'<p>Seats: <b>{html.escape(booking.seats)}</b></p>'
         f'<p>Reference: <b>{html.escape(booking.reference)}</b></p>'
-        '<p>Your QR entry pass is attached to this email.</p></body></html>', subtype='html')
+        '<p>Your QR ticket is attached to this email.</p></body></html>', subtype='html')
     try:
         import qrcode
         qr_buffer = io.BytesIO()
@@ -1107,6 +1122,8 @@ def commit_seats(booking):
 
 def finalise_paid_booking(booking, payment):
     """Commit seats, mark paid, drop the lock. Returns (ok, message)."""
+    if not payment.is_demo:
+        return False, 'Only demo payments can be completed by this application.'
     try:
         if booking.status == 'PENDING':
             claimed = Booking.query.filter_by(id=booking.id, status='PENDING').update(
@@ -1121,7 +1138,11 @@ def finalise_paid_booking(booking, payment):
         commit_seats(booking)
         booking.status = 'PAID'
         booking.paid_at = datetime.utcnow()
+        # Legacy state names describe the booking workflow, not bank settlement.
         payment.status = 'CAPTURED'
+        metadata = json.loads(payment.raw_response or '{}')
+        metadata.update(demo=True, settled=False)
+        payment.raw_response = json.dumps(metadata)
         if booking.lock_token:
             SeatHold.query.filter_by(token=booking.lock_token).delete(synchronize_session=False)
             lock = SeatLock.query.filter_by(token=booking.lock_token).first()
@@ -1149,7 +1170,7 @@ def finalise_paid_booking(booking, payment):
         db.session.commit()
         # Dispatch digital receipt / e-ticket
         dispatch_ticket_delivery(booking)
-        msg = "Payment successful" + (" 🎉 (Rewatch Bonus: 2X CinePass Points Earned!)" if is_rewatch else "")
+        msg = "Demo payment successful — no real money charged" + (" 🎉 (Rewatch Bonus: 2X CinePass Points Earned!)" if is_rewatch else "")
         return True, msg
     except IntegrityError:
         db.session.rollback()
@@ -1189,7 +1210,7 @@ def inject_globals():
         user_points = current_user.points or 0
     return {'wallet_balance': wallet_balance,
             'user_points': user_points,
-            'gateway_live': payments.is_live_gateway(),
+            'demo_payments_enabled': payments.mock_payments_enabled(),
             'startup_id': app.config['STARTUP_ID'],
             'today': date.today()}
 
@@ -1809,7 +1830,7 @@ def checkout(reference):
                            showtime=booking.showtime,
                            movie=booking.showtime.movie,
                            wallet=wallet,
-                           can_use_wallet=wallet.balance >= booking.total_amount,
+                           can_use_wallet=payments.mock_payments_enabled() and wallet.balance >= booking.total_amount,
                            gateway=payments.gateway_name(),
                            snack_items=SNACK_ITEMS,
                            split_pay_url=_split_invite_url(booking) if booking.split_token else '',
@@ -1848,8 +1869,8 @@ def split_pay(token):
 @login_required
 def start_split_payment(token):
     booking = Booking.query.filter_by(split_token=token).first_or_404()
-    if payments.gateway_name() != 'mock':
-        flash('Split Pay is available in sandbox mode. Use the booking holder’s checkout for live payment.')
+    if not payments.mock_payments_enabled():
+        flash('Demo split payments are disabled.')
         return redirect(url_for('split_pay', token=token))
     if booking.status != 'PENDING' or booking.is_expired:
         if booking.is_expired:
@@ -1911,6 +1932,8 @@ def simulate_split_payment(token, contribution_id):
         flash('This split payment is no longer active.')
         return redirect(url_for('split_pay', token=token))
 
+    if request.form.get('outcome', 'success') not in {'success', 'fail'}:
+        abort(400, description='Unsupported demo outcome.')
     succeeded = request.form.get('outcome', 'success') == 'success'
     result = payments.simulate_payment(contribution.order_id,
                                        method='split', succeed=succeeded)
@@ -2057,7 +2080,7 @@ def pay_with_wallet(reference):
 @app.route('/pay/gateway/<reference>', methods=['POST'])
 @login_required
 def pay_gateway(reference):
-    """Creates the Razorpay (or mock) order and opens the payment page."""
+    """Create a local demo order and open the simulator; never contact a provider."""
     booking = _load_pending(reference)
     if _has_split_progress(booking):
         flash('A group split is in progress. Finish it from the Squad Pay invite link.')
@@ -2067,6 +2090,8 @@ def pay_gateway(reference):
         return redirect(url_for('dashboard'))
 
     method = request.form.get('method', 'upi')
+    if method not in payments.DEMO_METHODS - {'split'}:
+        abort(400, description='Unsupported demo payment method.')
     try:
         order = payments.create_order(
             booking.total_amount,
@@ -2088,8 +2113,7 @@ def pay_gateway(reference):
     db.session.add(payment)
     db.session.commit()
 
-    template = 'pay_razorpay.html' if order['gateway'] == 'razorpay' else 'pay_mock.html'
-    return render_template(template, booking=booking, order=order,
+    return render_template('pay_mock.html', booking=booking, order=order,
                            movie=booking.showtime.movie,
                            showtime=booking.showtime, method=method,
                            user=current_user)
@@ -2098,15 +2122,11 @@ def pay_gateway(reference):
 @app.route('/pay/callback', methods=['POST'])
 @login_required
 def payment_callback():
-    """
-    Where the gateway hands control back. Razorpay Checkout posts
-    razorpay_order_id / razorpay_payment_id / razorpay_signature here;
-    the mock page posts the same three fields.
-    """
+    """Compatibility endpoint for signed local demo responses only."""
     reference = request.form.get('reference', '')
-    order_id = request.form.get('razorpay_order_id', '')
-    payment_id = request.form.get('razorpay_payment_id', '')
-    signature = request.form.get('razorpay_signature', '')
+    order_id = request.form.get('order_id', '')
+    payment_id = request.form.get('payment_id', '')
+    signature = request.form.get('signature', '')
     failed = request.form.get('failed') == '1'
     error_msg = request.form.get('error_message', 'Payment failed at the gateway.')
 
@@ -2115,6 +2135,17 @@ def payment_callback():
     if not payment:
         flash("No payment was started for this booking.")
         return redirect(url_for('checkout', reference=reference))
+
+    if payment.gateway != 'mock' or not (payment.order_id or '').startswith('order_mock_'):
+        abort(404)
+    if booking.status == 'PAID':
+        return redirect(url_for('ticket', reference=reference))
+    if booking.status != 'PENDING' or booking.is_expired:
+        if booking.is_expired:
+            release_booking(booking, 'EXPIRED')
+        return redirect(url_for('dashboard'))
+    if payment.status != 'CREATED' or payment.amount != booking.total_amount:
+        abort(400, description='Demo order does not match the booking.')
 
     if order_id != payment.order_id:
         flash("Payment could not be matched to this booking. Please retry checkout.")
@@ -2128,29 +2159,13 @@ def payment_callback():
         flash(f"{error_msg} Your seats have been released.")
         return redirect(url_for('book', showtime_id=booking.showtime_id))
 
-    # signature check - this is what makes the success real
+    # Authenticate a demo response; this is not evidence of financial settlement.
     if not payments.verify_signature(order_id, payment_id, signature):
         payment.status = 'FAILED'
         payment.error_message = 'Signature verification failed'
         db.session.commit()
         release_booking(booking, 'FAILED')
         flash("Payment could not be verified. Nothing was charged.")
-        return redirect(url_for('book', showtime_id=booking.showtime_id))
-
-    if payment.gateway == 'razorpay' and not payments.fetch_captured_payment(
-            order_id, payment_id, int(round(payment.amount * 100))):
-        payment.status = 'FAILED'
-        payment.error_message = 'Gateway payment details did not match the order'
-        db.session.commit()
-        release_booking(booking, 'FAILED')
-        flash("Payment could not be confirmed by the gateway. Please contact support if charged.")
-        return redirect(url_for('book', showtime_id=booking.showtime_id))
-
-    if booking.status == 'PAID':                     # double submit guard
-        return redirect(url_for('ticket', reference=reference))
-    if booking.is_expired:
-        release_booking(booking, 'EXPIRED')
-        flash("Your hold expired before payment completed. Refund will be processed.")
         return redirect(url_for('book', showtime_id=booking.showtime_id))
 
     payment.payment_id = payment_id
@@ -2174,9 +2189,13 @@ def simulate(reference):
     if (not payment or not payment.order_id or payment.gateway != 'mock'
             or not payment.order_id.startswith('order_mock_')):
         abort(404)
+    if payment.amount != booking.total_amount:
+        abort(400, description='Demo order does not match the booking.')
     if booking.status != 'PENDING' or booking.is_expired:
         flash("This booking can no longer be paid.")
         return redirect(url_for('checkout', reference=reference))
+    if request.form.get('outcome', 'success') not in {'success', 'fail'}:
+        abort(400, description='Unsupported demo outcome.')
     succeed = request.form.get('outcome', 'success') == 'success'
     result = payments.simulate_payment(payment.order_id,
                                        method=payment.method or 'upi',
@@ -2189,6 +2208,8 @@ def simulate(reference):
         flash(f"{result['error']} Your seats have been released.")
         return redirect(url_for('book', showtime_id=booking.showtime_id))
 
+    if not payments.verify_signature(payment.order_id, result['payment_id'], result['signature']):
+        abort(400, description='Invalid demo response.')
     payment.payment_id = result['payment_id']
     payment.signature = result['signature']
     db.session.commit()
@@ -2197,33 +2218,6 @@ def simulate(reference):
     flash(msg)
     return redirect(url_for('ticket', reference=reference) if ok
                     else url_for('book', showtime_id=booking.showtime_id))
-
-
-@app.route('/pay/webhook', methods=['POST'])
-def payment_webhook():
-    """
-    Razorpay webhook (payment.captured). Set RAZORPAY_WEBHOOK_SECRET to enable.
-    Makes the booking survive the user closing the tab mid-payment.
-    """
-    signature = request.headers.get('X-Razorpay-Signature', '')
-    if not payments.verify_webhook(request.get_data(), signature):
-        return jsonify({'status': 'invalid signature'}), 400
-
-    event = request.get_json(silent=True) or {}
-    if event.get('event') != 'payment.captured':
-        return jsonify({'status': 'ignored'}), 200
-    entity = (event.get('payload', {}).get('payment', {}).get('entity', {}))
-    order_id = entity.get('order_id')
-    payment = Payment.query.filter_by(order_id=order_id).first()
-    if (payment and payment.gateway == 'razorpay'
-            and payment.booking.status == 'PENDING'
-            and entity.get('status') == 'captured'
-            and entity.get('currency') == payment.currency == 'INR'
-            and int(entity.get('amount', -1)) == int(round(payment.amount * 100))):
-        payment.payment_id = entity.get('id')
-        payment.method = entity.get('method', payment.method)
-        finalise_paid_booking(payment.booking, payment)
-    return jsonify({'status': 'ok'})
 
 
 @app.route('/booking/<reference>/cancel', methods=['POST'])
@@ -2314,6 +2308,8 @@ def ticket_qr(reference):
     payload = (f"CINEWAVE|{booking.reference}|{booking.showtime.movie.title}|"
                f"{booking.showtime.theater}|{booking.showtime.show_date}|"
                f"{booking.showtime.show_time}|{booking.seats}")
+    if booking.payment and booking.payment.is_demo:
+        payload = 'DEMO|' + payload
     try:
         import qrcode
         img = qrcode.make(payload)
@@ -3375,7 +3371,7 @@ def admin_analytics_export():
     writer.writerow(['reference', 'booked_at', 'status', 'movie', 'theatre',
                      'screen', 'show_date', 'show_time', 'seats', 'seat_count',
                      'ticket_amount', 'convenience_fee', 'gst', 'total_amount',
-                     'method', 'paid_at'])
+                     'method', 'paid_at', 'payment_mode'])
     for b in _analytics_bookings(days):
         payment = b.payment
         writer.writerow([
@@ -3395,6 +3391,7 @@ def admin_analytics_export():
             f"{b.total_amount:.2f}",
             payment.method if payment else '',
             b.paid_at.strftime('%Y-%m-%d %H:%M') if b.paid_at else '',
+            'DEMO - not settled' if payment and payment.is_demo else 'Historical record',
         ])
 
     stamp = datetime.utcnow().strftime('%Y%m%d_%H%M')
@@ -3705,7 +3702,7 @@ def init_db():
                 s.theater = screen.theater.name
         db.session.commit()
 
-        mode = "LIVE Razorpay" if payments.is_live_gateway() else "MOCK gateway (no keys set)"
+        mode = 'DEMO — no real money' if payments.mock_payments_enabled() else 'DEMO disabled'
         print(f"Payments: {mode}")
 
 

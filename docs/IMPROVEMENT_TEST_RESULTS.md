@@ -16,6 +16,6 @@
 
 ## Not run
 
-- PostgreSQL migration/restore, production configuration against real credentials, live Razorpay and webhook integration, browser or WebGL interaction, mobile viewport checks, load tests, distributed multi-worker concurrency, and credential history scanning.
+- PostgreSQL migration/restore, production configuration against real credentials, browser or WebGL interaction, mobile viewport checks, load tests, distributed multi-worker concurrency, and credential history scanning.
 
 The successful local test results do not establish production readiness.

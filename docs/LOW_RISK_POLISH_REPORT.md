@@ -115,7 +115,7 @@ lights, high-resolution textures or external dependencies were introduced.
 
 Flask backend and routes, database schema, theatre/screen/seat identifiers,
 reference profiles, seating layouts, pricing, seat locks and reservation
-concurrency, authentication/authorization, booking workflow, Razorpay verification,
+concurrency, authentication/authorization, booking workflow, the then-existing payment verification,
 wallet and refund calculations, analytics calculations, seat selection, camera
 controls, seat POV, recliners, VR stereo and existing resource cleanup.
 

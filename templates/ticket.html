@@ -3,6 +3,7 @@
 
 {% block content %}
 <div class="max-w-lg mx-auto space-y-4">
+  {% if payment and payment.is_demo %}<p class="cine-notice"><strong>DEMO TICKET — No real money charged. Not valid for theatre admission.</strong></p>{% endif %}
 
   {% if booking.status == 'PAID' %}
     <div class="text-center space-y-1">
@@ -10,7 +11,7 @@
         <i class="fa-solid fa-check text-emerald-400 text-xl"></i>
       </div>
       <h1 class="text-xl font-bold text-white">Booking confirmed</h1>
-      <p class="text-xs text-slate-400">Show this ticket at the entrance.</p>
+      <p class="text-xs text-slate-400">{{ 'Demonstration booking only; this is not an admission pass.' if payment and payment.is_demo else 'Historical booking record.' }}</p>
       {% if booking.ticket_email_sent_at %}
         <p class="text-xs text-emerald-400">E-ticket emailed to {{ booking.user.email }}.</p>
       {% elif booking.ticket_email_error %}
@@ -79,7 +80,7 @@
       <div class="space-y-1 min-w-0">
         <p class="text-[10px] uppercase tracking-wider text-slate-500">Booking ID</p>
         <p class="font-mono font-bold text-white break-all">{{ booking.reference }}</p>
-        <p class="text-[10px] text-slate-500">Total paid ₹{{ '%.2f'|format(booking.total_amount) }}</p>
+        <p class="text-[10px] text-slate-500">{{ 'Demo amount' if payment and payment.is_demo else 'Recorded amount' }} ₹{{ '%.2f'|format(booking.total_amount) }}</p>
         {% if payment %}
           <p class="text-[10px] text-slate-500 break-all">
             {{ payment.gateway|upper }} · {{ payment.method or '—' }} · {{ payment.payment_id or '—' }}

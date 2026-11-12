@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Sandbox Payment · {{ booking.reference }}{% endblock %}
+{% block title %}DEMO Payment · {{ booking.reference }}{% endblock %}
 
 {% block content %}
 <div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6">
   <div class="text-center space-y-1">
-    <p class="text-[10px] uppercase tracking-[0.2em] text-amber-500">Sandbox gateway</p>
+    <p class="text-xs font-bold text-amber-500">DEMO — No real money is charged</p>
     <h1 class="text-2xl font-black text-white">₹{{ '%.2f'|format(booking.total_amount) }}</h1>
     <p class="text-xs text-slate-400 break-words">{{ movie.title }} · {{ booking.seats }}</p>
   </div>
@@ -21,25 +21,18 @@
       <div class="w-32 h-32 mx-auto bg-white rounded-xl flex items-center justify-center">
         <i class="fa-solid fa-qrcode text-6xl text-slate-900"></i>
       </div>
-      <p class="text-[11px] text-slate-500">Scan with any UPI app (simulated)</p>
+      <p class="text-[11px] text-slate-500">Decorative demo icon only. Do not scan or open a payment app.</p>
     </div>
   {% elif method == 'card' %}
-    <div class="space-y-3">
-      <input value="4111 1111 1111 1111" readonly class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-300 font-mono">
-      <div class="flex gap-3">
-        <input value="12/28" readonly class="w-1/2 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-300 font-mono">
-        <input value="123" readonly class="w-1/2 bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-300 font-mono">
-      </div>
-      <p class="text-[10px] text-slate-600">Test card, no real charge.</p>
-    </div>
+    <p class="text-xs text-slate-400 text-center">Card payment simulation. No card number, expiry or security code is needed.</p>
   {% else %}
-    <p class="text-xs text-slate-400 text-center">Redirecting to your bank (simulated).</p>
+    <p class="text-xs text-slate-400 text-center">Netbanking simulation. No bank website is opened and no credentials are needed.</p>
   {% endif %}
 
   <form method="POST" action="{{ url_for('simulate', reference=booking.reference) }}" class="space-y-3">
     <button type="submit" name="outcome" value="success"
             class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">
-      Pay ₹{{ '%.2f'|format(booking.total_amount) }}
+      Simulate success · ₹{{ '%.2f'|format(booking.total_amount) }}
     </button>
     <button type="submit" name="outcome" value="fail"
             class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition">
@@ -48,7 +41,7 @@
   </form>
 
   <p class="text-[10px] text-center text-slate-600 leading-relaxed">
-    The response is signed with HMAC-SHA256 and verified server side, same as Razorpay.
+    This creates a demo booking only. No payment provider is contacted and no funds are settled.
   </p>
 </div>
 {% endblock %}

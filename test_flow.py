@@ -17,8 +17,7 @@ from datetime import date, timedelta
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-for _key in ('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET',
-             'SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'TMDB_API_KEY'):
+for _key in ('SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'TMDB_API_KEY'):
     os.environ[_key] = ''
 os.environ['ADMIN_PASSWORD'] = 'isolated-test-admin-password'
 # Keep this integration test isolated from the app's local or
@@ -29,6 +28,7 @@ _test_dir = tempfile.TemporaryDirectory(prefix='flow-', dir=_test_instance)
 os.environ['DATABASE_URL'] = 'sqlite:///' + (Path(_test_dir.name) / 'flow.db').as_posix()
 os.environ['TEST_DATABASE_URL'] = os.environ['DATABASE_URL']
 os.environ['APP_ENV'] = 'testing'
+os.environ['DEMO_PAYMENTS_ENABLED'] = 'true'
 
 import app as A
 
@@ -215,7 +215,7 @@ def main():
     ref2 = r.headers['Location'].rsplit('/', 1)[1]
     r = c2.post(f'/pay/gateway/{ref2}', data={'method': 'upi'})
     body = r.get_data(as_text=True)
-    assert 'order_mock_' in body and 'Sandbox gateway' in body
+    assert 'order_mock_' in body and 'DEMO — No real money is charged' in body
     with A.app.app_context():
         p = A.Booking.query.filter_by(reference=ref2).one().payment
         assert p.status == 'CREATED' and p.order_id.startswith('order_mock_')
@@ -252,30 +252,30 @@ def main():
     with A.app.app_context():
         order_id = A.Booking.query.filter_by(reference=ref4).one().payment.order_id
     r = c2.post('/pay/callback', data={'reference': ref4,
-                                       'razorpay_order_id': 'order_mock_unrelated',
-                                       'razorpay_payment_id': 'pay_fake_123',
-                                       'razorpay_signature': 'deadbeef'},
+                                       'order_id': 'order_mock_unrelated',
+                                       'payment_id': 'pay_mock_fake',
+                                       'signature': 'deadbeef'},
                 follow_redirects=True)
     assert 'could not be matched' in r.get_data(as_text=True)
     with A.app.app_context():
         assert A.Booking.query.filter_by(reference=ref4).one().status == 'PENDING'
     r = c2.post('/pay/callback', data={'reference': ref4,
-                                       'razorpay_order_id': order_id,
-                                       'razorpay_payment_id': 'pay_fake_123',
-                                       'razorpay_signature': 'deadbeef'},
+                                       'order_id': order_id,
+                                       'payment_id': 'pay_mock_fake',
+                                       'signature': 'deadbeef'},
                 follow_redirects=True)
     assert 'could not be verified' in r.get_data(as_text=True)
     with A.app.app_context():
         assert A.Booking.query.filter_by(reference=ref4).one().status == 'FAILED'
     print("9. signature check OK - forged payment response rejected, nothing charged")
 
-    # A live Razorpay order must never be markable as paid through the sandbox route.
+    # Historical external orders must never be completed by the demo simulator.
     r = c1.post(f'/book/{show_id}', data={'selected_seats': 'F5'}, follow_redirects=False)
     ref_live = r.headers['Location'].rsplit('/', 1)[1]
     c1.post(f'/pay/gateway/{ref_live}', data={'method': 'upi'})
     with A.app.app_context():
         live_booking = A.Booking.query.filter_by(reference=ref_live).one()
-        live_booking.payment.gateway = 'razorpay'
+        live_booking.payment.gateway = 'historical-provider'
         live_booking.payment.order_id = 'order_live_security_check'
         A.db.session.commit()
     r = c1.post(f'/pay/simulate/{ref_live}', data={'outcome': 'success'},
@@ -286,9 +286,10 @@ def main():
         assert live_booking.status == 'PENDING'
         assert A.BookedSeat.query.filter_by(booking_id=live_booking.id).count() == 0
         A.release_booking(live_booking, 'CANCELLED')
-    print("9b. live payment protected - sandbox route cannot capture a Razorpay order")
+    print("9b. historical records protected - simulator refuses external orders")
 
     previous_env = os.environ.get('APP_ENV')
+    previous_demo = os.environ.pop('DEMO_PAYMENTS_ENABLED', None)
     os.environ['APP_ENV'] = 'production'
     try:
         assert not A.payments.mock_payments_enabled()
@@ -300,11 +301,13 @@ def main():
         except A.payments.PaymentGatewayError:
             pass
     finally:
+        if previous_demo is not None:
+            os.environ['DEMO_PAYMENTS_ENABLED'] = previous_demo
         if previous_env is None:
             os.environ.pop('APP_ENV', None)
         else:
             os.environ['APP_ENV'] = previous_env
-    print("9c. production payment guard OK - mock order and signature rejected")
+    print("9c. production opt-in guard OK - disabled by default")
 
     # ---- 10. hold expiry -------------------------------------------------
     r = c1.post(f'/book/{show_id}', data={'selected_seats': 'F1'}, follow_redirects=False)
@@ -460,6 +463,52 @@ def main():
         assert len(sc.comfort_features) >= 2
     print(f"20. Comfort Score OK - {sc.full_name} scored {sc.comfort_score}/5.0 with {len(sc.comfort_features)} features")
 
+    # Demo authorization, replay protection and split shares use the real routes.
+    assert c1.post(f'/pay/simulate/{ref2}', data={'outcome': 'success'}).status_code == 403
+    r = c2.post('/pay/callback', data={'reference': ref2, 'failed': '1'}, follow_redirects=False)
+    assert r.status_code == 302
+    with A.app.app_context():
+        assert A.Booking.query.filter_by(reference=ref2).one().status == 'PAID'
+    r = c1.post(f'/book/{show_id}', data={'selected_seats': 'G1,G2'}, follow_redirects=False)
+    split_ref = r.headers['Location'].rsplit('/', 1)[1]
+    assert c1.post(f'/pay/gateway/{split_ref}', data={'method': 'external'}).status_code == 400
+    os.environ['DEMO_PAYMENTS_ENABLED'] = 'false'
+    try:
+        assert c1.post(f'/pay/wallet/{split_ref}').status_code == 403
+        assert c1.post(f'/pay/gateway/{split_ref}').status_code == 403
+    finally:
+        os.environ['DEMO_PAYMENTS_ENABLED'] = 'true'
+    c1.get(f'/checkout/{split_ref}')
+    with A.app.app_context():
+        split_booking = A.Booking.query.filter_by(reference=split_ref).one()
+        token = split_booking.split_token
+    for index, client in enumerate((c1, c2)):
+        r = client.post(f'/split-pay/{token}/start')
+        assert r.status_code == 200
+        with A.app.app_context():
+            participant_id = A.User.query.filter_by(username=('mohith' if index == 0 else 'rahul')).one().id
+            contribution = A.SplitContribution.query.filter_by(
+                booking_id=split_booking.id, user_id=participant_id).one()
+            contribution_id = contribution.id
+        path = f'/split-pay/{token}/simulate/{contribution_id}'
+        other = c2 if index == 0 else c1
+        assert other.post(path, data={'outcome': 'success'}).status_code == 404
+        if index == 1:
+            assert client.post(path, data={'outcome': 'fail'}).status_code == 302
+            client.post(f'/split-pay/{token}/start')
+        assert client.post(path, data={'outcome': 'success'}).status_code == 302
+        if index == 0:
+            with A.app.app_context():
+                assert A.Booking.query.filter_by(reference=split_ref).one().status == 'PENDING'
+    with A.app.app_context():
+        paid_split = A.Booking.query.filter_by(reference=split_ref).one()
+        assert paid_split.status == 'PAID' and paid_split.payment.gateway == 'mock-split'
+        assert json.loads(paid_split.payment.raw_response) == {'demo': True, 'settled': False}
+        assert A.BookedSeat.query.filter_by(booking_id=paid_split.id).count() == 2
+    assert 'DEMO TICKET' in c1.get(f'/ticket/{split_ref}').get_data(as_text=True)
+    assert c1.get(f'/ticket/{split_ref}/qr.png').status_code == 200
+    print('21. Demo ownership, replay, explicit disable, split success/failure and ticket labels OK')
+
     with A.app.app_context():
         rev = A.db.session.query(A.db.func.sum(A.Booking.total_amount)) \
                           .filter(A.Booking.status == 'PAID').scalar() or 0.0
@@ -471,7 +520,7 @@ def main():
         print(f"\nSeeded {A.Theater.query.count()} Vizag theatres, "
               f"{A.Screen.query.count()} screens, {seats} total seats")
         print(f"Revenue from active paid bookings: ₹{rev:.2f}")
-    print("\nALL 20 CHECKS PASSED")
+    print("\nALL BOOKING AND DEMO PAYMENT CHECKS PASSED")
 
 
 if __name__ == '__main__':

@@ -216,6 +216,7 @@
 
   <main id="main-content" tabindex="-1" class="flex-1 w-full">
     <div class="max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6">
+      <div role="note" class="cine-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           {% for m in messages %}
@@ -229,7 +230,7 @@
 
   <footer class="border-t border-slate-800/50 py-6 text-center text-[11px] text-slate-600">
     MD CineWave · Movie ticket booking for Visakhapatnam theatres
-    {% if not gateway_live %}<span class="ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Sandbox payments</span>{% endif %}
+    <span class="ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">DEMO · No real money</span>
   </footer>
 
   <script>
