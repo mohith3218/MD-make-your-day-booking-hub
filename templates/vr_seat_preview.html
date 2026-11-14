@@ -924,7 +924,7 @@
         let measuredFps = 0;
         const previewStartedAt = performance.now();
         function startAnimationLoop() {
-            if (animationDestroyed || previewPausedByParent || document.hidden || !container.isConnected || animationFrameId) return;
+            if (animationDestroyed || previewPausedByParent || document.hidden || !container.isConnected || animationFrameId || window.innerWidth <= 0 || window.innerHeight <= 0) return;
             clock.start();
             animationFrameId = requestAnimationFrame(animate);
         }
@@ -933,12 +933,24 @@
             animationFrameId = 0;
         }
         function destroyPreview() {
+            if (animationDestroyed) return;
             animationDestroyed = true;
             pauseAnimationLoop();
             customVideoEl.pause();
             customVideoEl.removeAttribute('src');
             customVideoEl.load();
-            screenTexture.dispose();
+            const geometries = new Set(), materials = new Set(), textures = new Set([screenTexture, seatFabricTexture]);
+            scene.traverse(object => {
+                if (object.geometry) geometries.add(object.geometry);
+                (Array.isArray(object.material) ? object.material : [object.material]).filter(Boolean).forEach(material => {
+                    materials.add(material);
+                    Object.values(material).forEach(value => { if (value?.isTexture) textures.add(value); });
+                });
+            });
+            seatGeometryVariants.forEach(v => { geometries.add(v.near); geometries.add(v.far); });
+            geometries.forEach(value => value.dispose());
+            materials.forEach(value => value.dispose());
+            textures.forEach(value => value?.dispose());
             renderer.dispose();
             renderer.forceContextLoss();
         }
@@ -958,6 +970,7 @@
             }
             if (event.data?.type === 'cinewave:resume') {
                 previewPausedByParent = false;
+                resizePreview();
                 startAnimationLoop();
             }
         });
@@ -3596,7 +3609,8 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        window.addEventListener('resize', () => {
+        function resizePreview() {
+            if (animationDestroyed || previewPausedByParent || window.innerWidth <= 0 || window.innerHeight <= 0) return;
             const w = window.innerWidth;
             const h = window.innerHeight;
             renderer.setSize(w, h);
@@ -3607,7 +3621,8 @@
             applyResponsivePreviewLayout();
             camera.updateProjectionMatrix();
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, renderQuality === 'high' ? 1.75 : (renderQuality === 'balanced' ? 1.5 : 1)));
-        });
+        }
+        window.addEventListener('resize', resizePreview);
 
         // Start once after the DOM is ready. All dependencies are local and
         // loaded synchronously before this script.

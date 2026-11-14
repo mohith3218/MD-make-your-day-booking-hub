@@ -37,6 +37,7 @@ import ssl
 from types import SimpleNamespace
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta
+from functools import wraps
 from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy import func as sa_func
@@ -72,7 +73,7 @@ from werkzeug.utils import secure_filename
 import seat_layout as sl
 from dotenv import load_dotenv  # load .env early
 load_dotenv()  # Ensure environment variables are available before any config
-from vizag_theaters import seed_vizag_theaters
+from vizag_theaters import seed_vizag_theaters, correct_jagadamba_levels
 from theatre_service import TheatreService
 
 
@@ -502,7 +503,8 @@ class Screen(db.Model):
     @property
     def layout(self):
         try:
-            return json.loads(self.layout_json or '{}')
+            layout = json.loads(self.layout_json or '{}')
+            return correct_jagadamba_levels(layout, self.theater.name, self.name)
         except json.JSONDecodeError:
             return {}
 
@@ -840,7 +842,7 @@ class RechargeRequest(db.Model):
 
 
 class PartySession(db.Model):
-    """Watch Together party session for real-time squad seat syncing."""
+    """Watch Together room; clients poll every two seconds (not WebSockets)."""
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(10), unique=True, nullable=False, default=lambda: secrets.token_hex(3).upper())
     showtime_id = db.Column(db.Integer, db.ForeignKey('showtime.id'), nullable=False)
@@ -849,6 +851,7 @@ class PartySession(db.Model):
     status = db.Column(db.String(20), default='ACTIVE')
 
     showtime = db.relationship('Showtime', backref=db.backref('parties', lazy=True))
+    host = db.relationship('User', foreign_keys=[host_id])
 
 
 class PartyMember(db.Model):
@@ -860,8 +863,10 @@ class PartyMember(db.Model):
     avatar_color = db.Column(db.String(20), default='#FF2E63')
     selected_seats = db.Column(db.String(200), default='')
     last_ping = db.Column(db.DateTime, default=datetime.utcnow)
+    __table_args__ = (db.Index('uq_party_member_user', 'party_id', 'user_id', unique=True),)
 
     party = db.relationship('PartySession', backref=db.backref('members', lazy=True, cascade='all, delete-orphan'))
+    user = db.relationship('User', foreign_keys=[user_id])
 
 
 @login_manager.user_loader
@@ -1417,6 +1422,26 @@ def book(showtime_id):
             flash(msg)
             return redirect(url_for('book', showtime_id=showtime_id))
 
+        party_member = None
+        code = request.args.get('party', '').strip()
+        if code:
+            party, error = load_party(code)
+            if error:
+                flash('This party is unavailable. Rejoin or continue without a party.')
+                return redirect(url_for('book', showtime_id=showtime_id))
+            party_member = PartyMember.query.filter_by(party_id=party.id, user_id=current_user.id).first()
+            if party.showtime_id != showtime.id or not party_member:
+                db.session.rollback()
+                flash('Join the party for this showtime before booking with it.')
+                return redirect(url_for('book', showtime_id=showtime_id))
+            squad = party_snapshot(party)['squad_seats']
+            if set(seats_list) & set(squad):
+                db.session.rollback()
+                flash('A party member is selecting one of these seats. Please choose again.')
+                return redirect(url_for('book', showtime_id=showtime_id, party=party.code))
+            # Re-read after the room lock; another member may have checked out.
+            booked, held = showtime.booked_seat_ids(), showtime.held_seat_ids()
+
         clash = sorted(set(seats_list) & (booked | held))
         if clash:
             flash(f"Seat(s) {', '.join(clash)} were just taken. Please choose again.")
@@ -1444,6 +1469,8 @@ def book(showtime_id):
                           status='PENDING', lock_token=lock.token,
                           expires_at=lock.expires_at)
         db.session.add(booking)
+        if party_member:
+            party_member.selected_seats = ''
         try:
             db.session.commit()
         except IntegrityError:
@@ -1463,6 +1490,7 @@ def book(showtime_id):
 
     grid = sl.build_layout(layout, booked=booked, held=held,
                            price_overrides=effective_overrides)
+    session.setdefault('party_csrf', secrets.token_urlsafe(32))
     party_code = request.args.get('party', '').strip().upper()
     return render_template('book.html', movie=movie, showtime=showtime,
                            screen=showtime.screen, grid=grid,
@@ -1628,87 +1656,184 @@ def movies_by_mood(mood_code):
     })
 
 
+# Party picks coordinate this room; checkout's unique SeatHold remains the
+# showtime-wide authority. No separate booking system or payment flow is used.
+PARTY_LIFETIME = timedelta(hours=2)
+PARTY_PRESENCE = timedelta(seconds=60)
+
+
+def party_api(view):
+    @wraps(view)
+    def guarded(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify(success=False, error='Please sign in to use Watch Together.'), 401
+        origin = request.headers.get('Origin')
+        if origin and origin != request.host_url.rstrip('/'):
+            return jsonify(success=False, error='Invalid request origin.'), 403
+        token = session.get('party_csrf', '')
+        supplied_token = request.headers.get('X-Party-CSRF', '')
+        if not token or not secrets.compare_digest(token.encode(), supplied_token.encode()):
+            return jsonify(success=False, error='Refresh this page before using Watch Together.'), 403
+        return view(*args, **kwargs)
+    return guarded
+
+
+def load_party(code):
+    code = code.strip().upper()
+    if not re.fullmatch(r'[0-9A-F]{6}', code):
+        return None, (jsonify(success=False, error='Enter a valid six-character party code.'), 400)
+    # This write locks one room on PostgreSQL and serializes writers on SQLite.
+    # Every join/sync/leave/close takes this lock before reading membership/picks.
+    count = PartySession.query.filter_by(code=code).update(
+        {PartySession.status: PartySession.status}, synchronize_session=False)
+    if not count:
+        db.session.rollback()
+        return None, (jsonify(success=False, error='Party code not found.'), 404)
+    party = PartySession.query.filter_by(code=code).populate_existing().one()
+    if party.status == 'ACTIVE' and (
+            not party.created_at or datetime.utcnow() >= party.created_at + PARTY_LIFETIME
+            or party.showtime.status == 'ended'):
+        party.status = 'EXPIRED'
+    if party.status != 'ACTIVE':
+        status = str(party.status or 'CLOSED').lower()
+        db.session.commit()
+        return None, (jsonify(success=False, error=f'This party is {status}.', status=party.status), 410)
+    return party, None
+
+
+def party_snapshot(party):
+    cutoff = datetime.utcnow() - PARTY_PRESENCE
+    members, squad = [], {}
+    unavailable = party.showtime.booked_seat_ids() | party.showtime.held_seat_ids()
+    for member in PartyMember.query.filter_by(party_id=party.id).order_by(PartyMember.id):
+        # Expired presence releases picks but keeps a stable authenticated membership.
+        seats = [s for s in (member.selected_seats or '').split(',') if s and s not in unavailable]
+        if not member.last_ping or member.last_ping < cutoff:
+            seats = []
+        member.selected_seats = ','.join(seats)
+        me = member.user_id == current_user.id
+        if member.last_ping and member.last_ping >= cutoff:
+            members.append(dict(user_name=member.user_name, color=member.avatar_color,
+                                seats=seats, is_me=me, is_host=member.user_id == party.host_id))
+            if not me:
+                squad.update({s: dict(user_name=member.user_name, color=member.avatar_color) for s in seats})
+    mine = PartyMember.query.filter_by(party_id=party.id, user_id=current_user.id).first()
+    return dict(success=True, party_code=party.code, showtime_id=party.showtime_id,
+                is_host=party.host_id == current_user.id, members=members, squad_seats=squad,
+                selected_seats=(mine.selected_seats or '').split(',') if mine and mine.selected_seats else [],
+                join_url=url_for('book', showtime_id=party.showtime_id, party=party.code),
+                expires_at=(party.created_at + PARTY_LIFETIME).isoformat() + 'Z')
+
+
 @app.route('/api/party/create/<int:showtime_id>', methods=['POST'])
-@login_required
+@party_api
 def party_create(showtime_id):
-    """Create a Watch Together party room for a showtime."""
-    showtime = Showtime.query.get_or_404(showtime_id)
-    party = PartySession(showtime_id=showtime.id, host_id=current_user.id)
-    db.session.add(party)
-    db.session.commit()
+    showtime = db.session.get(Showtime, showtime_id)
+    if not showtime or not showtime.screen:
+        return jsonify(success=False, error='Showtime not found.'), 404
+    if showtime.status == 'ended':
+        return jsonify(success=False, error='This show has ended.'), 410
+    for _ in range(5):
+        party = PartySession(showtime_id=showtime.id, host_id=current_user.id)
+        party.members.append(PartyMember(user_id=current_user.id, user_name=current_user.username[:80],
+                                         avatar_color='#FF2E63'))
+        db.session.add(party)
+        try:
+            db.session.flush()
+            result = party_snapshot(party)
+            db.session.commit()
+            return jsonify(result)
+        except IntegrityError:
+            db.session.rollback()  # a code collision never leaves a hostless room
+    return jsonify(success=False, error='Could not generate a party code. Please retry.'), 503
 
-    # Host joins automatically
-    member = PartyMember(party_id=party.id, user_id=current_user.id,
-                         user_name=current_user.username, avatar_color='#FF2E63')
-    db.session.add(member)
-    db.session.commit()
 
-    return jsonify({
-        'success': True,
-        'party_code': party.code,
-        'party_id': party.id,
-        'join_url': url_for('book', showtime_id=showtime.id, party=party.code, _external=True)
-    })
+@app.route('/api/party/<party_code>/join', methods=['POST'])
+@party_api
+def party_join(party_code):
+    party, error = load_party(party_code)
+    if error:
+        return error
+    member = PartyMember.query.filter_by(party_id=party.id, user_id=current_user.id).first()
+    if not member:
+        member = PartyMember(party_id=party.id, user_id=current_user.id,
+                             user_name=current_user.username[:80], avatar_color='#3B82F6')
+        db.session.add(member)
+    member.last_ping = datetime.utcnow()
+    result = party_snapshot(party)
+    db.session.commit()
+    return jsonify(result)
 
 
 @app.route('/api/party/<party_code>/sync', methods=['POST'])
+@party_api
 def party_sync(party_code):
-    """Real-time sync endpoint: updates current user seats and returns all squad members' picks."""
-    party = PartySession.query.filter_by(code=party_code.upper()).first_or_404()
-    data = request.get_json() or {}
-
-    user_name = data.get('user_name', 'Guest')
-    selected = data.get('selected_seats', '')
-    avatar_color = data.get('avatar_color', '#3B82F6')
-
-    uid = current_user.id if current_user.is_authenticated else None
-
-    # Find or create member
-    member = None
-    if uid:
-        member = PartyMember.query.filter_by(party_id=party.id, user_id=uid).first()
-    if not member and user_name:
-        member = PartyMember.query.filter_by(party_id=party.id, user_name=user_name).first()
-
+    party, error = load_party(party_code)
+    if error:
+        return error
+    member = PartyMember.query.filter_by(party_id=party.id, user_id=current_user.id).first()
     if not member:
-        member = PartyMember(party_id=party.id, user_id=uid, user_name=user_name,
-                             avatar_color=avatar_color, selected_seats=selected,
-                             last_ping=datetime.utcnow())
-        db.session.add(member)
-    else:
-        member.user_name = user_name
-        member.selected_seats = selected
-        member.avatar_color = avatar_color
-        member.last_ping = datetime.utcnow()
-
+        db.session.rollback()
+        return jsonify(success=False, error='Join this party before updating seats.'), 403
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or data.get('showtime_id') != party.showtime_id:
+        db.session.rollback()
+        return jsonify(success=False, error='Party showtime does not match this booking.'), 400
+    raw = data.get('selected_seats', [])
+    if not isinstance(raw, list) or any(not isinstance(s, str) for s in raw):
+        db.session.rollback()
+        return jsonify(success=False, error='Seat selection must be a list of seat IDs.'), 400
+    seats = [s.strip().upper() for s in raw]
+    ok, message = sl.validate_seats(party.showtime.layout, seats) if seats else (True, '')
+    if not ok:
+        db.session.rollback()
+        return jsonify(success=False, error=message), 400
+    result = party_snapshot(party)
+    unavailable = party.showtime.booked_seat_ids() | party.showtime.held_seat_ids()
+    conflicts = sorted(set(seats) & (set(result['squad_seats']) | unavailable))
+    member.last_ping = datetime.utcnow()
+    member.user_name = current_user.username[:80]  # identity never comes from JSON
+    member.selected_seats = ','.join(s for s in seats if s not in conflicts)
+    result = party_snapshot(party)
+    if conflicts:
+        result.update(success=False, error='Some seats were just taken. Please choose again.', conflicts=conflicts)
     db.session.commit()
+    return jsonify(result), 409 if conflicts else 200
 
-    # Fetch all active members in last 60 seconds
-    cutoff = datetime.utcnow() - timedelta(seconds=60)
-    active_members = PartyMember.query.filter(PartyMember.party_id == party.id,
-                                             PartyMember.last_ping >= cutoff).all()
 
-    members_out = []
-    squad_seats = {}
-    for m in active_members:
-        seats = [s.strip() for s in (m.selected_seats or '').split(',') if s.strip()]
-        is_me = (m.user_id == uid) if uid else (m.user_name == user_name)
-        members_out.append({
-            'user_name': m.user_name,
-            'color': m.avatar_color,
-            'seats': seats,
-            'is_me': is_me
-        })
-        for st in seats:
-            if not is_me:
-                squad_seats[st] = {'user_name': m.user_name, 'color': m.avatar_color}
+@app.route('/api/party/<party_code>/leave', methods=['POST'])
+@party_api
+def party_leave(party_code):
+    party, error = load_party(party_code)
+    if error:
+        return error
+    member = PartyMember.query.filter_by(party_id=party.id, user_id=current_user.id).first()
+    if not member:
+        db.session.rollback()
+        return jsonify(success=False, error='You are not a member of this party.'), 403
+    if party.host_id == current_user.id:
+        party.status = 'CLOSED'
+        for m in party.members:
+            m.selected_seats = ''
+    db.session.delete(member)
+    db.session.commit()
+    return jsonify(success=True)
 
-    return jsonify({
-        'party_code': party.code,
-        'members': members_out,
-        'squad_seats': squad_seats
-    })
 
+@app.route('/api/party/<party_code>/close', methods=['POST'])
+@party_api
+def party_close(party_code):
+    party, error = load_party(party_code)
+    if error:
+        return error
+    if party.host_id != current_user.id:
+        db.session.rollback()
+        return jsonify(success=False, error='Only the host can close this party.'), 403
+    party.status = 'CLOSED'
+    for member in party.members:
+        member.selected_seats = ''
+    db.session.commit()
+    return jsonify(success=True)
 
 
 @app.route('/api/showtime/<int:showtime_id>/availability')

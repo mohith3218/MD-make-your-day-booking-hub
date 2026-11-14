@@ -63,6 +63,12 @@
   </div>
 </div>
 
+<div class="flex flex-wrap items-center gap-2">
+  <label for="party-code-input" class="text-xs text-slate-300">Join Watch Together</label>
+  <input id="party-code-input" maxlength="6" placeholder="Party code" autocomplete="off" class="w-32 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase text-white">
+  <button type="button" onclick="joinPartyCode()" class="rounded-xl bg-purple-700 px-3 py-2 text-xs font-bold text-white">Join party</button>
+  <span id="party-status" role="status" aria-live="polite" class="text-xs text-purple-300"></span>
+</div>
 <!-- 👥 WATCH TOGETHER SQUAD BANNER -->
 <div id="party-squad-banner" class="glass-card rounded-2xl p-4 border border-purple-500/30 bg-purple-950/20 space-y-3 {% if not party_code %}hidden{% endif %}">
   <div class="flex flex-wrap items-center justify-between gap-3">
@@ -75,7 +81,7 @@
           <span>Squad Watch Party Room</span>
           <span class="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-bold" id="squad-room-code">{{ party_code or '' }}</span>
         </p>
-        <p class="text-[11px] text-slate-400">Seats picked by squad members will sync live on your screen!</p>
+        <p class="text-[11px] text-slate-400">Updates every 2 seconds. Party picks are reserved at checkout; other customers may still book them.</p>
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -84,6 +90,10 @@
         <span>Copy Party Link</span>
       </button>
     </div>
+  </div>
+  <div class="flex gap-2">
+    <button type="button" onclick="leaveParty(false)" class="rounded-xl bg-slate-800 px-3 py-2 text-xs text-white">Leave party</button>
+    <button id="party-close" type="button" onclick="leaveParty(true)" class="hidden rounded-xl bg-red-900 px-3 py-2 text-xs text-white">Close party (host)</button>
   </div>
   <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-purple-900/40" id="squad-member-roster">
     <span class="text-[11px] text-slate-400 font-semibold">Squad Members:</span>
@@ -145,12 +155,12 @@
     <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
       <span>Map View Mode:</span>
     </span>
-    <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/60">
+    <div class="flex flex-wrap items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/60">
       <button type="button" id="btn-view-2d" aria-pressed="true" onclick="toggleTheaterView('2d')" class="px-3 py-1 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white shadow">
-        🗺️ 2D Flat
+        2D Seat Selection
       </button>
       <button type="button" id="btn-view-3d" aria-pressed="false" onclick="toggleTheaterView('3d')" class="px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
-        🎬 3D Theater
+        3D Seat Preview
       </button>
     </div>
   </div>
@@ -405,9 +415,8 @@
   const priceOut = document.getElementById('total-price');
   const btn = document.getElementById('confirm-btn');
 
-  let activePartyCode = "{{ party_code or '' }}";
-  let myUserName = "{{ current_user.username if current_user.is_authenticated else 'Guest' }}";
-  let myAvatarColor = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+  let activePartyCode = {{ (party_code or '')|tojson }};
+  const partyCSRF = {{ session['party_csrf']|tojson }};
   const cinemaLayout = {{ screen.layout|tojson }};
 
   // Compute nearest exit info for any seat button
@@ -485,7 +494,7 @@
     });
   }
 
-  function paint() {
+  function paint(sync = true) {
     const seats = [...selected.keys()];
     const total = [...selected.values()].reduce((a, s) => a + s.price, 0);
     input.value = seats.join(',');
@@ -499,7 +508,7 @@
 
     updateImmersiveBookingPanel();
 
-    if (activePartyCode) syncParty();
+    if (sync && activePartyCode) syncParty();
   }
 
   // Build the booking view from this screen's saved layout and live seat states.
@@ -1386,7 +1395,7 @@
       povView.yaw = 0;
       updateInspector(nextSeat);
       showSeatARPreview(nextSeat);
-      if (!document.getElementById('arSeatModal').classList.contains('hidden')) {
+      if (document.getElementById('immersive-booking-layout')?.classList.contains('preview-fullscreen')) {
         draw3dArScreen();
       }
     }
@@ -1506,7 +1515,7 @@
   attachPovDrag(document.getElementById('seatPovCanvas'));
 
   function toggleSeatSelection(seatButton) {
-    if (!seatButton || seatButton.disabled || !seatButton.dataset.seat) return false;
+    if (!seatButton || seatButton.disabled || seatButton.dataset.partyOwner || !seatButton.dataset.seat) return false;
     updateInspector(seatButton);
     showSeatARPreview(seatButton);
 
@@ -1549,84 +1558,112 @@
     });
   });
 
-  // ---- WATCH TOGETHER PARTY ENGINE ----
-  async function initOrShowParty() {
-    if (!activePartyCode) {
-      try {
-        const res = await fetch('/api/party/create/{{ showtime.id }}', { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-          activePartyCode = data.party_code;
-          document.getElementById('squad-room-code').textContent = activePartyCode;
-          document.getElementById('party-btn-badge').textContent = 'Code: ' + activePartyCode;
-          document.getElementById('party-squad-banner').classList.remove('hidden');
-          const url = new URL(window.location);
-          url.searchParams.set('party', activePartyCode);
-          window.history.pushState({}, '', url);
-          syncParty();
-        }
-      } catch(e) { alert('Could not start Watch Together room.'); }
-    } else {
-      document.getElementById('party-squad-banner').classList.toggle('hidden');
-    }
+  // ---- WATCH TOGETHER: authenticated, serialized two-second polling ----
+  let partyPoll = null, partySyncRunning = false, partySyncPending = false;
+  function partyStatus(message) { document.getElementById('party-status').textContent = message; }
+  async function partyRequest(path, data = {}) {
+    const res = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json', 'X-Party-CSRF':partyCSRF}, body:JSON.stringify(data)});
+    let payload;
+    try { payload = await res.json(); } catch (_) { throw new Error('Please sign in again or refresh this page.'); }
+    return {res, data:payload};
   }
-
-  function copySquadLink() {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
-      alert('🎉 Squad Watch Party Link Copied!\n\nShare this link with your friends so they can pick seats with you live:\n' + url);
+  function clearPartyMarks() {
+    document.querySelectorAll('.seat-btn').forEach(b => {
+      delete b.dataset.partyOwner; b.style.border = ''; b.style.boxShadow = '';
+      b.title = b.dataset.originalTitle || b.title;
     });
   }
-
-  async function syncParty() {
+  function resetParty() {
+    clearInterval(partyPoll); partyPoll = null; activePartyCode = '';
+    clearPartyMarks();
+    document.getElementById('party-squad-banner').classList.add('hidden');
+    document.getElementById('party-btn-badge').textContent = 'Squad';
+    const url = new URL(location.href); url.searchParams.delete('party'); history.replaceState({}, '', url);
+    postVRPreviewState();
+  }
+  function activateParty(data) {
+    activePartyCode = data.party_code;
+    document.getElementById('squad-room-code').textContent = activePartyCode;
+    document.getElementById('party-btn-badge').textContent = 'Code: ' + activePartyCode;
+    document.getElementById('party-squad-banner').classList.remove('hidden');
+    document.getElementById('party-close').classList.toggle('hidden', !data.is_host);
+    const url = new URL(location.href); url.searchParams.set('party', activePartyCode); history.replaceState({}, '', url);
+    if (!partyPoll) partyPoll = setInterval(() => { if (!document.hidden) syncParty(); }, 2000);
+    syncParty();
+  }
+  async function initOrShowParty() {
+    if (activePartyCode) { document.getElementById('party-squad-banner').classList.toggle('hidden'); return; }
+    try {
+      const {res, data} = await partyRequest('/api/party/create/{{ showtime.id }}');
+      if (!res.ok) throw new Error(data.error);
+      activateParty(data);
+    } catch (e) { partyStatus(e.message || 'Could not create party.'); }
+  }
+  async function joinPartyCode(code = document.getElementById('party-code-input').value) {
+    code = code.trim().toUpperCase();
+    if (!/^[0-9A-F]{6}$/.test(code)) { if (code === activePartyCode) resetParty(); partyStatus('Enter a valid six-character party code.'); return; }
+    try {
+      const {res, data} = await partyRequest(`/api/party/${code}/join`);
+      if (!res.ok) throw new Error(data.error);
+      if (data.showtime_id !== {{ showtime.id }}) { location.assign(data.join_url); return; }
+      if (activePartyCode && activePartyCode !== code) await leaveParty(false);
+      activateParty(data);
+    } catch (e) { if (code === activePartyCode) resetParty(); partyStatus(e.message || 'Could not join party.'); }
+  }
+  async function copySquadLink() {
+    try { await navigator.clipboard.writeText(location.href); partyStatus('Party link copied.'); }
+    catch (_) { partyStatus('Copy the party code above to share it.'); }
+  }
+  async function leaveParty(close) {
     if (!activePartyCode) return;
     try {
-      const seatsArr = [...selected.keys()].join(',');
-      const res = await fetch(`/api/party/${activePartyCode}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_name: myUserName,
-          selected_seats: seatsArr,
-          avatar_color: myAvatarColor
-        })
+      const {res, data} = await partyRequest(`/api/party/${activePartyCode}/${close ? 'close' : 'leave'}`);
+      if (!res.ok) throw new Error(data.error);
+      resetParty(); partyStatus(close ? 'Party closed.' : 'You left the party.');
+    } catch (e) { partyStatus(e.message); }
+  }
+  async function syncParty() {
+    if (!activePartyCode) return;
+    if (partySyncRunning) { partySyncPending = true; return; }
+    partySyncRunning = true;
+    const code = activePartyCode;
+    try {
+      const {res, data} = await partyRequest(`/api/party/${code}/sync`, {showtime_id:{{ showtime.id }}, selected_seats:[...selected.keys()]});
+      if (code !== activePartyCode) return;
+      if (res.status === 410 || res.status === 404 || res.status === 403 || res.status === 401) { resetParty(); throw new Error(data.error); }
+      if (!res.ok && res.status !== 409) throw new Error(data.error);
+      partyStatus(data.error || 'Connected · updates every 2 seconds');
+      const roster = document.getElementById('squad-member-roster'); roster.replaceChildren();
+      (data.members || []).forEach(m => {
+        const chip = document.createElement('span');
+        chip.className = 'rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white';
+        chip.textContent = `${m.user_name}${m.is_me ? ' (You)' : ''}${m.is_host ? ' · Host' : ''}: ${m.seats.length ? m.seats.join(', ') : 'Choosing…'}`;
+        roster.appendChild(chip);
       });
-      const data = await res.json();
-
-      const roster = document.getElementById('squad-member-roster');
-      if (roster && data.members) {
-        let html = '<span class="text-[11px] text-slate-400 font-semibold">Squad Members:</span>';
-        data.members.forEach(m => {
-          const seatTxt = m.seats.length ? `(${m.seats.join(', ')})` : '(Choosing...)';
-          html += `
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-900 border border-slate-700 text-white">
-              <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${m.color}"></span>
-              <span>${m.user_name} ${m.is_me ? ' (You)' : ''}</span>
-              <span class="text-[10px] text-purple-400 font-mono">${seatTxt}</span>
-            </span>`;
-        });
-        roster.innerHTML = html;
-      }
-
+      let changed = false;
+      (data.conflicts || []).forEach(id => {
+        if (selected.delete(id)) changed = true;
+        const b = document.querySelector(`.seat-btn[data-seat="${id}"]`);
+        b?.classList.remove('seat-sel'); if (b && !b.disabled) b.classList.add('seat-avail');
+      });
+      clearPartyMarks();
       document.querySelectorAll('.seat-btn').forEach(b => {
-        const id = b.dataset.seat;
-        if (data.squad_seats && data.squad_seats[id] && !selected.has(id)) {
-          const sInfo = data.squad_seats[id];
-          b.style.border = `2px solid ${sInfo.color}`;
-          b.style.boxShadow = `0 0 10px ${sInfo.color}80`;
-          b.title = `${sInfo.user_name} is selecting seat ${id}`;
-        } else if (!selected.has(id)) {
-          b.style.border = '';
-          b.style.boxShadow = '';
+        const owner = data.squad_seats?.[b.dataset.seat];
+        if (owner && !selected.has(b.dataset.seat)) {
+          b.dataset.originalTitle ||= b.title; b.dataset.partyOwner = owner.user_name;
+          b.style.border = `2px solid ${owner.color}`; b.title = `${owner.user_name} is selecting ${b.dataset.seat}`;
         }
       });
-    } catch(e) {}
+      if (changed) paint(false);
+      postVRPreviewState();
+    } catch (e) { partyStatus(e.message || 'Connection interrupted; retrying…'); }
+    finally {
+      partySyncRunning = false;
+      if (partySyncPending) { partySyncPending = false; syncParty(); }
+    }
   }
-
-  if (activePartyCode) {
-    syncParty();
-    setInterval(syncParty, 2000);
-  }
+  if (activePartyCode) joinPartyCode(activePartyCode);
+  window.addEventListener('pagehide', () => clearInterval(partyPoll));
 
   let availabilityPollRunning = false;
   const availabilityPoll = setInterval(async () => {
@@ -1684,11 +1721,16 @@
       theaterWrapper.classList.add('theater-expanded');
       btn3d.setAttribute('aria-pressed', 'true');
       btn2d.setAttribute('aria-pressed', 'false');
-      setInlineCamera('overview');
+      document.getElementById('immersive-booking-layout')?.classList.remove('hidden');
+      ensureInlinePreview();
+      postVRPreviewState();
       document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:resume' }, window.location.origin);
     } else {
       btn2d.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white shadow";
       btn3d.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
+      close3dArModal();
+      if (inlineTourTimer) toggleInlineTour();
+      document.getElementById('immersive-booking-layout')?.classList.add('hidden');
       viewport.classList.remove('hidden');
       previewPanel.classList.add('hidden');
       theaterWrapper.classList.remove('theater-expanded');
@@ -1807,51 +1849,29 @@
   }
 
   function open3dArModal(showTrailer = false) {
-    const modal = document.getElementById('arSeatModal');
+    toggleTheaterView('3d');
     arTrailerMode = showTrailer;
-    activePovSeat = activePovSeat?.dataset?.seat
-      ? activePovSeat
-      : document.querySelector('.seat-btn.seat-sel[data-seat]') || document.querySelector('.seat-btn.seat-avail[data-seat]');
-    modal.classList.remove('hidden');
-    document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:pause' }, window.location.origin);
-    const frame = document.getElementById('vr-preview-frame');
-    if (!frame.dataset.loaded) {
-      frame.onload = () => {
-        frame.dataset.loaded = 'true';
-        postVRPreviewState(true, frame);
-      };
-      frame.src = frame.dataset.src;
-    } else {
-      postVRPreviewState(true, frame);
-    }
+    activePovSeat ||= document.querySelector('.seat-btn.seat-sel[data-seat]') || document.querySelector('.seat-btn.seat-avail[data-seat]');
+    document.getElementById('immersive-booking-layout').classList.add('preview-fullscreen');
+    document.getElementById('close-full-preview').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
   }
 
   function close3dArModal() {
-    const modal = document.getElementById('arSeatModal');
-    modal.classList.add('hidden');
+    document.getElementById('immersive-booking-layout')?.classList.remove('preview-fullscreen');
+    document.getElementById('close-full-preview')?.classList.add('hidden');
+    document.body.style.overflow = '';
     arTrailerMode = false;
-    const frame = document.getElementById('vr-preview-frame');
-    if (frame) {
-      frame.onload = null;
-      frame.src = 'about:blank';
-      frame.dataset.loaded = '';
-    }
-    if (document.getElementById('btn-view-3d')?.getAttribute('aria-pressed') === 'true') {
-      document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:resume' }, window.location.origin);
-    }
   }
 
   function postVRPreviewState(isInitial = false, onlyFrame = null, cameraRequest = false) {
-    const frames = onlyFrame ? [onlyFrame] : [
-      document.getElementById('vr-inline-frame'),
-      document.getElementById('vr-preview-frame')
-    ];
+    const frames = onlyFrame ? [onlyFrame] : [document.getElementById('vr-inline-frame')];
     frames.forEach(frame => {
       if (!frame?.contentWindow || !frame.dataset.loaded) return;
       frame.contentWindow.postMessage({
         type: isInitial ? 'cinewave:init' : 'cinewave:selection-state',
         selectedSeats: [...selected.keys()],
-        unavailableSeats: [...document.querySelectorAll('[data-seat].seat-booked, [data-seat].seat-held')].map(button => button.dataset.seat),
+        unavailableSeats: [...document.querySelectorAll('[data-seat].seat-booked, [data-seat].seat-held, [data-seat][data-party-owner]')].map(button => button.dataset.seat),
         bookedSeats: [...document.querySelectorAll('[data-seat].seat-booked')].map(button => button.dataset.seat),
         heldSeats: [...document.querySelectorAll('[data-seat].seat-held')].map(button => button.dataset.seat),
         // Keep the initial camera in the full-room view. Later seat changes
@@ -1863,17 +1883,17 @@
   }
 
   window.addEventListener('message', event => {
-    const frames = [document.getElementById('vr-inline-frame'), document.getElementById('vr-preview-frame')];
+    const frames = [document.getElementById('vr-inline-frame')];
     const fromPreview = frames.some(frame => frame && event.source === frame.contentWindow);
     if (!fromPreview || event.origin !== window.location.origin) return;
     if (event.data?.type === 'cinewave:ready') {
-      postVRPreviewState(false, event.source === document.getElementById('vr-inline-frame')?.contentWindow
-        ? document.getElementById('vr-inline-frame') : document.getElementById('vr-preview-frame'));
+      postVRPreviewState(false, document.getElementById('vr-inline-frame'));
+      const active = document.getElementById('btn-view-3d').getAttribute('aria-pressed') === 'true';
+      event.source.postMessage({type:active ? 'cinewave:resume' : 'cinewave:pause'}, location.origin);
       return;
     }
     if (event.data?.type === 'cinewave:fallback-close') {
-      if (event.source === document.getElementById('vr-preview-frame')?.contentWindow) close3dArModal();
-      else toggleTheaterView('2d');
+      toggleTheaterView('2d');
       return;
     }
     if (event.data?.type === 'cinewave:toggle-seat') {
@@ -1982,7 +2002,7 @@
   }
 
   async function enterVRView() {
-    const frame = document.getElementById('vr-preview-frame');
+    const frame = document.getElementById('vr-inline-frame');
     if (!frame) return;
     try {
       if (frame.requestFullscreen) await frame.requestFullscreen();
@@ -1994,7 +2014,7 @@
   // Global keyboard arrow navigation for 4-way seat hopping
   document.addEventListener('keydown', event => {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
-    if (event.key === 'Escape' && !document.getElementById('arSeatModal').classList.contains('hidden')) {
+    if (event.key === 'Escape' && document.getElementById('immersive-booking-layout')?.classList.contains('preview-fullscreen')) {
       close3dArModal();
       return;
     }
@@ -2002,14 +2022,14 @@
     if (event.key === 'ArrowRight') { event.preventDefault(); stepVrSeat(0, 1); }
     if (event.key === 'ArrowUp')    { event.preventDefault(); stepVrSeat(1, 0); }
     if (event.key === 'ArrowDown')  { event.preventDefault(); stepVrSeat(-1, 0); }
-    if (!document.getElementById('arSeatModal').classList.contains('hidden') && event.key === ' ') {
+    if (document.getElementById('immersive-booking-layout')?.classList.contains('preview-fullscreen') && event.key === ' ') {
       event.preventDefault();
       toggleVrSeatSelection();
     }
   });
 
   document.addEventListener('fullscreenchange', () => {
-    if (!document.getElementById('arSeatModal').classList.contains('hidden')) postVRPreviewState();
+    if (document.getElementById('immersive-booking-layout')?.classList.contains('preview-fullscreen')) postVRPreviewState();
   });
 
   function draw3dArScreen() {
@@ -2082,9 +2102,9 @@
   const inlineVrFrame = document.getElementById('vr-inline-frame');
   const immersiveSection = document.createElement('section');
   immersiveSection.id = 'immersive-booking-layout';
-  immersiveSection.className = 'immersive-booking-layout';
+  immersiveSection.className = 'immersive-booking-layout hidden';
   immersiveSection.innerHTML = `
-    <div class="immersive-viewer-column"></div>
+    <div class="immersive-viewer-column"><button id="close-full-preview" type="button" onclick="close3dArModal()" class="hidden absolute right-4 top-4 z-30 rounded-xl bg-slate-800 px-4 py-2 text-white">Close full preview</button></div>
     <aside id="immersive-seat-sidebar" class="immersive-seat-sidebar">
       <p class="immersive-eyebrow">SEAT CLASSES</p>
       <div data-seat-classes class="space-y-2.5"></div>
@@ -2102,26 +2122,27 @@
     </aside>`;
   const viewerColumn = immersiveSection.querySelector('.immersive-viewer-column');
   const immersiveViewer = document.getElementById('ar-preview-panel');
-  immersiveViewer?.classList.remove('hidden');
+  immersiveViewer?.classList.add('hidden');
   if (immersiveViewer) {
     viewerColumn.appendChild(immersiveViewer);
-    const header = document.querySelector('main .max-w-7xl > .flex.flex-wrap.items-start');
+    const header = document.getElementById('seat-map-mode-controls');
     if (header?.parentNode) header.insertAdjacentElement('afterend', immersiveSection);
     else document.querySelector('main')?.prepend(immersiveSection);
   }
-  ['seat-inspector','seat-pov-badge','ar-info-strip','seat-availability-legend','dynamic-pricing-banner','seat-vibe-filters'].forEach(id => document.getElementById(id)?.classList.add('immersive-secondary-hidden'));
-  document.querySelectorAll('.immersive-secondary-hidden').forEach(el => { el.style.display = 'none'; });
-  document.getElementById('btn-view-3d')?.click();
   updateImmersiveBookingPanel();
-
-  if (inlineVrFrame) {
+  // The iframe has no src until an explicit 3D request. Reuse it for every mode/fullscreen switch.
+  function ensureInlinePreview() {
+    if (!inlineVrFrame || inlineVrFrame.hasAttribute('src')) return;
     inlineVrFrame.onload = () => {
+      if (!inlineVrFrame.getAttribute('src')) return;
       inlineVrFrame.dataset.loaded = 'true';
       postVRPreviewState(true, inlineVrFrame);
-      setInlineCamera('overview');
+      const active = document.getElementById('btn-view-3d').getAttribute('aria-pressed') === 'true';
+      inlineVrFrame.contentWindow.postMessage({type: active ? 'cinewave:resume' : 'cinewave:pause'}, location.origin);
     };
     inlineVrFrame.src = inlineVrFrame.dataset.src;
   }
+  toggleTheaterView('2d');
 </script>
 
 <!-- 🎬 Trailer Video Modal -->
@@ -2145,8 +2166,11 @@
 </div>
 
 <style>
+  #seat-map-mode-controls > div:first-child { flex-wrap:wrap; min-width:0; max-width:100%; }
   .immersive-booking-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,360px); gap:0; margin:18px 0 26px; min-height:600px; border:1px solid rgba(255,255,255,.1); border-radius:20px; overflow:hidden; background:#090a0f; box-shadow:0 24px 70px rgba(0,0,0,.38); }
-  .immersive-viewer-column { min-width:0; min-height:600px; background:#050609; }
+  .immersive-booking-layout.hidden { display:none; }
+  .immersive-booking-layout.preview-fullscreen { position:fixed; inset:0; z-index:100; margin:0; border-radius:0; overflow:auto; }
+  .immersive-viewer-column { position:relative; min-width:0; min-height:600px; background:#050609; }
   .immersive-viewer-column #ar-preview-panel { display:block; height:100%; padding:0; border:0; border-radius:0; background:#050609; box-shadow:none; }
   .immersive-viewer-column #ar-preview-panel > .flex:first-child { position:absolute; z-index:3; margin:14px; padding:0; }
   .immersive-viewer-column #ar-preview-panel > .flex:first-child > div:first-child,
@@ -2183,8 +2207,4 @@
   #ar-canvas-container.vr-immersive { position: fixed; inset: 0; z-index: 100; width: 100vw; height: 100vh; max-height: none; border: 0; border-radius: 0; }
 </style>
 
-<!-- Full 3D seat preview powered by the supplied CineVR auditorium simulator -->
-<div id="arSeatModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/95 p-0 backdrop-blur-xl sm:p-2" role="dialog" aria-modal="true" aria-label="3D cinema seat preview">
-  <iframe id="vr-preview-frame" title="Interactive 3D cinema seat preview" data-src="{{ url_for('vr_seat_preview', showtime_id=showtime.id) }}" class="h-full w-full overflow-hidden border-0 bg-[#07090e] sm:rounded-2xl" allow="fullscreen; autoplay"></iframe>
-</div>
 {% endblock %}

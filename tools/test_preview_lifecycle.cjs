@@ -13,7 +13,7 @@ function preview() {
     const document = {hidden:false, addEventListener:(type, fn) => { listeners[type] = fn; }};
     const window = {parent:{}, addEventListener:(type, fn) => { listeners[type] = fn; }};
     const ctx = vm.createContext({document, window, location:{origin:'http://localhost'},
-        container:{isConnected:true}, clock:{start() {}}, animate() {},
+        container:{isConnected:true}, clock:{start() {}}, animate() {}, resizePreview() {},
         requestAnimationFrame:() => { frames.add(++next); return next; },
         cancelAnimationFrame:id => frames.delete(id)});
     const start = source.indexOf('        function startAnimationLoop()');
@@ -53,6 +53,35 @@ test('hidden, detached and destroyed previews do not schedule frames', () => {
     assert.equal(p.frames.size, 0);
     vm.runInContext('container.isConnected=true; animationDestroyed=true; startAnimationLoop()', p.ctx);
     assert.equal(p.frames.size, 0);
+});
+
+test('zero-sized viewports cannot start a render loop', () => {
+    const p = preview();
+    vm.runInContext('window.innerWidth=0; window.innerHeight=0; startAnimationLoop()', p.ctx);
+    assert.equal(p.frames.size, 0);
+    vm.runInContext('window.innerWidth=390; window.innerHeight=844; startAnimationLoop()', p.ctx);
+    assert.equal(p.frames.size, 1);
+});
+
+test('destroy releases unique geometries, materials, textures and context exactly once', () => {
+    const p = preview();
+    const start = source.indexOf('        function destroyPreview()');
+    const end = source.indexOf("        renderer.domElement.addEventListener", start);
+    vm.runInContext(`
+      let releases=0;
+      const shared={dispose(){releases++}}, lod={dispose(){releases++}};
+      const screenTexture={isTexture:true,dispose(){releases++}};
+      const seatFabricTexture={isTexture:true,dispose(){releases++}};
+      const material={map:seatFabricTexture,dispose(){releases++}};
+      const scene={traverse(fn){fn({geometry:shared,material});fn({geometry:shared,material})}};
+      const seatGeometryVariants=[{near:shared,far:lod}];
+      const customVideoEl={pause(){},removeAttribute(){},load(){}};
+      const renderer={dispose(){releases++},forceContextLoss(){releases++}};
+      ${source.slice(start,end)}
+      startAnimationLoop();destroyPreview();destroyPreview();
+    `,p.ctx);
+    assert.equal(p.frames.size,0);
+    assert.equal(vm.runInContext('releases',p.ctx),7);
 });
 
 test('untrusted message origins and senders cannot resume the preview', () => {

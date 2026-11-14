@@ -70,16 +70,30 @@ class AuditoriumGeometryTests(unittest.TestCase):
         self.assertEqual(sl.count_seats(layout), 12)
         self.assertEqual(len(set(sl.seat_price_map(layout))), 13)
 
-    def test_seeded_jagadamba_uses_distinct_estimated_physical_levels(self):
+    def test_jagadamba_two_levels_preserve_all_seats_and_prices(self):
         layout = theaters.jagadamba_70mm()
+        before = (sl.seat_price_map(layout), sl.seat_class_map(layout), sl.count_seats(layout))
         theaters._attach_known_screen_geometry(layout, "Jagadamba Theatre", "70MM Main")
         self.assertEqual({row["level_id"] for cls in layout["classes"] for row in cls["rows"]},
-                         {"upper-balcony", "lower-balcony", "stalls"})
+                         {"balcony", "stalls"})
         geo = self.geometry(layout)
-        heights = {level["id"]: level["base_elevation_m"] for level in geo["levels"]}
-        self.assertGreater(heights["upper-balcony"], heights["lower-balcony"])
-        self.assertGreater(heights["lower-balcony"], heights["stalls"])
+        self.assertEqual(len(geo['levels']), 2)
+        self.assertEqual(before, (sl.seat_price_map(layout), sl.seat_class_map(layout), sl.count_seats(layout)))
+        balcony = [r for r in geo['rows'] if r['levelId'] == 'balcony']
+        self.assertEqual(len(balcony), 24)
+        self.assertEqual(len(set(r['z'] for r in balcony)), 24)
+        self.assertEqual(len({r['levelId'] for r in geo['rows'][24:]}), 1)
         self.assertTrue(geo["estimated"])
+
+    def test_legacy_jagadamba_geometry_is_corrected_without_affecting_other_theaters(self):
+        layout = theaters.jagadamba_70mm()
+        layout['levels'] = [dict(id='upper-balcony'), dict(id='lower-balcony'), dict(id='stalls')]
+        original = copy.deepcopy(layout)
+        corrected = theaters.correct_jagadamba_levels(layout, 'Jagadamba Theatre', '70MM Main')
+        self.assertEqual(layout, original, 'Read adapter must never mutate saved JSON')
+        self.assertEqual(len(corrected['levels']), 2)
+        self.assertEqual(corrected, theaters.correct_jagadamba_levels(corrected, 'Jagadamba Theatre', '70MM Main'))
+        self.assertEqual(original, theaters.correct_jagadamba_levels(original, 'Another theatre', '70MM Main'))
 
     def test_all_seeded_layouts_have_valid_geometry_and_unique_ids(self):
         for theater in theaters.VIZAG_THEATERS:

@@ -1,5 +1,6 @@
 """Migration safety tests. Only temporary SQLite files are ever written."""
 import copy
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -28,6 +29,50 @@ from migrate_sqlite_to_postgres import backup_source, read_snapshot, transfer, M
 
 
 class MigrationTests(unittest.TestCase):
+    def test_legacy_party_and_jagadamba_upgrade(self):
+        import vizag_theaters as theaters
+        import seat_layout as sl
+        legacy = create_engine('sqlite:///' + (self.folder / 'legacy.db').as_posix())
+        cfg = Config(str(Path(__file__).with_name('alembic.ini')))
+        layout = theaters.jagadamba_70mm()
+        layout['levels'] = [dict(id='upper-balcony', type='balcony'),
+                            dict(id='lower-balcony', type='balcony'), dict(id='stalls', type='floor')]
+        for cls in layout['classes']:
+            for row in cls['rows']:
+                row['level_id'] = {'PREM_UPPER':'upper-balcony', 'PREM_LOWER':'lower-balcony',
+                                   'NONPREM':'stalls'}[cls['code']]
+        before = (sl.seat_price_map(layout), sl.seat_class_map(layout), sl.count_seats(layout))
+        try:
+            with legacy.begin() as conn:
+                cfg.attributes['connection'] = conn
+                command.upgrade(cfg, '20261110_01')
+                conn.execute(db.metadata.tables['user'].insert(), dict(id=1, username='Host', password_hash='unchanged'))
+                conn.execute(db.metadata.tables['theater'].insert(), dict(id=1, name='Jagadamba Theatre'))
+                conn.execute(db.metadata.tables['movie'].insert(), dict(id=1, title='Fixture', description='Fixture', duration=120))
+                conn.execute(db.metadata.tables['screen'].insert(), [dict(id=1, theater_id=1, name='70MM Main', layout_json=json.dumps(layout)),
+                             dict(id=2, theater_id=1, name='Other screen', layout_json='{"classes":[]}')])
+                from datetime import date, datetime
+                conn.execute(db.metadata.tables['showtime'].insert(), dict(id=1, movie_id=1, screen_id=1,
+                             theater='Jagadamba Theatre', show_date=date.today(), show_time='18:30'))
+                conn.execute(db.metadata.tables['party_session'].insert(), dict(id=1, code='ABC123', showtime_id=1, host_id=1))
+                conn.execute(db.metadata.tables['party_member'].insert(), [
+                    dict(id=1, party_id=1, user_id=1, user_name='Old', selected_seats='A1'),
+                    dict(id=2, party_id=1, user_id=1, user_name='New', selected_seats='A2')])
+            with legacy.begin() as conn:
+                cfg.attributes['connection'] = conn
+                command.upgrade(cfg, 'head')
+                raw = conn.execute(select(db.metadata.tables['screen'].c.layout_json).where(
+                    db.metadata.tables['screen'].c.id == 1)).scalar_one()
+                corrected = json.loads(raw)
+                self.assertEqual(len(corrected['levels']), 2)
+                self.assertEqual(before, (sl.seat_price_map(corrected), sl.seat_class_map(corrected), sl.count_seats(corrected)))
+                members = conn.execute(select(db.metadata.tables['party_member'])).mappings().all()
+                self.assertEqual([(m['id'], m['selected_seats']) for m in members], [(2, 'A2')])
+                self.assertEqual(conn.execute(select(db.metadata.tables['screen'].c.layout_json).where(
+                    db.metadata.tables['screen'].c.id == 2)).scalar_one(), '{"classes":[]}')
+        finally:
+            legacy.dispose()
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(dir=_temp.name)
         self.folder = Path(self.temp.name)
