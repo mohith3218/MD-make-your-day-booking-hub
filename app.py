@@ -1246,8 +1246,26 @@ def home():
         Movie.is_rerelease.is_(True)
     ).order_by(Movie.release_date.asc(), Movie.id.desc()).all()
 
+    # The landing-page screening cards use the same live schedule as booking.
+    scheduled_shows = (Showtime.query.filter(Showtime.show_date >= date.today())
+                       .order_by(Showtime.show_date, Showtime.id).all())
+    scheduled_shows = [show for show in scheduled_shows if show.status == 'upcoming']
+    screening_dates = sorted({show.show_date for show in scheduled_shows})[:5]
+    screening_groups = {}
+    for show in scheduled_shows:
+        if show.show_date in screening_dates:
+            screening_groups.setdefault(show.show_date, {}).setdefault(show.theater, []).append(show)
+    current_movies = now_showing_releases + now_showing_rereleases
+    spotlight = next((movie for movie in current_movies if 'devara' in movie.title.lower()),
+                     current_movies[0] if current_movies else None)
+
     return render_template(
         'index.html',
+        spotlight=spotlight,
+        screening_dates=screening_dates,
+        screening_groups=screening_groups,
+        theater_count=Theater.query.count(),
+        screen_count=Screen.query.count(),
         now_showing_releases=now_showing_releases,
         now_showing_rereleases=now_showing_rereleases,
         coming_soon_releases=coming_soon_releases,

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root { --cine-gold: #c9a84c; --cine-gold-light: #f0d78c; }
     body { font-family: 'Manrope', sans-serif; background: #0d0d0d !important; }
@@ -168,55 +168,31 @@
       border-color: #e2e8f0 !important;
     }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/coastal.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body id="app-body" class="bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
+<body id="app-body" class="light-mode bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
   <a class="cine-skip" href="#main-content">Skip to content</a>
 
-  <header class="sticky top-0 z-50 glass-card border-b border-slate-800/50">
-    <div class="cine-header-inner max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-4">
-      <a href="{{ url_for('home') }}" class="flex items-center space-x-3 shrink-0">
-        <div id="site-logo-mark" class="w-10 h-10 bg-gradient-to-tr from-amber-500 to-yellow-200 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-          <i class="fa-solid fa-film text-slate-950 text-lg"></i>
-        </div>
-        <span class="text-2xl font-black tracking-wider cine-brand">MD CINEWAVE</span>
-      </a>
-
-      <nav aria-label="Main navigation" class="cine-nav flex items-center gap-3 sm:gap-5 text-sm">
-        <!-- Theme Toggle Button -->
-        <button id="theme-toggle" onclick="toggleTheme()" aria-label="Use light theme" aria-pressed="false" class="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 hover:bg-slate-700 flex items-center justify-center text-amber-400 transition" title="Toggle Light/Dark Mode">
-          <i class="fa-solid fa-moon text-sm" id="theme-icon"></i>
-        </button>
-
-        {% if current_user.is_authenticated %}
-          {% if current_user.is_admin %}
-            <a href="{{ url_for('admin') }}" class="font-semibold text-amber-400 hover:text-amber-300 whitespace-nowrap">
-              <i class="fa-solid fa-user-shield mr-1"></i>Admin
-            </a>
-          {% endif %}
-          <span class="text-amber-400 font-bold whitespace-nowrap text-xs bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20">
-            <i class="fa-solid fa-coins mr-1 text-amber-400"></i>{{ user_points }} Pts
-          </span>
-          <a href="{{ url_for('wallet_page') }}" class="font-semibold text-slate-300 hover:text-white whitespace-nowrap">
-            <i class="fa-solid fa-wallet mr-1 text-emerald-400"></i>₹{{ '%.0f'|format(wallet_balance or 0) }}
-          </a>
-          <a href="{{ url_for('dashboard') }}" class="font-semibold text-slate-300 hover:text-white whitespace-nowrap">My Bookings</a>
-          <a href="{{ url_for('profile') }}" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold text-slate-200 hover:text-white border border-slate-700/60 transition whitespace-nowrap">
-            <span class="w-6 h-6 rounded-lg bg-[#e66f51] text-slate-950 text-[10px] font-black flex items-center justify-center">{{ current_user.initials }}</span>
-            <span>Profile</span>
-          </a>
-          <a href="{{ url_for('logout') }}" class="px-3 py-1.5 bg-slate-800/80 hover:bg-amber-950/50 hover:text-amber-400 text-slate-400 text-xs font-semibold rounded-xl border border-slate-700/40 transition whitespace-nowrap">Logout</a>
-        {% else %}
-          <a href="{{ url_for('login') }}" class="font-semibold text-slate-300 hover:text-white">Login</a>
-          <a href="{{ url_for('register') }}" class="px-4 py-2 cine-primary hover:bg-amber-300 font-semibold rounded-xl transition shadow-lg shadow-amber-600/20">Register</a>
-        {% endif %}
-      </nav>
+  <header class="cw-header">
+    <div class="cw-container cw-header-inner">
+      <a href="{{ url_for('home') }}" class="cw-brand" aria-label="CineWave home"><span id="site-logo-mark" class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
+      <span class="cw-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Visakhapatnam <span>(Jagadamba)</span></span>
+      <form action="{{ url_for('home') }}#movies" class="cw-search" role="search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input name="q" aria-label="Search movies" placeholder="Search movies, screens & experiences in Vizag…" value="{{ request.args.get('q', '') }}"></form>
+      <nav class="cw-nav" aria-label="Main navigation"><a href="{{ url_for('home') }}#movies" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>Movies</a><a href="{{ url_for('home') }}#showtimes-section">Theatres</a><a href="{{ url_for('home') }}#coastal-standard">Experiences</a></nav>
+      <div class="cw-account">
+      {% if current_user.is_authenticated %}
+        <a class="cw-wallet" href="{{ url_for('wallet_page') }}"><i class="fa-solid fa-wallet" aria-hidden="true"></i> ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
+        <a class="cw-bookings-link" href="{{ url_for('dashboard') }}" aria-label="My bookings" title="My bookings"><i class="fa-solid fa-ticket" aria-hidden="true"></i></a>
+        <details class="cw-profile"><summary aria-label="Account menu"><i class="fa-regular fa-user" aria-hidden="true"></i></summary><div class="cw-profile-menu"><a href="{{ url_for('profile') }}">My profile · {{ user_points }} Pts</a><a href="{{ url_for('dashboard') }}">My bookings</a>{% if current_user.is_admin %}<a href="{{ url_for('admin') }}">Admin dashboard</a>{% endif %}<button id="theme-toggle" onclick="toggleTheme()" aria-label="Use dark theme" aria-pressed="true" type="button"><i id="theme-icon" class="fa-solid fa-sun" aria-hidden="true"></i> Switch theme</button><a href="{{ url_for('logout') }}">Log out</a></div></details>
+      {% else %}<a href="{{ url_for('login') }}" class="cw-login">Sign in</a><a href="{{ url_for('register') }}" class="cw-profile-link" aria-label="Create an account"><i class="fa-regular fa-user" aria-hidden="true"></i></a>{% endif %}
+      </div>
     </div>
   </header>
 
   <main id="main-content" tabindex="-1" class="flex-1 w-full">
-    <div class="max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6">
-      <div role="note" class="cine-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>
+    <div class="cw-main-wrap max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6">
+      <div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           {% for m in messages %}
@@ -228,9 +204,16 @@
     </div>
   </main>
 
-  <footer class="border-t border-slate-800/50 py-6 text-center text-[11px] text-slate-600">
-    MD CineWave · Movie ticket booking for Visakhapatnam theatres
-    <span class="ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">DEMO · No real money</span>
+  <footer class="cw-footer">
+    <div class="cw-container">
+      <div class="cw-footer-grid">
+        <div class="cw-footer-about"><a href="{{ url_for('home') }}" class="cw-brand"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave Vizag</span></a><p>Curating cinematic journeys along the coast of Visakhapatnam. From heritage theatres at Jagadamba Junction to waterfront multiplexes on Beach Road.</p><small>PORT OF CINEMA · EST. 2024</small></div>
+        <div><h2>Vizag hubs</h2><a href="{{ url_for('home') }}#showtimes-section">Jagadamba Junction</a><a href="{{ url_for('home') }}#showtimes-section">Beach Road Promenades</a><a href="{{ url_for('home') }}#showtimes-section">Maddilapalem Multiplexes</a><a href="{{ url_for('home') }}#showtimes-section">Gajuwaka Screens</a><a href="{{ url_for('home') }}#showtimes-section">Madhurawada Cinemas</a></div>
+        <div><h2>Platform perks</h2><a href="{{ url_for('dashboard') }}">Squad Pay Split</a><a href="{{ url_for('profile') }}">CinePass Points</a><a href="{{ url_for('home') }}#coastal-standard">In-seat Snacks</a><a href="{{ url_for('wallet_page') }}">CineWave Wallet</a></div>
+        <div><h2>Your cinema, connected</h2><p>Made for Visakhapatnam</p><a href="{{ url_for('dashboard') }}">Manage your bookings</a><a href="{{ url_for('profile') }}">Your account</a><span class="cw-footer-demo">DEMO · No real money</span></div>
+      </div>
+      <div class="cw-footer-bottom"><span>© {{ 2026 }} CineWave. Crafted for Visakhapatnam cinephiles.</span><span>Demo tickets are not valid for theatre admission.</span></div>
+    </div>
   </footer>
 
   <script>
@@ -238,16 +221,16 @@
       const body = document.getElementById('app-body');
       const icon = document.getElementById('theme-icon');
       const toggle = document.getElementById('theme-toggle');
-      toggle.setAttribute('aria-pressed', String(isLight));
-      toggle.setAttribute('aria-label', isLight ? 'Use dark theme' : 'Use light theme');
+      if (toggle) toggle.setAttribute('aria-pressed', String(isLight));
+      if (toggle) toggle.setAttribute('aria-label', isLight ? 'Use dark theme' : 'Use light theme');
       if (isLight) {
         body.classList.add('light-mode');
-        icon.classList.remove('fa-moon');
-        icon.classList.add('fa-sun');
+        if (icon) icon.classList.remove('fa-moon');
+        if (icon) icon.classList.add('fa-sun');
       } else {
         body.classList.remove('light-mode');
-        icon.classList.remove('fa-sun');
-        icon.classList.add('fa-moon');
+        if (icon) icon.classList.remove('fa-sun');
+        if (icon) icon.classList.add('fa-moon');
       }
     }
 
@@ -258,7 +241,7 @@
     }
 
     // Load theme on startup
-    try { applyTheme(localStorage.getItem('cinewave_theme') === 'light'); } catch { applyTheme(false); }
+    try { applyTheme(localStorage.getItem('cinewave_theme') !== 'dark'); } catch { applyTheme(true); }
   </script>
 
   {% block scripts %}{% endblock %}

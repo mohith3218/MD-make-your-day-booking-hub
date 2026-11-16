@@ -1,225 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Payment · {{ booking.reference }}{% endblock %}
-
+{% block title %}Settlement & Verification · CineWave{% endblock %}
 {% block content %}
-<div class="flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-2xl font-bold text-white">Complete your payment</h1>
-  <div class="glass-card rounded-xl px-4 py-2 text-right">
-    <p class="text-[10px] uppercase tracking-wider text-slate-500">Seats held for</p>
-    <p id="timer" class="text-lg font-black text-amber-400">--:--</p>
+<div class="cw-checkout">
+  <div class="cw-security-band"><div class="cw-security-badges"><span><i class="cw-dot" aria-hidden="true"></i> Seat Lock Secured</span><span><i class="fa-solid fa-ticket" aria-hidden="true"></i> Booking: <b>{{ booking.reference }}</b></span><span><i class="fa-solid fa-lock" aria-hidden="true"></i> Signed demo payments</span></div><div class="cw-hold"><i class="fa-regular fa-clock" aria-hidden="true"></i> HOLD: <strong id="timer" role="timer">--:--</strong></div></div>
+  <div class="cw-checkout-heading"><div><p class="cw-overline">Visakhapatnam waterfront booking terminal</p><h1>Settlement &amp; Verification Desk</h1></div><span class="cw-folio">FOLIO: <b>{{ booking.reference }}</b> <span class="cw-dot"></span> DEMO BOOKING</span></div>
+  <div class="cw-checkout-grid">
+    <div class="cw-checkout-main">
+      <form id="extras-form" method="POST" action="{{ url_for('update_booking_extras', reference=booking.reference) }}" class="cw-panel cw-concessions">
+        <div class="cw-panel-heading"><div><p class="cw-eyebrow"><i class="fa-solid fa-bell-concierge" aria-hidden="true"></i> Concession express</p><h2>Artisanal In-Seat Curation</h2><p>Pick something delicious for <strong>{{ booking.seat_list|join(' & ') }}</strong>.</p></div><span class="cw-badge">Cinema favourites</span></div>
+        <div class="cw-snack-grid">{% for snack in snack_items %}{% set selected = snack.id in (booking.snacks_list|map(attribute='id')|list) %}<label class="cw-snack {% if selected %}is-selected{% endif %}"><div class="cw-snack-top"><span class="cw-perk-icon"><i class="fa-solid {{ snack.icon }}" aria-hidden="true"></i></span><strong>₹{{ '%.2f'|format(snack.price) }}</strong></div><h3>{{ snack.name }}</h3><p>{{ snack.desc }}</p><div class="cw-snack-bottom"><span>Fresh from the counter</span><span class="cw-add"><input type="checkbox" name="snacks" value="{{ snack.id }}" {% if split_started %}disabled{% endif %} {% if selected %}checked{% endif %}><span class="cw-snack-action">{{ 'Added' if selected else '+ Add' }}</span></span></div></label>{% endfor %}</div>
+        {% if user_points > 0 %}<div class="cw-points"><div><strong>CinePass Points</strong><p>{{ user_points }} points available · 1 point = ₹1 off</p></div><select {% if split_started %}disabled{% endif %} name="redeem_points" aria-label="Redeem CinePass points"><option value="0">Save my points</option>{% if user_points >= 50 %}<option value="50" {% if booking.points_redeemed == 50 %}selected{% endif %}>Redeem 50 points</option>{% endif %}{% if user_points >= 100 %}<option value="100" {% if booking.points_redeemed == 100 %}selected{% endif %}>Redeem 100 points</option>{% endif %}</select></div>{% endif %}
+        <div class="cw-extras-footer"><p><i class="fa-solid fa-leaf" aria-hidden="true"></i> A little extra for your movie moment. Apply your selection to update the bill.</p><button type="submit" {% if split_started %}disabled{% endif %} class="cw-button cw-button-small cw-button-white">Update extras <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button></div><p id="extras-status" class="cw-muted" role="status">{% if split_started %}Extras are locked while your squad payment is in progress.{% endif %}</p>
+      </form>
+      <section class="cw-panel cw-payment-panel" aria-labelledby="payment-title"><div class="cw-panel-heading"><div><p class="cw-eyebrow"><i class="fa-solid fa-building-columns" aria-hidden="true"></i> Payment architecture</p><h2 id="payment-title">Select Transaction Gateway</h2></div><span class="cw-mono cw-muted">Demo payments</span></div>
+      {% if split_started %}<div class="cw-payment-paused"><i class="fa-solid fa-users" aria-hidden="true"></i><h3>Your squad has started paying.</h3><p>Full-bill payments are paused while split payments are in progress.</p><a class="cw-button cw-button-primary" href="{{ split_pay_url }}">View Squad Pay progress →</a></div>
+      {% else %}<form id="payment-form" method="POST" action="{{ url_for('pay_gateway', reference=booking.reference) }}"><fieldset><legend class="cw-sr-only">Choose a payment method</legend>
+        <label class="cw-payment-option is-selected"><input type="radio" name="method" value="upi" checked {% if not demo_payments_enabled %}disabled{% endif %}><div><div class="cw-option-title"><strong>Demo Sandbox Simulator <span class="cw-recommended">Recommended</span></strong><span class="cw-accent cw-mono">Instant checkout</span></div><p>Try the complete CineWave payment flow with a signed demo transaction. No real money is charged.</p><div class="cw-sandbox-status"><span>Local payment simulator</span><span><span class="cw-dot"></span> {{ 'Ready' if demo_payments_enabled else 'Disabled' }}</span></div></div></label>
+        {% if booking.seat_list|length > 1 %}<label class="cw-payment-option"><input type="radio" name="method" value="squad" {% if not demo_payments_enabled %}disabled{% endif %}><div><div class="cw-option-title"><strong>Squad Pay · Group Split <span class="cw-tag">Shared settlement</span></strong><span class="cw-mono">₹{{ '%.2f'|format(booking.per_person_amount) }} / person</span></div><p>Split this booking between {{ booking.seat_list|length }} people. Share the invite so everyone can contribute.</p><div class="cw-squad-link"><input type="text" readonly id="squad-link" aria-label="Squad Pay invite link" value="{{ split_pay_url }}"><button type="button" id="copy-squad" class="cw-button cw-button-small cw-button-white">Copy link</button></div></div></label>{% endif %}
+        <label class="cw-payment-option {% if not can_use_wallet %}cw-unavailable{% endif %}"><input type="radio" name="method" value="wallet" {% if not can_use_wallet %}disabled{% endif %}><div><div class="cw-option-title"><strong>CineWave Stored Balance <span class="cw-tag">1-Tap Checkout</span></strong><span class="cw-accent cw-mono">Available: ₹{{ '%.2f'|format(wallet.balance) }}</span></div><p>{% if can_use_wallet %}Pay for this booking using your virtual CineWave wallet balance.{% else %}₹{{ '%.2f'|format([booking.total_amount - wallet.balance, 0]|max) }} more required. <a href="{{ url_for('wallet_page') }}">Recharge your wallet →</a>{% endif %}</p></div></label>
+        <label class="cw-payment-option"><input type="radio" name="method" value="card" {% if not demo_payments_enabled %}disabled{% endif %}><div><div class="cw-option-title"><strong>Debit / Credit Card</strong><span class="cw-muted">Demo only</span></div><p>Simulate a card payment. No card details are collected.</p><div class="cw-payment-tags"><span>Debit</span><span>Credit</span><span>RuPay</span></div></div></label>
+        <label class="cw-payment-option"><input type="radio" name="method" value="netbanking" {% if not demo_payments_enabled %}disabled{% endif %}><div><div class="cw-option-title"><strong>Netbanking</strong><span class="cw-muted">Demo only</span></div><p>Complete a simulated bank payment with no bank credentials.</p></div></label>
+      </fieldset></form>{% endif %}
+      <p class="cw-payment-disclaimer">DEMO — No real money is charged. Wallet balances are virtual; demo tickets are not valid for theatre admission.</p>
+      </section>
+      <form method="POST" action="{{ url_for('cancel_booking', reference=booking.reference) }}" {% if split_started %}onsubmit="return confirm('Cancel this booking and return all sandbox split shares?');"{% endif %}><button type="submit" class="cw-cancel">{% if split_started %}Cancel booking and return test shares{% else %}Cancel and release seats{% endif %}</button></form>
+    </div>
+    <aside class="cw-checkout-aside" aria-label="Booking and bill summary"><section class="cw-panel cw-order"><div class="cw-order-film">{% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster">{% else %}<div class="cw-order-placeholder"><i class="fa-solid fa-film" aria-hidden="true"></i></div>{% endif %}<div><span class="cw-badge cw-accent">{{ movie.language or 'Cinema' }} · {{ showtime.screen.screen_type if showtime.screen else '2D' }}</span><h2>{{ movie.title }}</h2><p>{{ showtime.theater }} · {{ showtime.screen_label }}</p><div class="cw-seat-tags">{% for seat in booking.seat_meta %}<span>{{ seat.id }} ({{ seat['class'] }})</span>{% endfor %}</div><p class="cw-mono">{{ showtime.show_date.strftime('%a, %d %b') }} · {{ showtime.show_time }}</p></div></div><div class="cw-order-venue"><span class="cw-perk-icon"><i class="fa-solid fa-location-arrow" aria-hidden="true"></i></span><div><strong>Your cinema destination</strong><p>{{ showtime.screen.theater.location if showtime.screen else 'Visakhapatnam' }}</p></div><a href="{{ url_for('movie_detail', movie_id=movie.id) }}">Show details →</a></div></section>
+      <section class="cw-panel cw-bill"><div class="cw-bill-content"><div class="cw-bill-title"><h2>Itemized bill breakdown</h2><span class="cw-mono cw-muted">INR (₹)</span></div><dl><div><dt>{{ booking.seat_list|length }}× Cinema admission</dt><dd>₹{{ '%.2f'|format(booking.ticket_amount) }}</dd></div>{% for snack in booking.snacks_list %}<div><dt>{{ snack.name }}</dt><dd>₹{{ '%.2f'|format(snack.price) }}</dd></div>{% endfor %}<div><dt>Box Office Convenience Fee</dt><dd>₹{{ '%.2f'|format(booking.convenience_fee) }}</dd></div><div><dt>Integrated GST (18% on fee)</dt><dd>₹{{ '%.2f'|format(booking.gst) }}</dd></div>{% if booking.points_redeemed %}<div class="cw-accent"><dt>CinePass Points Redeemed</dt><dd>−₹{{ '%.2f'|format(booking.points_redeemed) }}</dd></div>{% endif %}</dl></div><div class="cw-total"><div><span>Total payable now</span><p>All taxes and local cess included</p></div><strong>₹{{ '%.2f'|format(booking.total_amount) }}</strong></div><div class="cw-payment-cta">{% if not split_started %}<button id="confirm-payment" type="submit" form="payment-form" class="cw-button cw-button-primary" {% if not demo_payments_enabled %}disabled{% endif %}><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Continue to Demo Payment — ₹{{ '%.2f'|format(booking.total_amount) }}</span></button>{% else %}<a class="cw-button cw-button-primary" href="{{ split_pay_url }}">View Squad Pay progress →</a>{% endif %}<p><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Your seats are held while you complete checkout.</p><small>No card numbers, UPI PINs or bank credentials needed.</small></div></section>
+    </aside>
   </div>
 </div>
-
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-  <!-- order summary -->
-  <section class="lg:col-span-2 glass-card rounded-2xl p-6 space-y-4 h-fit">
-    <div class="flex gap-4">
-      {% if movie.poster %}
-        <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-20 rounded-xl border border-slate-800">
-      {% endif %}
-      <div class="min-w-0">
-        <h2 class="text-base font-bold text-white break-words">{{ movie.title }}</h2>
-        <p class="text-[11px] text-slate-400 mt-1">{{ showtime.theater }}</p>
-        <p class="text-[11px] text-slate-400">{{ showtime.screen_label }} · {{ showtime.show_date.strftime('%d %b %Y') }} · {{ showtime.show_time }}</p>
-      </div>
-    </div>
-
-    <div class="border-t border-slate-800 pt-4 space-y-2">
-      {% for s in booking.seat_meta %}
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-slate-300"><span class="font-bold text-white">{{ s.id }}</span> · {{ s['class'] }}</span>
-          <span class="text-slate-300">₹{{ '%.0f'|format(s.price) }}</span>
-        </div>
-      {% endfor %}
-    </div>
-
-    <div class="border-t border-slate-800 pt-4 space-y-2 text-xs">
-      <div class="flex justify-between text-slate-400"><span>Tickets ({{ booking.seat_list|length }})</span><span>₹{{ '%.2f'|format(booking.ticket_amount) }}</span></div>
-      {% if booking.snacks_list %}
-        <div class="flex justify-between text-amber-300">
-          <span>Snacks ({{ booking.snacks_list|length }})</span>
-          <span>₹{{ '%.2f'|format(booking.snacks_list|sum(attribute='price')) }}</span>
-        </div>
-      {% endif %}
-      <div class="flex justify-between text-slate-400"><span>Convenience fee</span><span>₹{{ '%.2f'|format(booking.convenience_fee) }}</span></div>
-      <div class="flex justify-between text-slate-400"><span>GST (18% on fee)</span><span>₹{{ '%.2f'|format(booking.gst) }}</span></div>
-      {% if booking.points_redeemed and booking.points_redeemed > 0 %}
-        <div class="flex justify-between text-emerald-400 font-semibold">
-          <span>CinePass Points Redeemed</span>
-          <span>-₹{{ '%.2f'|format(booking.points_redeemed) }}</span>
-        </div>
-      {% endif %}
-      <div class="flex justify-between pt-2 border-t border-slate-800 text-sm font-bold text-white">
-        <span>Amount payable</span><span class="text-[#C9A84C]">₹{{ '%.2f'|format(booking.total_amount) }}</span>
-      </div>
-    </div>
-
-    <p class="text-[10px] text-slate-600">Booking ref {{ booking.reference }}</p>
-  </section>
-
-  <!-- payment methods -->
-  <section class="lg:col-span-3 space-y-4">
-
-    <!-- Squad Pay / Group Split-Bill Card -->
-    {% if booking.seat_list|length > 1 %}
-    <div class="glass-card rounded-2xl p-5 space-y-3 border border-indigo-500/20 bg-indigo-950/20">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-users text-indigo-400"></i>
-          <p class="text-sm font-bold text-white">Squad Pay (Split Bill with Friends)</p>
-        </div>
-        <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold uppercase">Group Feature</span>
-      </div>
-      <p class="text-xs text-slate-300">
-        Booking <strong class="text-white">{{ booking.seat_list|length }} seats</strong>? Split the bill equally:
-        <strong class="text-indigo-400">₹{{ '%.2f'|format(booking.per_person_amount) }}</strong> per person.
-      </p>
-      <div class="flex items-center gap-2 pt-1">
-        <input type="text" readonly id="squad-link" value="{{ split_pay_url }}" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 font-mono">
-        <button type="button" onclick="copySquadLink()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition whitespace-nowrap">
-          <i class="fa-solid fa-copy mr-1"></i> Copy Link
-        </button>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if split_started %}
-    <div class="glass-card rounded-2xl p-4 border border-indigo-400/30 bg-indigo-950/25 text-xs text-indigo-100">
-      A group member has started paying. The regular full-bill buttons are paused to prevent a duplicate charge.
-      <a href="{{ split_pay_url }}" target="_blank" rel="noopener" class="font-bold text-amber-300 underline underline-offset-2">Open the split payment page</a>
-      to check progress.
-    </div>
-    {% endif %}
-
-    <!-- In-Seat Snacks & CinePass Redemption Form -->
-    <form method="POST" action="{{ url_for('update_booking_extras', reference=booking.reference) }}" class="glass-card rounded-2xl p-5 space-y-4 border border-amber-500/20 bg-amber-950/10">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-burger text-amber-400"></i>
-          <p class="text-sm font-bold text-white">Add In-Seat Snacks & Redeem CinePass Points</p>
-        </div>
-        <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold uppercase">Express Counter</span>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        {% for s in snack_items %}
-          {% set selected = s.id in (booking.snacks_list|map(attribute='id')|list) %}
-          <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900/60 cursor-pointer hover:border-amber-500/50 transition">
-            <input type="checkbox" name="snacks" value="{{ s.id }}" {% if selected %}checked{% endif %} class="w-4 h-4 rounded text-amber-500 bg-slate-800 border-slate-700">
-            <div class="min-w-0 flex-1">
-              <p class="text-xs font-bold text-white"><i class="fa-solid {{ s.icon }} text-amber-400 mr-1.5"></i>{{ s.name }}</p>
-              <p class="text-[10px] text-slate-400">{{ s.desc }}</p>
-            </div>
-            <span class="text-xs font-bold text-amber-400">₹{{ s.price }}</span>
-          </label>
-        {% endfor %}
-      </div>
-
-      {% if user_points > 0 %}
-      <div class="flex items-center justify-between pt-3 border-t border-slate-800">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-coins text-amber-400"></i>
-          <div>
-            <p class="text-xs font-bold text-white">Redeem CinePass Points</p>
-            <p class="text-[10px] text-slate-400">Available: {{ user_points }} Pts (1 Pt = ₹1 Off)</p>
-          </div>
-        </div>
-        <select name="redeem_points" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
-          <option value="0">Don't redeem points</option>
-          {% if user_points >= 50 %}<option value="50" {% if booking.points_redeemed == 50 %}selected{% endif %}>Redeem 50 Pts (-₹50)</option>{% endif %}
-          {% if user_points >= 100 %}<option value="100" {% if booking.points_redeemed == 100 %}selected{% endif %}>Redeem 100 Pts (-₹100)</option>{% endif %}
-        </select>
-      </div>
-      {% endif %}
-
-      <button type="submit" class="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-xl transition">
-        Update Booking Extras & Recalculate Total
-      </button>
-    </form>
-
-    {% if not split_started %}
-    <!-- wallet -->
-    <form method="POST" action="{{ url_for('pay_with_wallet', reference=booking.reference) }}"
-          class="glass-card rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
-      <div class="min-w-0">
-        <p class="text-sm font-bold text-white"><i class="fa-solid fa-wallet text-emerald-400 mr-2"></i>MD CineWave Wallet</p>
-        <p class="text-[11px] text-slate-400 mt-1">Balance ₹{{ '%.2f'|format(wallet.balance) }}
-          {% if not can_use_wallet %}<span class="text-amber-400">· ₹{{ '%.2f'|format(booking.total_amount - wallet.balance) }} short</span>{% endif %}
-        </p>
-      </div>
-      {% if can_use_wallet %}
-        <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition whitespace-nowrap">
-          Pay ₹{{ '%.0f'|format(booking.total_amount) }} from wallet
-        </button>
-      {% else %}
-        <a href="{{ url_for('wallet_page') }}" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition whitespace-nowrap">Recharge wallet</a>
-      {% endif %}
-    </form>
-
-    <!-- gateway -->
-    <div class="glass-card rounded-2xl p-5 space-y-4">
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-sm font-bold text-white"><i class="fa-solid fa-credit-card text-[#C9A84C] mr-2"></i>UPI / Card / Netbanking</p>
-        <span class="text-[10px] px-2 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap">
-          DEMO only
-        </span>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {% for m, icon, label in [('upi','fa-mobile-screen','UPI / GPay / PhonePe'), ('card','fa-credit-card','Credit / Debit card'), ('netbanking','fa-building-columns','Netbanking')] %}
-          <form method="POST" action="{{ url_for('pay_gateway', reference=booking.reference) }}">
-            <input type="hidden" name="method" value="{{ m }}">
-            <button type="submit" {% if not demo_payments_enabled %}disabled{% endif %} class="w-full h-full px-4 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-[#C9A84C] rounded-xl transition text-left disabled:opacity-40">
-              <i class="fa-solid {{ icon }} text-[#C9A84C]"></i>
-              <p class="text-xs font-semibold text-white mt-2 leading-snug">{{ label }}</p>
-            </button>
-          </form>
-        {% endfor %}
-      </div>
-
-        <p class="text-[10px] text-slate-500 leading-relaxed">
-          DEMO — No real money is charged. Choose a simulated method, then simulate success or failure.
-          Never enter card details, UPI PINs or bank credentials.
-        </p>
-    </div>
-
-    <form method="POST" action="{{ url_for('cancel_booking', reference=booking.reference) }}">
-      <button type="submit" class="text-[11px] text-slate-500 hover:text-[#C9A84C] transition">Cancel and release seats</button>
-    </form>
-    {% else %}
-    <form method="POST" action="{{ url_for('cancel_booking', reference=booking.reference) }}" onsubmit="return confirm('Cancel this booking and return all sandbox split shares?');">
-      <button type="submit" class="text-[11px] text-slate-500 hover:text-[#C9A84C] transition">Cancel booking and return test shares</button>
-    </form>
-    {% endif %}
-  </section>
-</div>
 {% endblock %}
-
 {% block scripts %}
 <script>
-  function copySquadLink() {
-    const input = document.getElementById('squad-link');
-    if (!input) return;
-    input.select();
-    navigator.clipboard.writeText(input.value);
-    alert('Squad Pay link copied! Share this with your friends to split the bill.');
-  }
-
-  let left = {{ booking.seconds_left }};
-  const out = document.getElementById('timer');
-  function tick() {
-    if (left <= 0) {
-      out.textContent = 'Expired';
-      window.location.href = "{{ url_for('book', showtime_id=booking.showtime_id) }}";
-      return;
-    }
-    const m = String(Math.floor(left / 60)).padStart(2, '0');
-    const s = String(left % 60).padStart(2, '0');
-    out.textContent = `${m}:${s}`;
-    left--;
-    setTimeout(tick, 1000);
-  }
+(() => {
+  const deadline = Date.now() + {{ booking.seconds_left }} * 1000;
+  const timer = document.getElementById('timer');
+  function tick() { const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000)); timer.textContent = String(Math.floor(left / 60)).padStart(2, '0') + ':' + String(left % 60).padStart(2, '0'); if (left <= 0) { timer.textContent = 'Expired'; window.location.href = {{ url_for('book', showtime_id=booking.showtime_id)|tojson }}; return; } setTimeout(tick, 1000); }
   tick();
+  const form = document.getElementById('payment-form');
+  const cta = document.getElementById('confirm-payment');
+  const extras = document.getElementById('extras-form');
+  let dirty = false;
+  extras.addEventListener('change', () => { dirty = true; document.getElementById('extras-status').textContent = 'You have unsaved extras. Update extras to recalculate your total.'; extras.querySelectorAll('.cw-snack').forEach(label => { const checked = label.querySelector('input').checked; label.classList.toggle('is-selected', checked); label.querySelector('.cw-snack-action').textContent = checked ? 'Added' : '+ Add'; }); });
+  if (form) {
+    form.addEventListener('change', () => { const method = form.querySelector('input[name="method"]:checked').value; form.querySelectorAll('.cw-payment-option').forEach(option => option.classList.toggle('is-selected', option.querySelector('input').checked)); cta.querySelector('span').textContent = method === 'squad' ? 'Continue to Squad Pay' : method === 'wallet' ? 'Pay from Demo Wallet — ₹{{ '%.2f'|format(booking.total_amount) }}' : 'Continue to Demo Payment — ₹{{ '%.2f'|format(booking.total_amount) }}'; });
+    form.addEventListener('submit', event => { if (dirty) { event.preventDefault(); document.getElementById('extras-status').textContent = 'Apply your extras before continuing to payment.'; extras.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } const method = form.querySelector('input[name="method"]:checked').value; if (method === 'squad') { event.preventDefault(); window.location.href = {{ split_pay_url|tojson }}; return; } if (method === 'wallet') form.action = {{ url_for('pay_with_wallet', reference=booking.reference)|tojson }}; cta.disabled = true; cta.querySelector('span').textContent = 'Preparing your payment…'; });
+  }
+  const copy = document.getElementById('copy-squad');
+  if (copy) copy.addEventListener('click', async () => { const input = document.getElementById('squad-link'); try { await navigator.clipboard.writeText(input.value); copy.textContent = 'Copied!'; } catch { input.focus(); input.select(); copy.textContent = 'Select & copy link'; } });
+})();
 </script>
 {% endblock %}

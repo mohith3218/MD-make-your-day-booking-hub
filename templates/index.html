@@ -1,450 +1,72 @@
 {% extends "base.html" %}
-{% block title %}MD CineWave · Movie tickets in Vizag{% endblock %}
-
-{% block head %}
-<style>
-  @keyframes cine-intro-exit { to { opacity: 0; visibility: hidden; } }
-  @keyframes cine-intro-dock { from { transform: translate(0,0) scale(1); } to { transform: translate(var(--dock-x),var(--dock-y)) scale(.667); } }
-  @keyframes cine-md-zoom-through {
-    0% { opacity: 0; transform: scale(.6); box-shadow: 0 0 24px rgba(201,168,76,.18); }
-    22% { opacity: 1; transform: scale(1); box-shadow: 0 0 54px rgba(201,168,76,.52); }
-    55% { opacity: 1; transform: scale(1.06); box-shadow: 0 0 68px rgba(240,215,140,.75); }
-    82% { opacity: 1; transform: scale(14); }
-    100% { opacity: 0; transform: scale(35); }
-  }
-  @keyframes cine-md-sheen { 0%, 15% { transform: translateX(-140%) skewX(-25deg); } 52%, 100% { transform: translateX(160%) skewX(-25deg); } }
-  @keyframes cine-intro-ray { 0% { opacity: 0; } 12% { opacity: .9; } 34% { opacity: .42; } 100% { opacity: .22; } }
-  @keyframes cine-intro-curtain { to { transform: translateY(0); } }
-  @keyframes cine-intro-fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes cine-intro-spark { 0% { left: 0; opacity: 0; } 8% { opacity: 1; } 75% { left: 100%; opacity: 1; } 100% { left: 100%; opacity: 0; } }
-  @keyframes cine-intro-line { 0%, 16% { transform: scaleX(0); opacity: 0; } 62% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: .85; } }
-  @keyframes cine-intro-title { 0%, 52% { opacity: 0; transform: translate(-50%,-50%); clip-path: inset(0 50% 0 50%); } 78% { opacity: 1; transform: translate(-50%,-50%); clip-path: inset(0 0 0 0); } 100% { opacity: 1; transform: translate(-50%,-50%); clip-path: inset(0 0 0 0); } }
-  @keyframes cine-intro-logo { 0% { opacity: 0; transform: translateY(112px) scale(1.65); } 18% { opacity: 1; } 82% { opacity: 1; transform: translateY(-3px) scale(1.02); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
-  @keyframes cine-intro-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-  #cine-intro { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at 50% 46%, rgba(201,168,76,.16), transparent 29%), radial-gradient(ellipse at 50% 110%, rgba(20,90,115,.22), transparent 52%), #08090c; animation: cine-intro-exit .6s cubic-bezier(.5,0,.2,1) 5.9s forwards; }
-  #cine-intro::before, #cine-intro::after { position: absolute; left: 0; right: 0; height: 9vh; z-index: 8; content: ''; background: linear-gradient(180deg, #030405, #11100d); }
-  #cine-intro::before { top: 0; border-bottom: 1px solid rgba(201,168,76,.35); transform: translateY(-100%); animation: cine-intro-curtain .7s cubic-bezier(.2,.7,.2,1) both; }
-  #cine-intro::after { bottom: 0; border-top: 1px solid rgba(201,168,76,.25); transform: translateY(100%); animation: cine-intro-curtain .7s cubic-bezier(.2,.7,.2,1) both; }
-  .cine-intro-ray { position: absolute; top: 0; left: 50%; z-index: 0; width: min(80vw,640px); height: 78%; pointer-events: none; transform: translateX(-50%); clip-path: polygon(46% 0,54% 0,100% 100%,0 100%); background: linear-gradient(180deg,rgba(255,240,176,.3),rgba(201,168,76,.07) 60%,transparent); filter: blur(10px); mix-blend-mode: screen; opacity: 0; animation: cine-intro-ray 2s ease-out .2s forwards; }
-  .cine-md-stage { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; pointer-events: none; }
-  .cine-md-block { position: relative; display: grid; width: 76px; height: 76px; place-items: center; overflow: hidden; border: 1px solid rgba(240,215,140,.6); border-radius: 22px; color: #111; background: linear-gradient(145deg,#f0d78c,#c9a84c); box-shadow: 0 0 48px rgba(201,168,76,.45); transform-origin: center; will-change: transform,opacity; animation: cine-md-zoom-through 1.9s cubic-bezier(.5,0,.2,1) both; }
-  .cine-md-block::after { position: absolute; inset: -20%; width: 55%; content: ''; background: linear-gradient(90deg,transparent,rgba(255,255,255,.68),transparent); animation: cine-md-sheen 1.2s ease .1s both; }
-  .cine-intro-content { position: relative; z-index: 1; width: min(88vw, 620px); text-align: center; }
-  .cine-intro-content.is-docking { z-index: 9; }
-  .cine-intro-line-wrap { position: relative; width: min(72vw,420px); height: 116px; margin: 0 auto 10px; }
-  .cine-intro-beam { position: absolute; top: 72%; right: 0; left: 0; height: 3px; background: linear-gradient(90deg,transparent,#fff0b0 15%,#c9a84c 50%,#fff0b0 85%,transparent); box-shadow: 0 0 18px 3px rgba(240,215,140,.42); transform-origin: left center; animation: cine-intro-line 1.05s cubic-bezier(.2,.7,.2,1) 3.1s both; }
-  .cine-intro-spark { position: absolute; z-index: 1; top: 72%; left: 0; width: 8px; height: 8px; border-radius: 50%; background: #fff8d7; box-shadow: 0 0 10px 4px #f5ca62, 0 0 28px 9px rgba(240,178,48,.75); transform: translate(-50%,-50%); animation: cine-intro-spark 1.05s cubic-bezier(.3,.7,.2,1) 3.1s both; }
-  .cine-intro-title { position: absolute; inset: 38% auto auto 50%; z-index: 2; width: max-content; max-width: 100%; color: #fff4d1; font: 800 clamp(36px,8vw,68px)/.95 'Bebas Neue',sans-serif; letter-spacing: .08em; text-shadow: 0 0 12px rgba(8,9,12,.95), 0 0 24px rgba(8,9,12,.8); transform: translate(-50%,-50%); animation: cine-intro-title 1.1s ease 3.9s both; }
-  .cine-intro-reel { display: grid; width: 60px; height: 60px; margin: 0 auto 8px; place-items: center; border: 1px solid rgba(240,215,140,.6); border-radius: 19px; color: #111; background: linear-gradient(145deg,#f0d78c,#c9a84c); box-shadow: 0 0 48px rgba(201,168,76,.32); animation: cine-intro-logo 1.35s cubic-bezier(.2,.8,.2,1) 1.65s both; }
-  .cine-intro-reel.is-docking { animation: cine-intro-dock .42s cubic-bezier(.68,0,.24,1) forwards; }
-  .cine-intro-progress { width: min(58vw,280px); height: 3px; margin: 44px auto 0; overflow: hidden; border-radius: 10px; background: rgba(255,255,255,.12); }
-  .cine-intro-progress span { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left; background: #c9a84c; animation: cine-intro-progress 3.6s cubic-bezier(.65,0,.35,1) 1.8s forwards; }
-  .cine-intro-caption { margin-top: 14px; color: #9296a0; font-size: 10px; font-weight: 700; letter-spacing: .25em; text-transform: uppercase; animation: cine-intro-fade-up .5s ease 1.7s both; }
-  @media (prefers-reduced-motion: reduce) { #cine-intro { animation-duration: .2s; animation-delay: .65s; } #cine-intro::before,#cine-intro::after { animation: none; transform: none; } .cine-md-stage { display: none; } .cine-intro-ray { display: none; } .cine-intro-spark,.cine-intro-beam,.cine-intro-reel,.cine-intro-progress,.cine-intro-caption { animation: none; opacity: 1; transform: none; } .cine-intro-title { animation: none; opacity: 1; transform: translate(-50%,-50%); clip-path: none; } }
-</style>
-{% endblock %}
-
+{% block title %}CineWave · A little closer to cinema{% endblock %}
 {% block content %}
-<div id="cine-intro" role="status" aria-live="polite" aria-label="Opening MD CineWave">
-  <div class="cine-intro-ray" aria-hidden="true"></div>
-  <div class="cine-md-stage" aria-hidden="true">
-    <div class="cine-md-block">
-      <svg viewBox="0 0 120 80" width="48" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M8 68V12L34 48L60 12V68" stroke="#111" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M18 68V30L34 52L50 30V68" stroke="#111" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity=".72"/>
-        <path d="M72 12H90C106 12 114 23 114 40C114 57 106 68 90 68H72V12Z" stroke="#111" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M81 22H89C100 22 105 29 105 40C105 51 100 58 89 58H81V22Z" stroke="#111" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity=".72"/>
-      </svg>
+<div class="cw-home">
+  <section class="cw-hero" aria-labelledby="spotlight-title">
+    <div class="cw-container cw-hero-grid">
+      <div class="cw-hero-copy">
+        <div class="cw-badges"><span class="cw-badge cw-badge-solid"><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i> Coastal spotlight</span><span class="cw-badge">The big-screen experience</span><span class="cw-heritage"><i class="fa-solid fa-water" aria-hidden="true"></i> Made for Vizag</span></div>
+        {% if spotlight %}
+        <h1 id="spotlight-title">{% if spotlight.title|lower in ['devara', 'devara: part 1', 'devara part 1'] %}Devara: <em>Part 1</em>{% else %}{{ spotlight.title }}{% endif %}</h1>
+        <p class="cw-credits">{% if spotlight.cast_info.director %}Directed by <strong>{{ spotlight.cast_info.director }}</strong><span>·</span>{% endif %}{{ spotlight.language or 'Cinema' }}<span>·</span>{{ spotlight.duration }} minutes<span>·</span>{{ spotlight.certificate or 'U/A' }}</p>
+        {% else %}<p class="cw-overline">The coast. The crowd. The cinema.</p><h1 id="spotlight-title">Make your day.<br><em>Make it cinema.</em></h1><p class="cw-credits">Extraordinary stories, right here in Visakhapatnam.</p>{% endif %}
+        <div class="cw-editorial-quote"><p>“From the roar of Jagadamba to the sea breeze on Beach Road. Every great story deserves a screen that does it justice.”</p><div><span>Your city. Your cinema.</span><span><i class="fa-regular fa-circle-check" aria-hidden="true"></i> The CineWave experience</span></div></div>
+        <div class="cw-hero-proof">{% if spotlight %}<div class="cw-rating"><span class="cw-rating-star">★</span><div><strong>{{ '%.1f'|format(spotlight.display_rating) }} <small>/ {{ 5 if spotlight.user_ratings else 10 }}</small></strong><span>{{ spotlight.user_ratings|length }} community ratings</span></div></div>{% endif %}<p><i class="fa-solid fa-masks-theater" aria-hidden="true"></i> Big-screen memories, from <strong>Jagadamba to Beach Road</strong></p></div>
+        <div class="cw-hero-actions"><a class="cw-button cw-button-primary" href="#showtimes-section"><i class="fa-solid fa-ticket" aria-hidden="true"></i> Book Tickets Now</a>{% if spotlight %}<a class="cw-button cw-button-white" href="{{ url_for('movie_detail', movie_id=spotlight.id) }}"><i class="fa-regular fa-circle-play" aria-hidden="true"></i> Explore the Film</a><span class="cw-runtime">{{ spotlight.duration }} min · {{ spotlight.certificate or 'U/A' }} Rated</span>{% endif %}</div>
+      </div>
+      <div class="cw-hero-art"><img src="{{ url_for('static', filename='images/coastal-spotlight.jpg') }}" alt="A coastal warrior aboard a wooden boat at sunset" fetchpriority="high"><div class="cw-art-shade"></div><div class="cw-art-caption"><div><span>Find your next front-row feeling</span><p>Jagadamba · AAA · INOX Beach</p></div><span class="cw-badge">Only in Vizag</span></div></div>
     </div>
-  </div>
-  <div class="cine-intro-content">
-    <div class="cine-intro-reel"><i class="fa-solid fa-film text-2xl"></i></div>
-    <div class="cine-intro-line-wrap" aria-hidden="true">
-      <span class="cine-intro-beam"></span><span class="cine-intro-spark"></span>
-      <div class="cine-intro-title">MD CINEWAVE</div>
+  </section>
+  <section id="showtimes-section" class="cw-showtimes" aria-labelledby="screenings-title">
+    <div class="cw-date-band"><div class="cw-container cw-date-inner"><div class="cw-dates" role="group" aria-label="Screening date">{% for day in screening_dates %}<button type="button" class="cw-date {% if loop.first %}is-active{% endif %}" data-date="{{ day.isoformat() }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"><small>{{ day.strftime('%A') }}</small><strong>{{ day.strftime('%b %d') }}</strong></button>{% else %}<span class="cw-muted">New screenings coming soon</span>{% endfor %}</div><div class="cw-screen-formats"><span><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Immersive sound</span><span><i class="fa-solid fa-couch" aria-hidden="true"></i> Your seat, your choice</span></div></div></div>
+    <div class="cw-container cw-section-pad"><div class="cw-section-heading"><div><p class="cw-overline">Cinematic landmarks</p><h2 id="screenings-title">Scheduled Screenings &amp; Curated Auditoriums</h2></div><p class="cw-section-note"><span class="cw-dot"></span> Choose a show. Find your perfect seat.</p></div>
+    {% for day in screening_dates %}<div class="cw-theatre-grid" data-screening-date="{{ day.isoformat() }}" {% if not loop.first %}hidden{% endif %}>
+      {% for theater_name, shows in screening_groups.get(day, {}).items() %}{% set first = shows[0] %}
+      <article class="cw-theatre-card"><div class="cw-theatre-top"><span class="cw-overline">{% if first.screen %}{{ first.screen.theater.location or 'Visakhapatnam' }}{% else %}Visakhapatnam{% endif %}</span><span class="cw-badge">{{ first.screen.screen_type if first.screen else 'Cinema' }}</span></div><h3>{{ theater_name }}</h3><p class="cw-muted">{% if first.screen %}{{ first.screen.theater.address or first.screen.theater.location or 'Visakhapatnam' }}{% else %}Visakhapatnam{% endif %}</p><div class="cw-theatre-features"><i class="fa-solid fa-film" aria-hidden="true"></i> {{ first.screen.classes_summary if first.screen else 'The big-screen experience' }}</div><p class="cw-micro">Available times</p><div class="cw-show-grid">{% for show in shows[:4] %}<a class="cw-show" href="{{ url_for('book', showtime_id=show.id) }}"><strong>{{ show.show_time }}</strong><span>{{ show.movie.title }}</span><small>{{ show.screen_label }} · {{ show.seats_left }} seats left</small></a>{% endfor %}</div><div class="cw-theatre-bottom"><a class="cw-muted" href="{{ url_for('movie_detail', movie_id=first.movie_id) }}">All film showtimes</a><a class="cw-button cw-button-primary cw-button-small" href="{{ url_for('book', showtime_id=first.id) }}">Select Show <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></div></article>
+      {% else %}<p class="cw-empty">No upcoming shows left on this date. Choose another day to explore more screenings.</p>{% endfor %}
+    </div>{% else %}<div class="cw-empty"><i class="fa-solid fa-film" aria-hidden="true"></i><h3>The next great story is on its way.</h3><p>Showtimes will appear here as soon as they are scheduled. Explore the films below.</p></div>{% endfor %}
     </div>
-    <div class="cine-intro-progress"><span></span></div>
-    <p class="cine-intro-caption">The lights are coming up</p>
-  </div>
-</div>
-<section class="cine-hero relative -mx-5 -mt-8 mb-2 min-h-[330px] sm:min-h-[390px] overflow-hidden sm:rounded-b-3xl">
-  <img src="{{ url_for('static', filename='images/cinewave-hero.jpg') }}" alt="" aria-hidden="true" class="pointer-events-none absolute inset-0 h-full w-full object-cover">
-  <div aria-hidden="true" class="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#0d0d0d] via-[#0d0d0d]/75 to-transparent"></div>
-  <div class="relative mx-auto flex min-h-[330px] max-w-7xl flex-col justify-end px-6 pb-10 sm:min-h-[390px] sm:px-10">
-    <p class="mb-3 text-xs font-bold uppercase tracking-[.28em] text-amber-200">Your front row starts here</p>
-    <h1 class="max-w-2xl text-6xl leading-[.88] text-white sm:text-8xl">Feel every frame</h1>
-    <p class="mt-4 max-w-lg text-sm text-slate-300 sm:text-base">Find your next favorite, choose your seats, and make it a movie night in Vizag.</p>
-    <div class="mt-6 flex flex-wrap gap-3">
-      <a href="#movies" class="cine-primary rounded-xl px-5 py-3 text-sm font-extrabold shadow-lg shadow-amber-900/20 transition hover:-translate-y-0.5">Explore movies <i class="fa-solid fa-arrow-down ml-2"></i></a>
-      <span class="rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-slate-200 backdrop-blur">Now showing across Vizag</span>
-    </div>
-  </div>
-</section>
-<div id="movies" class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-  <div>
-    <h2 class="text-4xl text-white">Vizag Cinemas</h2>
-    <p class="text-xs text-slate-500 mt-1">Real seat maps · Dynamic Pricing · Squad Pay · Express Snacks</p>
-  </div>
-
-  <!-- Category Tabs -->
-  <div class="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
-    <button id="tab-showing" onclick="switchCategory('showing')" class="px-4 py-2 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white">
-      🎬 Now Showing ({{ total_now_showing }})
-    </button>
-    <button id="tab-upcoming" onclick="switchCategory('upcoming')" class="px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
-      🗓️ Coming Soon ({{ total_coming_soon }})
-    </button>
-  </div>
-</div>
-
-<!-- 🧠 MOOD-BASED MOVIE RECOMMENDER -->
-<div class="glass-card rounded-2xl p-4 sm:p-5 border border-amber-500/20 bg-gradient-to-r from-slate-900 via-amber-950/20 to-slate-900 space-y-3 mt-4">
-  <div class="flex flex-wrap items-center justify-between gap-2">
-    <div>
-      <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
-        <span>🧠 Mood Match Recommender</span>
-        <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold uppercase tracking-wider">Quick filters</span>
-      </h3>
-      <p class="text-xs text-slate-400">How are you feeling today? Tap a mood to filter perfect matches instantly.</p>
-    </div>
-    <span id="mood-active-tag" class="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-xl">Showing All Movies</span>
-  </div>
-
-  <div class="flex flex-wrap items-center gap-2 pt-1" id="mood-pills">
-    <button onclick="filterMood('ALL', this)" class="mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-[#C9A84C] text-white shadow-lg shadow-amber-600/30">
-      ✨ All Vibes
-    </button>
-    <button onclick="filterMood('FUN', this)" class="mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700">
-      😂 Laugh & Fun
-    </button>
-    <button onclick="filterMood('THRILL', this)" class="mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700">
-      ⚡ High Thrill
-    </button>
-    <button onclick="filterMood('EMOTIONAL', this)" class="mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700">
-      💧 Deep Drama
-    </button>
-    <button onclick="filterMood('MIND_BENDING', this)" class="mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700">
-      🤯 Mind-Bending
-    </button>
-    <button onclick="filterMood('ROMANCE', this)" class="mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700">
-      ❤️ Romance
-    </button>
-  </div>
-</div>
-
-<!-- NOW SHOWING SECTION -->
-<div id="section-showing" class="space-y-10">
-  <!-- 1. Releases -->
-  <div class="space-y-4">
-    <div class="flex items-center gap-2 border-b border-slate-800/80 pb-2">
-      <span class="text-lg font-bold text-white tracking-wide">✨ Releases :-</span>
-      <span class="text-xs font-semibold text-slate-400">({{ now_showing_releases|length }})</span>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {% for movie in now_showing_releases %}
-        <div data-moods="{{ movie.moods|join(',') }}" class="movie-card group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700 relative">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            {% if movie.poster %}
-              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-            {% else %}
-              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
-                <i class="fa-solid fa-film text-4xl"></i>
-                <span class="text-xs">No Poster</span>
-              </div>
-            {% endif %}
-            <!-- Watchlist heart button -->
-            <button onclick="toggleWatchlistHome(event, {{ movie.id }}, this)"
-                    class="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 {% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}text-amber-500{% else %}text-slate-300 hover:text-amber-400{% endif %} hover:bg-black/90 flex items-center justify-center transition shadow-lg"
-                    title="Save to Watchlist">
-              <i class="{% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}fa-solid{% else %}fa-regular{% endif %} fa-heart text-sm"></i>
-            </button>
-            <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-bold text-amber-400 border border-amber-400/20">
-              ★ {{ '%.1f'|format(movie.rating or 8.5) }}
-            </div>
-          </div>
-          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-[11px] text-slate-400 font-medium">
-                <i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} mins
-                {% if movie.language %} · {{ movie.language }}{% endif %}
-              </p>
-              <h3 class="text-base font-bold text-white group-hover:text-[#C9A84C] transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
-            </div>
-            <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="w-full py-2.5 bg-slate-800 hover:bg-[#C9A84C] text-center text-white text-sm font-semibold rounded-xl transition duration-200">
-              View Showtimes
-            </a>
-          </div>
-        </div>
-      {% else %}
-        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
-          <p class="text-sm">No new releases currently showing.</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- 2. Re-Releases -->
-  <div class="space-y-4 pt-2">
-    <div class="flex items-center gap-2 border-b border-purple-900/40 pb-2">
-      <span class="text-lg font-bold text-purple-300 tracking-wide">🔁 Re-Releases :-</span>
-      <span class="text-xs font-semibold text-purple-400">({{ now_showing_rereleases|length }})</span>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {% for movie in now_showing_rereleases %}
-        <div data-moods="{{ movie.moods|join(',') }}" class="movie-card group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-purple-500/50 relative">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            {% if movie.poster %}
-              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-            {% else %}
-              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
-                <i class="fa-solid fa-film text-4xl"></i>
-                <span class="text-xs">No Poster</span>
-              </div>
-            {% endif %}
-            <!-- Watchlist heart button -->
-            <button onclick="toggleWatchlistHome(event, {{ movie.id }}, this)"
-                    class="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 {% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}text-amber-500{% else %}text-slate-300 hover:text-amber-400{% endif %} hover:bg-black/90 flex items-center justify-center transition shadow-lg"
-                    title="Save to Watchlist">
-              <i class="{% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}fa-solid{% else %}fa-regular{% endif %} fa-heart text-sm"></i>
-            </button>
-            <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-bold text-purple-400 border border-purple-400/20">
-              ★ {{ '%.1f'|format(movie.rating or 8.5) }}
-            </div>
-          </div>
-          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-[11px] text-purple-400 font-medium">
-                <i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} mins
-                {% if movie.language %} · {{ movie.language }}{% endif %}
-              </p>
-              <h3 class="text-base font-bold text-white group-hover:text-purple-400 transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
-            </div>
-            <a href="{{ url_for('movie_detail', movie_id=movie.id) }}" class="w-full py-2.5 bg-slate-800 hover:bg-purple-600 text-center text-white text-sm font-semibold rounded-xl transition duration-200">
-              View Showtimes
-            </a>
-          </div>
-        </div>
-      {% else %}
-        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
-          <p class="text-sm">No re-releases currently showing.</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-
-<!-- COMING SOON SECTION -->
-<div id="section-upcoming" class="hidden space-y-10">
-  <!-- 1. Upcoming Releases -->
-  <div class="space-y-4">
-    <div class="flex items-center gap-2 border-b border-slate-800/80 pb-2">
-      <span class="text-lg font-bold text-white tracking-wide">✨ Releases :-</span>
-      <span class="text-xs font-semibold text-slate-400">({{ coming_soon_releases|length }})</span>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {% for movie in coming_soon_releases %}
-        <div class="group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-slate-700 relative">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            {% if movie.poster %}
-              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-            {% else %}
-              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
-                <i class="fa-solid fa-film text-4xl"></i>
-                <span class="text-xs">No Poster</span>
-              </div>
-            {% endif %}
-            <!-- Watchlist heart button -->
-            <button onclick="toggleWatchlistHome(event, {{ movie.id }}, this)"
-                    class="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 {% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}text-amber-500{% else %}text-slate-300 hover:text-amber-400{% endif %} hover:bg-black/90 flex items-center justify-center transition shadow-lg"
-                    title="Save to Watchlist">
-              <i class="{% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}fa-solid{% else %}fa-regular{% endif %} fa-heart text-sm"></i>
-            </button>
-          </div>
-          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-[11px] text-amber-400 font-bold">
-                <i class="fa-regular fa-calendar mr-1"></i>Releasing {{ movie.release_date.strftime('%d %b %Y') if movie.release_date else 'Soon' }}
-              </p>
-              <h3 class="text-base font-bold text-white transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
-              <p class="text-xs text-slate-400 mt-1 line-clamp-2">{{ movie.description }}</p>
-            </div>
-            <button onclick="alert('Notification set! We will notify you when tickets open for {{ movie.title }}.')" class="w-full py-2.5 bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 text-center text-amber-300 hover:text-white text-sm font-semibold rounded-xl transition duration-200">
-              <i class="fa-regular fa-bell mr-1"></i> Notify Me
-            </button>
-          </div>
-        </div>
-      {% else %}
-        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
-          <p class="text-sm">No new upcoming releases announced yet.</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- 2. Upcoming Re-Releases -->
-  <div class="space-y-4 pt-2">
-    <div class="flex items-center gap-2 border-b border-purple-900/40 pb-2">
-      <span class="text-lg font-bold text-purple-300 tracking-wide">🔁 Re-Releases :-</span>
-      <span class="text-xs font-semibold text-purple-400">({{ coming_soon_rereleases|length }})</span>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {% for movie in coming_soon_rereleases %}
-        <div class="group cine-card rounded-2xl overflow-hidden flex flex-col transition duration-300 hover:border-purple-500/50 relative">
-          <div class="relative aspect-[2/3] bg-slate-900 overflow-hidden">
-            {% if movie.poster %}
-              <img loading="lazy" decoding="async" src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-            {% else %}
-              <div class="w-full h-full flex flex-col items-center justify-center text-slate-600 space-y-2">
-                <i class="fa-solid fa-film text-4xl"></i>
-                <span class="text-xs">No Poster</span>
-              </div>
-            {% endif %}
-            <!-- Watchlist heart button -->
-            <button onclick="toggleWatchlistHome(event, {{ movie.id }}, this)"
-                    class="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 {% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}text-amber-500{% else %}text-slate-300 hover:text-amber-400{% endif %} hover:bg-black/90 flex items-center justify-center transition shadow-lg"
-                    title="Save to Watchlist">
-              <i class="{% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}fa-solid{% else %}fa-regular{% endif %} fa-heart text-sm"></i>
-            </button>
-          </div>
-          <div class="p-5 flex-1 flex flex-col justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-[11px] text-purple-400 font-bold">
-                <i class="fa-solid fa-rotate-left mr-1"></i>Returning {{ movie.release_date.strftime('%d %b %Y') if movie.release_date else 'Soon' }}
-              </p>
-              <h3 class="text-base font-bold text-white group-hover:text-purple-400 transition mt-1 leading-snug break-words">{{ movie.title }}</h3>
-              <p class="text-xs text-slate-400 mt-1 line-clamp-2">{{ movie.description }}</p>
-            </div>
-            <button onclick="alert('Notification set! We will notify you when tickets open for {{ movie.title }}.')" class="w-full py-2.5 bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 text-center text-purple-300 hover:text-white text-sm font-semibold rounded-xl transition duration-200">
-              <i class="fa-regular fa-bell mr-1"></i> Notify Me
-            </button>
-          </div>
-        </div>
-      {% else %}
-        <div class="col-span-full glass-card rounded-2xl p-8 text-center text-slate-400">
-          <p class="text-sm">No upcoming re-releases announced yet.</p>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
+  </section>
+  <section id="movies" class="cw-releases" aria-labelledby="releases-title"><div class="cw-container cw-section-pad"><div class="cw-section-heading"><div><p class="cw-overline">Now running</p><h2 id="releases-title">Repertoire &amp; Coastside Releases</h2></div><div class="cw-filter-tabs" role="group" aria-label="Movie category"><button type="button" class="is-active" data-category="showing" aria-pressed="true">Now Showing <span>{{ total_now_showing }}</span></button><button type="button" data-category="upcoming" aria-pressed="false">Coming Soon <span>{{ total_coming_soon }}</span></button></div></div>
+    <div class="cw-movie-toolbar"><div class="cw-mood-filters" role="group" aria-label="Filter by mood"><button type="button" class="is-active" data-mood="ALL" aria-pressed="true">All genres</button><button type="button" data-mood="THRILL" aria-pressed="false">Thrillers</button><button type="button" data-mood="FUN" aria-pressed="false">Feel-good</button><button type="button" data-mood="EMOTIONAL" aria-pressed="false">Drama</button><button type="button" data-mood="ROMANCE" aria-pressed="false">Romance</button><button type="button" data-mood="MIND_BENDING" aria-pressed="false">Mind-bending</button></div><span id="movie-filter-status" role="status" class="cw-muted"></span></div>
+    <div class="cw-movie-grid">{% for category, films in [('showing', now_showing_releases + now_showing_rereleases), ('upcoming', coming_soon_releases + coming_soon_rereleases)] %}{% for movie in films %}<article class="cw-movie-card" data-category="{{ category }}" data-moods="{{ movie.moods|join(',') }}" data-title="{{ movie.title|lower }}" {% if category == 'upcoming' %}hidden{% endif %}><div class="cw-poster"><a href="{{ url_for('movie_detail', movie_id=movie.id) }}" aria-label="Explore {{ movie.title }}">{% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster" loading="lazy" decoding="async" onerror="this.hidden=true;this.parentElement.classList.add('cw-poster-missing');this.parentElement.textContent=this.alt">{% else %}<div class="cw-poster-placeholder"><i class="fa-solid fa-film" aria-hidden="true"></i><span>{{ movie.title }}</span></div>{% endif %}</a><span class="cw-poster-rating">★ {{ '%.1f'|format(movie.display_rating) }}</span><button type="button" class="cw-watchlist {% if movie.is_in_watchlist(current_user) %}is-saved{% endif %}" data-movie-id="{{ movie.id }}" aria-label="Save {{ movie.title }} to watchlist" aria-pressed="{{ 'true' if movie.is_in_watchlist(current_user) else 'false' }}"><i class="{% if movie.is_in_watchlist(current_user) %}fa-solid{% else %}fa-regular{% endif %} fa-heart" aria-hidden="true"></i></button>{% if movie.is_rerelease %}<span class="cw-rerelease-label">Back on the big screen</span>{% endif %}</div><div class="cw-movie-info"><h3><a href="{{ url_for('movie_detail', movie_id=movie.id) }}">{{ movie.title }}</a></h3><p>{{ movie.language or 'Cinema' }} · {{ movie.duration }} min · {{ movie.certificate or 'U/A' }}</p><p class="cw-movie-locality"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> {% if category == 'upcoming' %}{{ movie.release_date.strftime('%d %b %Y') if movie.release_date else 'Coming soon to Vizag' }}{% else %}Visakhapatnam cinemas{% endif %}</p><a class="cw-movie-book" href="{{ url_for('movie_detail', movie_id=movie.id) }}">{{ 'Explore Film' if category == 'upcoming' else 'Book Screening' }} <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></div></article>{% endfor %}{% endfor %}</div><div id="no-movies" class="cw-empty" hidden><h3>No films found.</h3><p>Try a different search, mood, or category.</p></div>
+  </div></section>
+  <section id="coastal-standard" class="cw-standard"><div class="cw-container cw-section-pad"><div class="cw-standard-intro"><p class="cw-overline">Engineered for Visakhapatnam</p><h2>The CineWave Coastal Standard</h2><p>Thoughtful little details. Unforgettable big-screen moments.<br>A better way to experience your city's cinemas.</p></div><div class="cw-perks"><article><span class="cw-perk-icon"><i class="fa-solid fa-users" aria-hidden="true"></i></span><h3>Squad Pay · Shared Patronage</h3><p>Good films are better together. Reserve your seats, share your booking's Squad Pay link, and let everyone pay their own share.</p><a href="{{ url_for('dashboard') }}">Discover Squad Pay <span>→</span></a></article><article><span class="cw-perk-icon"><i class="fa-solid fa-ticket" aria-hidden="true"></i></span><h3>Your CinePass Privileges</h3><p>Keep your cinema life in one place. Explore your watchlist, earn CinePass points, and enjoy an easier checkout with your CineWave wallet.</p><a href="{{ url_for('profile') }}">Explore your CinePass <span>→</span></a></article><article><span class="cw-perk-icon"><i class="fa-regular fa-eye" aria-hidden="true"></i></span><h3>3D VR Sightline Preview</h3><p>Find your favourite view before you book. Explore an interactive auditorium and preview the screen from the seat you choose.</p><a href="#showtimes-section">Find a show &amp; explore <span>→</span></a></article></div><div class="cw-stats"><div><strong>{{ theater_count }}</strong><span>Vizag cinemas</span></div><div><strong>{{ screen_count }}</strong><span>Auditoriums to explore</span></div><div><strong>3D</strong><span>Interactive seat previews</span></div><div><strong>One city.</strong><span>Countless cinema memories</span></div></div></div></section>
 </div>
 {% endblock %}
-
 {% block scripts %}
 <script>
-  (() => {
-    const intro = document.getElementById('cine-intro');
-    if (!intro) return;
-    const startupId = {{ startup_id|tojson }};
-    try {
-      if (sessionStorage.getItem('cinewave-intro-startup') === startupId) {
-        intro.remove();
-        return;
-      }
-      sessionStorage.setItem('cinewave-intro-startup', startupId);
-    } catch (_) {}
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      window.setTimeout(() => {
-        const reel = intro.querySelector('.cine-intro-reel');
-        const siteMark = document.getElementById('site-logo-mark');
-        if (!reel || !siteMark) return;
-        const from = reel.getBoundingClientRect();
-        const to = siteMark.getBoundingClientRect();
-        reel.style.setProperty('--dock-x', `${to.left + to.width / 2 - (from.left + from.width / 2)}px`);
-        reel.style.setProperty('--dock-y', `${to.top + to.height / 2 - (from.top + from.height / 2)}px`);
-        reel.parentElement.classList.add('is-docking');
-        reel.classList.add('is-docking');
-      }, 5050);
-    }
-    window.setTimeout(() => intro.remove(), 6550);
-  })();
-
-  function filterMood(code, btn) {
-    // Update active pill button UI
-    document.querySelectorAll('.mood-btn').forEach(b => {
-      b.className = "mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700";
-    });
-    btn.className = "mood-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition bg-[#C9A84C] text-white shadow-lg shadow-amber-600/30";
-
-    const tag = document.getElementById('mood-active-tag');
-    const moodNames = {
-      'ALL': 'Showing All Movies',
-      'FUN': '😂 Laugh & Fun Matches',
-      'THRILL': '⚡ High-Octane Thrill Matches',
-      'EMOTIONAL': '💧 Deep Drama & Emotion Matches',
-      'MIND_BENDING': '🤯 Mind-Bending Matches',
-      'ROMANCE': '❤️ Romance Matches'
-    };
-    if (tag) tag.textContent = moodNames[code] || 'Filtered Movies';
-
-    // Filter cards
-    document.querySelectorAll('.movie-card').forEach(card => {
-      const moods = (card.dataset.moods || '').split(',');
-      if (code === 'ALL' || moods.includes(code)) {
-        card.style.display = 'flex';
-        card.classList.add('animate-fadeIn');
-      } else {
-        card.style.display = 'none';
-      }
-    });
+(() => {
+  document.querySelectorAll('[data-date]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-date]').forEach(other => { const active = other === button; other.classList.toggle('is-active', active); other.setAttribute('aria-pressed', active); });
+    document.querySelectorAll('[data-screening-date]').forEach(group => { group.hidden = group.dataset.screeningDate !== button.dataset.date; });
+  }));
+  let category = 'showing', mood = 'ALL';
+  const search = document.querySelector('.cw-search input');
+  const cards = [...document.querySelectorAll('.cw-movie-card')];
+  function filter() {
+    let count = 0;
+    const query = search.value.trim().toLowerCase();
+    cards.forEach(card => { card.hidden = card.dataset.category !== category || (mood !== 'ALL' && !card.dataset.moods.split(',').includes(mood)) || !card.dataset.title.includes(query); if (!card.hidden) count++; });
+    document.getElementById('no-movies').hidden = count > 0;
+    document.getElementById('movie-filter-status').textContent = count + (count === 1 ? ' film' : ' films');
   }
-
-  function switchCategory(cat) {
-    const secShowing = document.getElementById('section-showing');
-    const secUpcoming = document.getElementById('section-upcoming');
-    const tabShowing = document.getElementById('tab-showing');
-    const tabUpcoming = document.getElementById('tab-upcoming');
-
-    if (cat === 'showing') {
-      secShowing.classList.remove('hidden');
-      secUpcoming.classList.add('hidden');
-      tabShowing.className = "px-4 py-2 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white";
-      tabUpcoming.className = "px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
-    } else {
-      secShowing.classList.add('hidden');
-      secUpcoming.classList.remove('hidden');
-      tabUpcoming.className = "px-4 py-2 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white";
-      tabShowing.className = "px-4 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
-    }
-  }
-
-  async function toggleWatchlistHome(event, movieId, btn) {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    {% if not current_user.is_authenticated %}
-      window.location.href = "{{ url_for('login') }}";
-      return;
-    {% endif %}
-
-    try {
-      const res = await fetch(`/api/watchlist/toggle/${movieId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-      if (data.success) {
-        const icon = btn.querySelector('i');
-        if (data.saved) {
-          btn.classList.remove('text-slate-300');
-          btn.classList.add('text-amber-500');
-          icon.classList.remove('fa-regular');
-          icon.classList.add('fa-solid');
-        } else {
-          btn.classList.remove('text-amber-500');
-          btn.classList.add('text-slate-300');
-          icon.classList.remove('fa-solid');
-          icon.classList.add('fa-regular');
-        }
-      }
-    } catch (e) {
-      console.error('Error toggling watchlist:', e);
-    }
-  }
+  document.querySelectorAll('button[data-category]').forEach(button => button.addEventListener('click', () => {
+    category = button.dataset.category;
+    document.querySelectorAll('button[data-category]').forEach(other => { const active = other === button; other.classList.toggle('is-active', active); other.setAttribute('aria-pressed', active); }); filter();
+  }));
+  document.querySelectorAll('button[data-mood]').forEach(button => button.addEventListener('click', () => {
+    mood = button.dataset.mood;
+    document.querySelectorAll('button[data-mood]').forEach(other => { const active = other === button; other.classList.toggle('is-active', active); other.setAttribute('aria-pressed', active); }); filter();
+  }));
+  search.addEventListener('input', filter);
+  document.querySelector('.cw-search').addEventListener('submit', event => { event.preventDefault(); filter(); document.getElementById('movies').scrollIntoView({ behavior: 'smooth' }); });
+  document.querySelectorAll('.cw-watchlist').forEach(button => button.addEventListener('click', async () => {
+    {% if not current_user.is_authenticated %}window.location.href = {{ url_for('login')|tojson }}; return;{% endif %}
+    button.disabled = true;
+    try { const response = await fetch('/api/watchlist/toggle/' + button.dataset.movieId, { method: 'POST', headers: { 'Content-Type': 'application/json' } }); const data = await response.json(); if (!response.ok || !data.success) throw new Error('Unable to update watchlist.'); button.classList.toggle('is-saved', data.saved); button.setAttribute('aria-pressed', data.saved); button.querySelector('i').className = (data.saved ? 'fa-solid' : 'fa-regular') + ' fa-heart'; document.getElementById('movie-filter-status').textContent = data.saved ? 'Added to your watchlist' : 'Removed from your watchlist'; } catch { document.getElementById('movie-filter-status').textContent = 'Watchlist could not be updated. Please try again.'; } finally { button.disabled = false; }
+  }));
+  filter();
+})();
 </script>
 {% endblock %}
-
