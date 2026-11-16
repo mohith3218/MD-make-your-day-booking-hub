@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}CineMatch · CineWave Vizag{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/cinematch.css') }}">{% endblock %}
+
+{% block content %}
+<section class="cm-page" aria-labelledby="cm-title">
+  <header class="cm-intro">
+    <div>
+      <p class="cm-eyebrow">A QUICK WAY TO DECIDE</p>
+      <h1 id="cm-title">Find your next <em>film match.</em></h1>
+      <p>Choose what fits tonight. We’ll find a few films from the CineWave catalog that match your mood, language and time.</p>
+    </div>
+    <div class="cm-intro-mark" aria-hidden="true"><i class="fa-solid fa-clapperboard"></i><span>MADE FOR YOUR MOVIE NIGHT</span></div>
+  </header>
+
+  <div class="cm-layout">
+    <form class="cm-form" method="post" action="{{ url_for('cine_match') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <fieldset class="cm-mood-field">
+        <legend>What are you in the mood for?</legend>
+        <div class="cm-moods">
+          {% for value, label, icon in [('', 'Anything', 'fa-wand-magic-sparkles'), ('lighthearted', 'Lighthearted', 'fa-face-smile'), ('intense', 'Intense', 'fa-bolt'), ('emotional', 'Emotional', 'fa-heart'), ('adventurous', 'Adventurous', 'fa-compass')] %}
+            <label class="cm-mood-option"><input type="radio" name="mood" value="{{ value }}" {% if mood == value %}checked{% endif %}><span><i class="fa-solid {{ icon }}" aria-hidden="true"></i>{{ label }}</span></label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <div class="cm-filter-grid">
+        <label>Language
+          <select name="language"><option value="">Any language</option>{% for value in languages %}<option value="{{ value }}" {% if language|lower == value|lower %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+        </label>
+        <label>Genre
+          <select name="genre"><option value="">Any genre</option>{% for value in genres %}<option value="{{ value }}" {% if genre|lower == value|lower %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+        </label>
+        <label class="cm-runtime">Time available
+          <select name="time"><option value="any" {% if runtime == 'any' %}selected{% endif %}>Any runtime</option><option value="short" {% if runtime == 'short' %}selected{% endif %}>Under 100 minutes</option><option value="medium" {% if runtime == 'medium' %}selected{% endif %}>100–150 minutes</option><option value="long" {% if runtime == 'long' %}selected{% endif %}>Over 150 minutes</option></select>
+        </label>
+      </div>
+
+      <div class="cm-form-actions"><button class="cw-button cw-button-primary" type="submit"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Find my matches</button><a href="{{ url_for('cine_match') }}">Reset filters</a></div>
+    </form>
+
+    <aside class="cm-note">
+      <span class="cm-note-icon"><i class="fa-solid fa-heart" aria-hidden="true"></i></span>
+      {% if current_user.is_authenticated and personalization_count %}
+        <h2>Your taste, included</h2><p>Your {{ personalization_count }} saved or highly rated film{% if personalization_count != 1 %}s{% endif %} help sort films that fit your preferences.</p>
+      {% elif current_user.is_authenticated %}
+        <h2>Start your taste profile</h2><p>Save a film or rate one you’ve seen. Those choices will help shape future matches.</p><a href="{{ url_for('home') }}#movies">Browse films <span aria-hidden="true">→</span></a>
+      {% else %}
+        <h2>Make it personal</h2><p>Sign in to let your watchlist and ratings help shape your matches.</p><a href="{{ url_for('login', next=request.path) }}">Sign in to CineWave <span aria-hidden="true">→</span></a>
+      {% endif %}
+      <small>Matches come from the films listed in this booking hub.</small>
+    </aside>
+  </div>
+
+  {% if results %}
+    <section class="cm-results" aria-labelledby="cm-results-title">
+      <div class="cm-results-heading"><div><p class="cm-eyebrow">CURATED FOR TONIGHT</p><h2 id="cm-results-title">Your film matches</h2></div><span>{{ results|length }} {% if results|length == 1 %}match{% else %}matches{% endif %}</span></div>
+      <div class="cm-results-grid">
+        {% for result in results %}
+          {% set movie = result.movie %}
+          <article class="cm-card">
+            <a class="cm-poster" href="{{ url_for('movie_detail', movie_id=movie.id) }}" aria-label="Explore {{ movie.title }}">
+              {% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster" loading="lazy" decoding="async" onerror="this.hidden=true;this.parentElement.classList.add('cm-poster-fallback');this.parentElement.querySelector('.cm-poster-placeholder').hidden=false">
+              {% endif %}<span class="cm-poster-placeholder" {% if movie.poster %}hidden{% endif %}><i class="fa-solid fa-film" aria-hidden="true"></i><strong>{{ movie.title }}</strong><small>Poster unavailable</small></span>
+              <span class="cm-rating">★ {{ '%.1f'|format(movie.display_rating) }}</span>
+            </a>
+            <div class="cm-card-body">
+              <div class="cm-card-meta"><span>{{ movie.language or 'Language not listed' }}</span><span>{{ movie.duration }} min</span></div>
+              <h3><a href="{{ url_for('movie_detail', movie_id=movie.id) }}">{{ movie.title }}</a></h3>
+              {% if result.why %}<p class="cm-why">{{ result.why|join(' · ') }}</p>{% endif %}
+              <a class="cm-card-link" href="{{ url_for('movie_detail', movie_id=movie.id) }}">Explore film &amp; showtimes <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% elif request.method == 'POST' %}
+    <section class="cm-empty" role="status"><span><i class="fa-solid fa-film" aria-hidden="true"></i></span><h2>No films match those choices yet.</h2><p>Try a different mood or clear one of the filters.</p><a class="cw-button cw-button-white" href="{{ url_for('cine_match') }}">Clear filters</a></section>
+  {% else %}
+    <section class="cm-first-use"><span><i class="fa-regular fa-lightbulb" aria-hidden="true"></i></span><p>Your picks will appear here. Start with a mood, or leave everything open for a broad selection.</p></section>
+  {% endif %}
+</section>
+{% endblock %}

@@ -189,6 +189,26 @@ def enforce_demo_payment_setting():
         abort(403, description='Demo payments are disabled. No real payment is available.')
 
 
+def current_csrf_token():
+    """Return a per-session CSRF token for account and logout forms."""
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['_csrf_token'] = token
+    return token
+
+
+@app.before_request
+def protect_account_forms():
+    """Protect authentication and email-verification mutations from cross-site posts."""
+    protected = {'login', 'register', 'verify_email', 'resend_email_otp', 'logout'}
+    if request.method == 'POST' and request.endpoint in protected:
+        expected = session.get('_csrf_token', '')
+        supplied = request.form.get('csrf_token', '')
+        if not expected or not supplied or not hmac.compare_digest(expected, supplied):
+            abort(400, description='Your form session expired. Reload the page and try again.')
+
+
 @app.after_request
 def add_security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
@@ -1231,10 +1251,155 @@ def inject_globals():
             'user_points': user_points,
             'demo_payments_enabled': payments.mock_payments_enabled(),
             'startup_id': app.config['STARTUP_ID'],
-            'today': date.today()}
+            'today': date.today(),
+            'csrf_token': current_csrf_token()}
 
 
 # ====================== PUBLIC ROUTES ======================
+
+# CineMatch derives broad genres from the local movie copy because the booking
+# catalog does not have a dedicated genre column. Keep the vocabulary explicit
+# so only genres supported by a title or description appear in its filters.
+CINEMATCH_GENRE_KEYWORDS = {
+    'Action': ('action', 'fight', 'combat', 'warrior', 'war', 'battle', 'army', 'mission', 'stunt', 'chase', 'vigilante', 'gangster', 'assassin'),
+    'Adventure': ('adventure', 'journey', 'expedition', 'treasure', 'quest', 'exploration'),
+    'Comedy': ('comedy', 'comedian', 'comic', 'laugh', 'humorous', 'funny', 'satire', 'entertainer'),
+    'Drama': ('drama', 'family drama', 'emotional', 'relationship', 'struggle'),
+    'Fantasy & Sci-Fi': ('sci-fi', 'science fiction', 'space', 'alien', 'future', 'universe', 'magic', 'fantasy', 'myth', 'supernatural'),
+    'Horror': ('horror', 'ghost', 'haunted', 'demon', 'terrifying', 'fear'),
+    'Mystery & Thriller': ('thriller', 'suspense', 'crime', 'mystery', 'police', 'investigation', 'murder', 'detective'),
+    'Romance': ('romance', 'romantic', 'love story', 'lovers', 'wedding', 'heartbreak'),
+}
+CINEMATCH_MOODS = {
+    'lighthearted': ('FUN',),
+    'intense': ('THRILL', 'ACTION', 'MIND_BENDING'),
+    'emotional': ('EMOTIONAL', 'DRAMA', 'ROMANCE'),
+    'adventurous': ('ACTION', 'THRILL', 'MIND_BENDING'),
+}
+
+
+def cinematch_genres(movie):
+    text_content = f'{movie.title or ""} {movie.description or ""}'.casefold()
+    found = []
+    for genre, keywords in CINEMATCH_GENRE_KEYWORDS.items():
+        if any(re.search(r'(?<![a-z0-9])' + re.escape(keyword) + r'(?![a-z0-9])', text_content)
+               for keyword in keywords):
+            found.append(genre)
+    return found
+
+
+def cinematch_preferences(user_id):
+    """Build lightweight taste signals from saves and the user's 4–5-star ratings."""
+    saved_ids = {row.movie_id for row in Watchlist.query.filter_by(user_id=user_id).all()}
+    rated = MovieRating.query.filter_by(user_id=user_id).all()
+    positive_ids = {row.movie_id for row in rated if row.rating >= 4.0}
+    disliked_ids = {row.movie_id for row in rated if row.rating <= 2.0}
+    positive_movies = Movie.query.filter(
+        Movie.id.in_(saved_ids | positive_ids)
+    ).all() if saved_ids or positive_ids else []
+    negative_movies = Movie.query.filter(Movie.id.in_(disliked_ids)).all() if disliked_ids else []
+
+    def tally(movies):
+        moods, genres, languages = {}, {}, {}
+        for movie in movies:
+            for mood in movie.moods:
+                mood_code = str(mood).upper()
+                moods[mood_code] = moods.get(mood_code, 0) + 1
+            for genre in cinematch_genres(movie):
+                genres[genre] = genres.get(genre, 0) + 1
+            language = (movie.language or '').strip().casefold()
+            if language:
+                languages[language] = languages.get(language, 0) + 1
+        return moods, genres, languages
+
+    positive_moods, positive_genres, positive_languages = tally(positive_movies)
+    negative_moods, negative_genres, _ = tally(negative_movies)
+    return (positive_moods, positive_genres, positive_languages), (negative_moods, negative_genres), saved_ids, len(positive_movies)
+
+
+@app.route('/cine-match', methods=['GET', 'POST'])
+def cine_match():
+    movies = Movie.query.order_by(Movie.id.desc()).all()
+    genres_by_movie = {movie.id: cinematch_genres(movie) for movie in movies}
+    available_genres = sorted({genre for movie_genres in genres_by_movie.values() for genre in movie_genres})
+    languages = sorted({movie.language.strip() for movie in movies if movie.language and movie.language.strip()}, key=str.casefold)
+
+    mood = request.values.get('mood', '').strip().casefold()
+    if mood not in CINEMATCH_MOODS:
+        mood = ''
+    language = request.values.get('language', '').strip()
+    if language and language.casefold() not in {value.casefold() for value in languages}:
+        language = ''
+    genre = request.values.get('genre', '').strip()
+    if genre.casefold() not in {value.casefold() for value in available_genres}:
+        genre = ''
+    runtime = request.values.get('time', 'any').strip().casefold()
+    if runtime not in {'any', 'short', 'medium', 'long'}:
+        runtime = 'any'
+
+    preferences = negative_preferences = None
+    saved_ids = set()
+    personalization_count = 0
+    if current_user.is_authenticated:
+        preferences, negative_preferences, saved_ids, personalization_count = cinematch_preferences(current_user.id)
+
+    results = []
+    if request.method == 'POST':
+        candidates = []
+        for movie in movies:
+            movie_moods = {str(value).upper() for value in movie.moods}
+            movie_genres = genres_by_movie[movie.id]
+            duration = movie.duration or 0
+            mood_codes = CINEMATCH_MOODS.get(mood, ())
+            if mood_codes and not movie_moods.intersection(mood_codes):
+                continue
+            if genre and genre.casefold() not in {value.casefold() for value in movie_genres}:
+                continue
+            if language and language.casefold() != (movie.language or '').casefold():
+                continue
+            if runtime == 'short' and not (0 < duration < 100):
+                continue
+            if runtime == 'medium' and not (100 <= duration <= 150):
+                continue
+            if runtime == 'long' and not (duration > 150):
+                continue
+
+            score = 0
+            why = []
+            if mood_codes:
+                score += 4
+                why.append(f'Fits your {mood} mood')
+            if genre:
+                score += 3
+                why.append(f'Matches {genre}')
+            if language:
+                score += 2
+                why.append(f'Available in {movie.language}')
+            if runtime != 'any':
+                why.append({'short': 'Under 100 minutes', 'medium': '100–150 minutes', 'long': 'Over 150 minutes'}[runtime])
+
+            if preferences:
+                liked_moods, liked_genres, liked_languages = preferences
+                disliked_moods, disliked_genres = negative_preferences
+                mood_affinity = sum(liked_moods.get(value, 0) for value in movie_moods)
+                genre_affinity = sum(liked_genres.get(value, 0) for value in movie_genres)
+                language_affinity = liked_languages.get((movie.language or '').casefold(), 0)
+                score += min(3, mood_affinity) + min(3, genre_affinity) + min(2, language_affinity)
+                score -= min(3, sum(disliked_moods.get(value, 0) for value in movie_moods))
+                score -= min(3, sum(disliked_genres.get(value, 0) for value in movie_genres))
+                if mood_affinity or genre_affinity or language_affinity:
+                    why.append('Similar to films you saved or rated highly')
+            if movie.id in saved_ids:
+                why.append('Already in your watchlist')
+            candidates.append((score, movie, why))
+
+        candidates.sort(key=lambda item: (-item[0], -(item[1].rating or 0), item[1].title.casefold()))
+        results = [{'movie': movie, 'why': why or ['A well-rated pick from the CineWave catalog']}
+                   for _, movie, why in candidates[:3]]
+
+    return render_template('cine_match.html', results=results, mood=mood, language=language,
+                           genre=genre, runtime=runtime, genres=available_genres,
+                           languages=languages, personalization_count=personalization_count)
 
 @app.route('/')
 def home():
@@ -1294,8 +1459,8 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             session.clear()
@@ -1309,16 +1474,19 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username'].strip()
+        username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip().lower()
         phone = request.form.get('phone', '').strip()
-        password = request.form['password']
+        password = request.form.get('password', '')
 
         if not re.fullmatch(r'[A-Za-z0-9_.-]{3,30}', username):
             flash('Username must be 3–30 characters and use only letters, numbers, dots, underscores, or hyphens.')
             return redirect(url_for('register'))
-        if not email or not is_valid_email(email):
+        if not email or len(email) > 120 or not is_valid_email(email):
             flash("Please enter a valid email address.")
+            return redirect(url_for('register'))
+        if phone and not re.fullmatch(r'\d{10}', phone):
+            flash('Enter a 10-digit mobile number, or leave the field blank.')
             return redirect(url_for('register'))
         if len(password) < 6 or len(password) > 256:
             flash('Use a password between 6 and 256 characters.')
@@ -1333,7 +1501,12 @@ def register():
         user = User(username=username, email=email, email_verified=True, phone=phone or None)
         user.set_password(password)
         db.session.add(user)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash('That username or email is already registered. Please sign in or use different details.')
+            return redirect(url_for('register'))
         create_wallet(user)
         login_user(user)
         flash('Your account is ready. Welcome to MD CineWave!')
@@ -1397,7 +1570,7 @@ def resend_email_otp():
     return redirect(url_for('verify_email'))
 
 
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()

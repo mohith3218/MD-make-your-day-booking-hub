@@ -78,8 +78,17 @@ def main():
     c1 = A.app.test_client()
     c2 = A.app.test_client()
 
+    def csrf_token(client, path):
+        page = client.get(path)
+        assert page.status_code == 200, page.status_code
+        with client.session_transaction() as client_session:
+            token = client_session.get('_csrf_token')
+        assert token, 'account form did not provide a CSRF token'
+        return token
+
     def login(c, who):
-        r = c.post('/login', data={'username': who, 'password': 'pass123'},
+        token = csrf_token(c, '/login')
+        r = c.post('/login', data={'csrf_token': token, 'username': who, 'password': 'pass123'},
                    follow_redirects=True)
         assert r.status_code == 200, r.status_code
 
@@ -331,7 +340,9 @@ def main():
     # Exercise actual password authentication against the isolated fixture.
     with A.app.app_context():
         admin_id = A.User.query.filter_by(username='admin').one().id
-    response = admin.post('/login', data={'username': 'admin', 'password': os.environ['ADMIN_PASSWORD']})
+    token = csrf_token(admin, '/login')
+    response = admin.post('/login', data={'csrf_token': token, 'username': 'admin',
+                                          'password': os.environ['ADMIN_PASSWORD']})
     assert response.status_code == 302
     with admin.session_transaction() as admin_session:
         assert admin_session['_user_id'] == str(admin_id)
@@ -347,7 +358,8 @@ def main():
 
     # ---- 13. signup gives a 500 welcome balance --------------------------
     c3 = A.app.test_client()
-    c3.post('/register', data={'username': 'newuser', 'email': 'n@x.com',
+    token = csrf_token(c3, '/register')
+    c3.post('/register', data={'csrf_token': token, 'username': 'newuser', 'email': 'n@x.com',
                                'phone': '9876543210', 'password': 'pass123'},
             follow_redirects=True)
     with A.app.app_context():

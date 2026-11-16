@@ -1,24 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Verify email · MD CineWave{% endblock %}
-
+{% block title %}Verify your email · CineWave{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">{% endblock %}
 {% block content %}
-<div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6">
-  <div class="text-center space-y-2">
-    <h1 class="text-3xl font-black tracking-wider text-white">Verify your email</h1>
-    <p class="text-sm text-slate-400">Enter the six-digit code sent to <strong class="text-slate-200">{{ email }}</strong>.</p>
-    <p class="text-xs text-slate-500">The code expires after 10 minutes. You have up to five attempts.</p>
+<section class="cw-auth cw-auth-verify" aria-labelledby="auth-title">
+  <div class="cw-auth-layout">
+    <aside class="cw-auth-story" aria-label="About CineWave">
+      <p class="cw-overline">One small step</p><h2>Make your<br>account yours.</h2>
+      <p>Confirm the email address connected to your account to finish setting up your CineWave profile.</p>
+      <span class="cw-auth-story-mark" aria-hidden="true"><i class="fa-solid fa-envelope-open-text"></i></span>
+    </aside>
+    <div class="cw-auth-card">
+      <header class="cw-auth-heading"><p class="cw-overline">Email confirmation</p><h1 id="auth-title">Check your inbox</h1><p>Enter the six-digit code sent to <strong>{{ email }}</strong>.</p><p class="cw-auth-note">The code expires after 10 minutes. You have up to five attempts.</p></header>
+      <form method="POST" action="{{ url_for('verify_email') }}" class="cw-auth-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="cw-auth-field"><label for="verify-code">Verification code</label><input id="verify-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required aria-describedby="verify-code-help"><small id="verify-code-help">Enter all six digits from the email.</small></div>
+        <button type="submit" class="cw-button cw-button-primary cw-auth-submit">Verify email</button>
+      </form>
+      <form method="POST" action="{{ url_for('resend_email_otp') }}" class="cw-auth-resend"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Send a new code</button></form>
+    </div>
   </div>
-
-  <form method="POST" class="space-y-4">
-    <label class="block text-xs text-slate-400 font-medium" for="code">Verification code</label>
-    <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
-           pattern="[0-9]{6}" minlength="6" maxlength="6" required
-           class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-3 text-center text-xl tracking-[.5em] text-slate-100">
-    <button type="submit" class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-slate-950 font-semibold rounded-xl">Verify email</button>
-  </form>
-
-  <form method="POST" action="{{ url_for('resend_email_otp') }}" class="text-center">
-    <button type="submit" class="text-sm text-[#C9A84C] hover:underline">Send a new code</button>
-  </form>
-</div>
+</section>
 {% endblock %}

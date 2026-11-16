@@ -1,36 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Register · MD CineWave{% endblock %}
-
+{% block title %}Create your account · CineWave{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">{% endblock %}
 {% block content %}
-<div class="max-w-md mx-auto glass-card rounded-3xl p-8 space-y-6">
-  <div class="text-center space-y-2">
-    <h1 class="text-3xl font-black tracking-wider text-white">MD CINE<span class="text-[#C9A84C]">WAVE</span></h1>
-    <p class="text-xs text-slate-400">Create your account</p>
-    <p class="text-[11px] text-emerald-400">Create your account and start booking movies.</p>
+<section class="cw-auth" aria-labelledby="auth-title">
+  <div class="cw-auth-layout">
+    <aside class="cw-auth-story" aria-label="About CineWave">
+      <p class="cw-overline">A better movie day starts here</p>
+      <h2>Find your seat<br>in the story.</h2>
+      <p>Discover films across Visakhapatnam, choose the screen that feels right, and keep your plans together in one place.</p>
+      <ul><li><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Theatres across Vizag</li><li><i class="fa-solid fa-ticket" aria-hidden="true"></i> A simpler way to plan screenings</li><li><i class="fa-solid fa-users" aria-hidden="true"></i> Shared plans with your movie crew</li></ul>
+      <span class="cw-auth-story-mark" aria-hidden="true"><i class="fa-solid fa-clapperboard"></i></span>
+    </aside>
+
+    <div class="cw-auth-card">
+      <header class="cw-auth-heading"><p class="cw-overline">Join the CineWave community</p><h1 id="auth-title">Create your account</h1><p>Your next movie day is a few details away.</p></header>
+      <form method="POST" action="{{ url_for('register') }}" class="cw-auth-form" data-auth-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="cw-auth-field"><label for="register-username">Username</label><input id="register-username" type="text" name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_.-]+" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="username-help"><small id="username-help">3–30 characters: letters, numbers, dots, underscores or hyphens.</small></div>
+        <div class="cw-auth-field"><label for="register-email">Email address</label><input id="register-email" type="email" name="email" autocomplete="email" maxlength="120" autocapitalize="none" required></div>
+        <div class="cw-auth-field"><label for="register-phone">Mobile number <span>(optional)</span></label><input id="register-phone" type="tel" name="phone" inputmode="numeric" autocomplete="tel-national" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit number" aria-describedby="phone-help"><small id="phone-help">Use 10 digits, or leave this field blank.</small></div>
+        <div class="cw-auth-field"><label for="register-password">Password</label><div class="cw-auth-password"><input id="register-password" type="password" name="password" minlength="6" maxlength="256" autocomplete="new-password" required aria-describedby="password-help"><button type="button" class="cw-password-toggle" data-password-toggle aria-controls="register-password" aria-pressed="false">Show</button></div><small id="password-help">Use 6–256 characters. Avoid reusing a password from another site.</small></div>
+        <button type="submit" class="cw-button cw-button-primary cw-auth-submit"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Create account</button>
+      </form>
+      <p class="cw-auth-switch">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+    </div>
   </div>
-
-  <form method="POST" class="space-y-4">
-    <div>
-      <label class="block text-xs text-slate-400 font-medium mb-1">Username</label>
-      <input type="text" name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_.-]+" autocomplete="username" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
-    </div>
-    <div>
-      <label class="block text-xs text-slate-400 font-medium mb-1">Email</label>
-      <input type="email" name="email" autocomplete="email" maxlength="120" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
-    </div>
-    <div>
-      <label class="block text-xs text-slate-400 font-medium mb-1">Mobile number</label>
-      <input type="tel" name="phone" pattern="[0-9]{10}" placeholder="10 digit mobile" class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
-    </div>
-    <div>
-      <label class="block text-xs text-slate-400 font-medium mb-1">Password</label>
-      <input type="password" name="password" minlength="6" maxlength="256" autocomplete="new-password" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
-    </div>
-    <button type="submit" class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">Create account</button>
-  </form>
-
-  <p class="text-xs text-center text-slate-400">
-    Already have an account? <a href="{{ url_for('login') }}" class="text-[#C9A84C] font-semibold hover:underline">Sign in</a>
-  </p>
-</div>
+</section>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>{% endblock %}
