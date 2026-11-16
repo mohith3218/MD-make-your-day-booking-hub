@@ -2933,15 +2933,60 @@ def delete_movie(movie_id):
     guard = admin_required()
     if guard:
         return guard
-    movie = Movie.query.get_or_404(movie_id)
+    # Lock the parent and shows before checking dependencies. PostgreSQL's FK
+    # locks prevent a concurrent reservation from slipping past these checks.
+    movie = Movie.query.filter_by(id=movie_id).with_for_update().first_or_404()
     title = movie.title
-    # Cascade: delete bookings (and payments) tied to this movie's showtimes
-    showtime_ids = [s.id for s in Showtime.query.filter_by(movie_id=movie_id).all()]
-    if showtime_ids:
-        Booking.query.filter(Booking.showtime_id.in_(showtime_ids)).delete(synchronize_session=False)
-    Showtime.query.filter_by(movie_id=movie_id).delete()
-    db.session.delete(movie)
-    db.session.commit()
+    try:
+        shows = Showtime.query.filter_by(movie_id=movie_id).with_for_update().all()
+        showtime_ids = [show.id for show in shows]
+        if showtime_ids:
+            # Ticket, payment and cancellation history must remain accessible.
+            if Booking.query.filter(Booking.showtime_id.in_(showtime_ids)).first():
+                db.session.rollback()
+                flash(f"Movie '{title}' cannot be deleted because it has bookings. Booking and payment history has been kept.")
+                return redirect(url_for('admin'))
+            if BookedSeat.query.filter(BookedSeat.showtime_id.in_(showtime_ids)).first():
+                db.session.rollback()
+                flash(f"Movie '{title}' cannot be deleted because it has confirmed seats.")
+                return redirect(url_for('admin'))
+
+            now = datetime.utcnow()
+            active_hold = SeatHold.query.filter(
+                SeatHold.showtime_id.in_(showtime_ids), SeatHold.expires_at > now).first()
+            active_lock = SeatLock.query.filter(
+                SeatLock.showtime_id.in_(showtime_ids), SeatLock.expires_at > now).first()
+            if active_hold or active_lock:
+                db.session.rollback()
+                flash(f"Movie '{title}' cannot be deleted while active seat holds exist. Please wait for checkout to finish or expire.")
+                return redirect(url_for('admin'))
+
+            active_parties = PartySession.query.filter(
+                PartySession.showtime_id.in_(showtime_ids), PartySession.status == 'ACTIVE',
+                PartySession.created_at > now - PARTY_LIFETIME).all()
+            if any(party.showtime.status != 'ended' for party in active_parties):
+                db.session.rollback()
+                flash(f"Movie '{title}' cannot be deleted while active Watch Together parties exist. Close the parties or wait for them to expire.")
+                return redirect(url_for('admin'))
+
+            # Bulk deletes do not invoke ORM cascades. Remove transient child
+            # rows first, then the shows, so PostgreSQL FK checks remain valid.
+            party_ids = [party.id for party in PartySession.query.filter(
+                PartySession.showtime_id.in_(showtime_ids)).all()]
+            if party_ids:
+                PartyMember.query.filter(PartyMember.party_id.in_(party_ids)).delete(synchronize_session='fetch')
+                PartySession.query.filter(PartySession.id.in_(party_ids)).delete(synchronize_session='fetch')
+            SeatHold.query.filter(SeatHold.showtime_id.in_(showtime_ids)).delete(synchronize_session='fetch')
+            SeatLock.query.filter(SeatLock.showtime_id.in_(showtime_ids)).delete(synchronize_session='fetch')
+            Showtime.query.filter(Showtime.id.in_(showtime_ids)).delete(synchronize_session='fetch')
+        # Reviews and watchlist entries already have ORM delete cascades.
+        db.session.delete(movie)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        app.logger.warning('Movie deletion blocked by related records (movie_id=%s)', movie_id)
+        flash(f"Movie '{title}' could not be deleted because related records still exist. No changes were saved.")
+        return redirect(url_for('admin'))
     flash(f"Movie '{title}' has been deleted.")
     return redirect(url_for('admin'))
 
