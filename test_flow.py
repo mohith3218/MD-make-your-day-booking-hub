@@ -114,7 +114,7 @@ def main():
     assert 'Recliner' in html and 'data-seat="A1"' in html
     assert '₹400' in html, 'per-show price override not applied'
     assert 'function toggleSeatSelection' in html and 'toggleSeatSelection(seatEl)' in html
-    assert 'id="vr-preview-frame"' in html and 'class="seat' in html
+    assert 'id="vr-inline-frame"' in html and 'class="seat' in html
     vr_preview = c1.get(f'/book/{show_id}/vr-preview')
     assert vr_preview.status_code == 200
     preview_html = vr_preview.get_data(as_text=True)

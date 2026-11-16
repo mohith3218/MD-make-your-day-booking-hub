@@ -75,6 +75,7 @@ from dotenv import load_dotenv  # load .env early
 load_dotenv()  # Ensure environment variables are available before any config
 from vizag_theaters import seed_vizag_theaters, correct_jagadamba_levels
 from theatre_service import TheatreService
+from theatre_discovery import create_theatre_blueprint, cinema_now, validate_booking_context
 
 
 def load_local_dotenv():
@@ -574,7 +575,7 @@ class Showtime(db.Model):
         """Parse show_date + show_time into a datetime object. Supports HH:MM and H:MM AM/PM formats."""
         for fmt in ('%H:%M', '%I:%M %p', '%I:%M%p'):
             try:
-                t = datetime.strptime(self.show_time.strip(), fmt).time()
+                t = datetime.strptime((self.show_time or '').strip(), fmt).time()
                 return datetime.combine(self.show_date, t)
             except ValueError:
                 continue
@@ -586,16 +587,16 @@ class Showtime(db.Model):
         if dt:
             # consider past only after movie ends (show_datetime + duration)
             end_dt = dt + timedelta(minutes=(self.movie.duration if self.movie else 0))
-            return datetime.now() > end_dt
-        return self.show_date < date.today()
+            return cinema_now() > end_dt
+        return self.show_date < cinema_now().date()
 
     @property
     def status(self):
         """Returns 'upcoming', 'live', or 'ended' based on current time."""
         dt = self.show_datetime
         if not dt:
-            return 'upcoming'
-        now = datetime.now()
+            return 'unavailable'
+        now = cinema_now()
         duration = self.movie.duration if self.movie else 0
         end_dt = dt + timedelta(minutes=duration)
         if now < dt:
@@ -606,14 +607,18 @@ class Showtime(db.Model):
 
     @property
     def dynamic_pricing_info(self):
+        return self.pricing_info()
+
+    def pricing_info(self, *, booked_count=None):
         """
         Calculates real-time surge or early-bird pricing adjustments based on occupancy and show time.
         """
         total = sl.count_seats(self.layout) or 1
-        booked_count = len(self.booked_seat_ids())
+        if booked_count is None:
+            booked_count = len(self.booked_seat_ids())
         occupancy_pct = (booked_count / max(1, total)) * 100.0
 
-        today = date.today()
+        today = cinema_now().date()
         days_ahead = (self.show_date - today).days
 
         if occupancy_pct >= 60.0:
@@ -1075,10 +1080,10 @@ def purge_expired_holds():
         db.session.commit()
 
 
-def price_seats(showtime, seat_ids):
-    """Return (ticket_total, [{'id','class','price'}...]) including dynamic surge/discount."""
+def show_seat_prices(showtime, *, pricing_info=None):
+    """Trusted seat-price map shared by discovery and checkout."""
     layout = showtime.layout
-    dyn = showtime.dynamic_pricing_info
+    dyn = pricing_info if pricing_info is not None else showtime.dynamic_pricing_info
     effective_overrides = {}
     base_overrides = showtime.price_overrides
     for cls in layout.get("classes", []):
@@ -1086,7 +1091,16 @@ def price_seats(showtime, seat_ids):
         base_p = float(base_overrides.get(code, cls.get("price", 0)))
         effective_overrides[code] = round(base_p * dyn['factor'], 2)
 
-    prices = sl.seat_price_map(layout, effective_overrides)
+    blocked = {seat for cls in layout.get('classes', []) for row in cls.get('rows', [])
+               for seat in (row.get('blocked') or [])}
+    return {seat: price for seat, price in sl.seat_price_map(layout, effective_overrides).items()
+            if seat not in blocked}
+
+
+def price_seats(showtime, seat_ids):
+    """Return (ticket_total, [{'id','class','price'}...]) including dynamic surge/discount."""
+    layout = showtime.layout
+    prices = show_seat_prices(showtime)
     classes = sl.seat_class_map(layout)
     meta = [{'id': s, 'class': classes.get(s, 'Standard'),
              'price': float(prices.get(s, 0))} for s in seat_ids]
@@ -1414,16 +1428,17 @@ def movie_detail(movie_id):
 @app.route('/book/<int:showtime_id>', methods=['GET', 'POST'])
 @login_required
 def book(showtime_id):
-    purge_expired_holds()
     showtime = Showtime.query.get_or_404(showtime_id)
+    discovery_context = validate_booking_context(showtime)
+    purge_expired_holds()
     movie = showtime.movie
 
     if not showtime.screen:
         flash("This showtime has no screen assigned. Ask an admin to fix it.")
         return redirect(url_for('movie_detail', movie_id=movie.id))
 
-    if showtime.status == 'ended':
-        flash("⛔ This show has already ended. Please choose another showtime.")
+    if showtime.status != 'upcoming' or showtime.show_datetime is None:
+        flash("This show has started or is unavailable. Please choose an upcoming showtime.")
         return redirect(url_for('movie_detail', movie_id=movie.id))
 
     layout = showtime.layout
@@ -1514,7 +1529,8 @@ def book(showtime_id):
                            screen=showtime.screen, grid=grid,
                            max_seats=sl.MAX_SEATS_PER_BOOKING,
                            stats=sl.availability(layout, booked | held),
-                           dynamic_info=dyn, party_code=party_code)
+                           dynamic_info=dyn, party_code=party_code,
+                           discovery_context=discovery_context)
 
 
 @app.route('/book/<int:showtime_id>/vr-preview')
@@ -3892,6 +3908,11 @@ def init_db():
 
         mode = 'DEMO — no real money' if payments.mock_payments_enabled() else 'DEMO disabled'
         print(f"Payments: {mode}")
+
+
+app.register_blueprint(create_theatre_blueprint(db, SimpleNamespace(
+    Theater=Theater, Screen=Screen, Showtime=Showtime, Movie=Movie,
+    BookedSeat=BookedSeat, SeatHold=SeatHold), show_seat_prices))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Explore by Theatre · CineWave{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/theatre-discovery.css') }}">{% endblock %}
+{% block content %}
+<div class="td-page">
+  <header class="td-intro">
+    <div><p class="cw-overline">Your city. Your cinema.</p><h1>Find your cinema.<br><em>Then your film.</em></h1><p>Explore by Theatre — from familiar neighbourhood screens to your favourite waterfront multiplex.</p></div>
+    <div class="td-intro-note"><i class="fa-solid fa-building" aria-hidden="true"></i><span>Real cinemas.<br>Actual screenings.<br>Your kind of movie day.</span></div>
+  </header>
+
+  <form class="td-filter-form td-directory-filters" method="GET" action="{{ url_for('theatre_discovery.index') }}" data-discovery-form>
+    <label class="td-search-label">Find a theatre
+      <span class="td-search-wrap"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input name="q" type="search" value="{{ filters.q }}" placeholder="Theatre name, neighbourhood or address" maxlength="120"></span>
+    </label>
+    <label>City<select name="city"><option value="">All cities</option>{% for city in cities %}<option value="{{ city }}" {% if city == filters.city %}selected{% endif %}>{{ city }}</option>{% endfor %}</select></label>
+    <label>Area<select name="area"><option value="">All areas</option>{% for area in areas %}<option value="{{ area }}" {% if area == filters.area %}selected{% endif %}>{{ area }}</option>{% endfor %}</select></label>
+    <button class="cw-button cw-button-primary" type="submit"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Find theatres</span></button>
+    {% if filters.q or filters.city or filters.area %}<a class="td-clear" href="{{ url_for('theatre_discovery.index') }}">Clear filters</a>{% endif %}
+    <p class="td-loading" role="status" hidden>Finding your cinemas…</p>
+  </form>
+
+  <div class="td-results-heading"><div><p class="cw-overline">Cinematic landmarks</p><h2>Explore by Theatre</h2></div><p>{{ theatres|length }} cinema{{ '' if theatres|length == 1 else 's' }} found</p></div>
+  <div class="td-venue-grid">
+    {% for theatre in theatres %}
+    <article class="td-venue-card">
+      <div class="td-venue-art" aria-hidden="true"><i class="fa-solid fa-clapperboard"></i><div class="td-art-seats">{% for seat in range(18) %}<span></span>{% endfor %}</div><span>{{ theatre.screens|length }} screen{{ '' if theatre.screens|length == 1 else 's' }}</span></div>
+      <div class="td-venue-content"><p class="cw-overline">{{ theatre.city or 'Cinema directory' }}</p><h3><a href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id) }}">{{ theatre.name }}</a></h3>
+        <p class="td-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>{{ theatre.location or 'Location not provided' }}</p>
+        {% if theatre.address %}<p class="td-address">{{ theatre.address }}</p>{% endif %}
+        <div class="td-screen-chips">{% for screen in theatre.screens[:3] %}<span>{{ screen.name }}{% if screen.screen_type %} · {{ screen.screen_type }}{% endif %}</span>{% endfor %}{% if theatre.screens|length > 3 %}<span>+{{ theatre.screens|length - 3 }} more</span>{% endif %}</div>
+        <p class="td-schedule-count">{% if summary[theatre.id].shows %}{{ summary[theatre.id].movies|length }} film{{ '' if summary[theatre.id].movies|length == 1 else 's' }} · {{ summary[theatre.id].shows }} upcoming screening{{ '' if summary[theatre.id].shows == 1 else 's' }}{% else %}New screenings will appear when scheduled{% endif %}</p>
+        <a class="td-explore-link" href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id) }}">Explore Movies <span aria-hidden="true">→</span><span class="cw-sr-only"> at {{ theatre.name }}</span></a>
+      </div>
+    </article>
+    {% else %}
+    <div class="cw-empty td-empty"><i class="fa-solid fa-location-dot" aria-hidden="true"></i><h3>No cinemas match your search.</h3><p>Try a different name or area, or clear the filters to browse every theatre.</p><a class="cw-button cw-button-primary" href="{{ url_for('theatre_discovery.index') }}">Browse all theatres</a></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/theatre-discovery.js') }}" defer></script>{% endblock %}

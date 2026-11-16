@@ -178,8 +178,8 @@
     <div class="cw-container cw-header-inner">
       <a href="{{ url_for('home') }}" class="cw-brand" aria-label="CineWave home"><span id="site-logo-mark" class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
       <span class="cw-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Visakhapatnam <span>(Jagadamba)</span></span>
-      <form action="{{ url_for('home') }}#movies" class="cw-search" role="search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input name="q" aria-label="Search movies" placeholder="Search movies, screens & experiences in Vizag…" value="{{ request.args.get('q', '') }}"></form>
-      <nav class="cw-nav" aria-label="Main navigation"><a href="{{ url_for('home') }}#movies" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>Movies</a><a href="{{ url_for('home') }}#showtimes-section">Theatres</a><a href="{{ url_for('home') }}#coastal-standard">Experiences</a></nav>
+      <form action="{{ url_for('home') }}#movies" class="cw-search" role="search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input name="q" aria-label="Search movies" placeholder="Search movies in Vizag…" value="{{ request.args.get('q', '') if request.endpoint == 'home' else '' }}"></form>
+      <nav class="cw-nav" aria-label="Main navigation"><a href="{{ url_for('home') }}#movies" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>Movies</a><a href="{{ url_for('theatre_discovery.index') }}" {% if request.blueprint == 'theatre_discovery' %}aria-current="page"{% endif %}>Theatres</a><a href="{{ url_for('home') }}#coastal-standard">Experiences</a></nav>
       <div class="cw-account">
       {% if current_user.is_authenticated %}
         <a class="cw-wallet" href="{{ url_for('wallet_page') }}"><i class="fa-solid fa-wallet" aria-hidden="true"></i> ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>

@@ -303,6 +303,9 @@
 </div>
 
 <form id="booking-form" method="POST" class="space-y-6">
+  {% for name, value in discovery_context.items() %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
   <input type="hidden" name="selected_seats" id="selected_seats_input">
 
   <div id="seating-viewport" class="glass-card rounded-2xl p-4 sm:p-6 rowscroll transition-all duration-700">
