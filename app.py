@@ -1461,13 +1461,16 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
+        next_url = safe_local_redirect(request.args.get('next'))
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             session.clear()
             login_user(user)
             get_wallet(user)
-            return redirect(safe_local_redirect(request.args.get('next')) or url_for('home'))
+            return redirect(next_url or url_for('home'))
         flash('Invalid username or password')
+        login_args = {'next': next_url} if next_url else {}
+        return redirect(url_for('login', **login_args))
     return render_template('login.html')
 
 
