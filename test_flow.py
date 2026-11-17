@@ -223,7 +223,8 @@ def main():
                 follow_redirects=False)
     ref2 = r.headers['Location'].rsplit('/', 1)[1]
     r = c2.post(f'/pay/gateway/{ref2}', data={'method': 'upi'})
-    body = r.get_data(as_text=True)
+    assert r.status_code == 303 and r.headers['Location'] == f'/pay/mock/{ref2}'
+    body = c2.get(r.headers['Location']).get_data(as_text=True)
     assert 'order_mock_' in body and 'DEMO — No real money is charged' in body
     with A.app.app_context():
         p = A.Booking.query.filter_by(reference=ref2).one().payment
@@ -339,13 +340,14 @@ def main():
     admin = A.app.test_client()
     # Exercise actual password authentication against the isolated fixture.
     with A.app.app_context():
-        admin_id = A.User.query.filter_by(username='admin').one().id
+        admin_user = A.User.query.filter_by(username='admin').one()
+        admin_id, admin_alt_id = admin_user.id, admin_user.alternative_id
     token = csrf_token(admin, '/login')
     response = admin.post('/login', data={'csrf_token': token, 'username': 'admin',
                                           'password': os.environ['ADMIN_PASSWORD']})
     assert response.status_code == 302
     with admin.session_transaction() as admin_session:
-        assert admin_session['_user_id'] == str(admin_id)
+        assert admin_session['_user_id'] == admin_alt_id
     with A.app.app_context():
         req_id = A.RechargeRequest.query.filter_by(status='PENDING').one().id
     admin.post(f'/admin/recharges/{req_id}/approve', follow_redirects=True)
@@ -496,7 +498,11 @@ def main():
         token = split_booking.split_token
     for index, client in enumerate((c1, c2)):
         r = client.post(f'/split-pay/{token}/start')
-        assert r.status_code == 200
+        assert r.status_code == 303
+        confirmation_path = r.headers['Location']
+        assert client.get(confirmation_path).status_code == 200
+        replay = client.post(f'/split-pay/{token}/start')
+        assert replay.status_code == 303 and replay.headers['Location'] == confirmation_path
         with A.app.app_context():
             participant_id = A.User.query.filter_by(username=('mohith' if index == 0 else 'rahul')).one().id
             contribution = A.SplitContribution.query.filter_by(
@@ -507,7 +513,9 @@ def main():
         assert other.post(path, data={'outcome': 'success'}).status_code == 404
         if index == 1:
             assert client.post(path, data={'outcome': 'fail'}).status_code == 302
-            client.post(f'/split-pay/{token}/start')
+            retry = client.post(f'/split-pay/{token}/start')
+            assert retry.status_code == 303
+            assert client.get(retry.headers['Location']).status_code == 200
         assert client.post(path, data={'outcome': 'success'}).status_code == 302
         if index == 0:
             with A.app.app_context():

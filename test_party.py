@@ -22,16 +22,8 @@ os.environ.update(APP_ENV='testing', DATABASE_URL=_url, TEST_DATABASE_URL=_url,
                   SECRET_KEY='isolated-party-test-key', SMTP_HOST='', TMDB_API_KEY='')
 
 import app as A
-from flask import g
 from sqlalchemy.exc import IntegrityError
 import vizag_theaters as theaters
-
-
-@A.app.before_request
-def clear_test_context_identity():
-    # Tests keep an app context for database assertions. A real request gets a
-    # fresh g; discard Flask-Login's cached identity when switching test clients.
-    g.pop('_login_user', None)
 
 
 class PartyTests(unittest.TestCase):
@@ -65,7 +57,7 @@ class PartyTests(unittest.TestCase):
         for user in self.users:
             client = A.app.test_client()
             with client.session_transaction() as session:
-                session['_user_id'] = str(user.id)
+                session['_user_id'] = user.alternative_id
                 session['_fresh'] = True
                 session['party_csrf'] = 'fixture-csrf'
             self.clients.append(client)

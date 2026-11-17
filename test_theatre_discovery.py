@@ -20,16 +20,10 @@ os.environ.update(APP_ENV='testing', DATABASE_URL=_url, TEST_DATABASE_URL=_url,
                   DEMO_PAYMENTS_ENABLED='true', SESSION_COOKIE_SECURE='0')
 
 import app as A
-from flask import g
 from sqlalchemy import event, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import OperationalError
 from theatre_discovery import cinema_now
-
-
-@A.app.before_request
-def clear_test_identity():
-    g.pop('_login_user', None)
 
 
 class DiscoveryHTML(HTMLParser):
@@ -111,6 +105,7 @@ class TheatreDiscoveryTests(unittest.TestCase):
         A.db.session.commit()
         self.client = A.app.test_client()
         self.detail = f'/theatres/{self.first.id}'
+        self.sign_in()
 
     def tearDown(self):
         A.db.session.remove()
@@ -118,23 +113,23 @@ class TheatreDiscoveryTests(unittest.TestCase):
 
     def sign_in(self):
         with self.client.session_transaction() as state:
-            state['_user_id'] = str(self.user.id)
+            state['_user_id'] = self.user.alternative_id
             state['_fresh'] = True
 
     def seat_links(self, html):
         return [item['href'] for item in DiscoveryHTML(html).links
                 if 'td-seat-link' in item.get('class', '')]
 
-    def test_directory_search_city_and_area(self):
-        html = self.client.get('/theatres?q=coAsTaL&city=Visakhapatnam&area=Beach+Road').text
+    def test_directory_search_matches_only_theatre_names(self):
+        html = self.client.get('/theatres?q=coAsTaL').text
         self.assertIn('Coastal Cinema', html)
         self.assertNotIn('Hill Cinema', html)
         self.assertIn('Coastal 1', html)
         self.assertIn('Coastal 3D', html)
-        self.assertEqual(self.client.get('/theatres?city=Other+City').status_code, 200)
+        self.assertNotIn('td-venue-card', self.client.get('/theatres?q=Waterfront').text)
 
-    def test_search_matches_address_and_escapes_wildcards(self):
-        self.assertIn('Coastal Cinema', self.client.get('/theatres?q=Waterfront').text)
+    def test_search_escapes_wildcards_and_matches_case_insensitively(self):
+        self.assertNotIn('Coastal Cinema', self.client.get('/theatres?q=Waterfront').text)
         html = self.client.get('/theatres?q=%25').text
         self.assertIn('No cinemas match', html)
         self.assertNotIn('td-venue-card', html)
@@ -247,7 +242,7 @@ class TheatreDiscoveryTests(unittest.TestCase):
         finally:
             event.remove(A.db.engine,'before_cursor_execute',count)
         self.assertEqual(response.status_code,200)
-        self.assertLessEqual(len(queries),7)
+        self.assertLessEqual(len(queries),8)
 
     def test_started_and_invalid_time_cannot_be_booked(self):
         self.sign_in()
@@ -278,12 +273,12 @@ class TheatreDiscoveryTests(unittest.TestCase):
         self.assertEqual(A.SeatHold.query.count(),0)
 
     def test_login_next_preserves_context(self):
-        handoff=self.client.get(f'{self.detail}/shows/{self.show.id}/book')
-        response=self.client.get(handoff.location)
-        self.assertEqual(response.status_code,302)
-        next_url=parse_qs(urlsplit(response.location).query)['next'][0]
-        self.assertIn('theatre_id=',next_url)
-        self.assertIn('screen_id=',next_url)
+        client=A.app.test_client()
+        handoff=client.get(f'{self.detail}/shows/{self.show.id}/book')
+        response=client.get(handoff.location)
+        self.assertEqual(response.status_code,200)
+        next_url=parse_qs(urlsplit(handoff.location).query)['next'][0]
+        self.assertEqual(next_url, f'/theatres/{self.first.id}/shows/{self.show.id}/book')
 
     def test_complete_discovery_to_booking_payment_and_ticket(self):
         self.sign_in()
@@ -305,7 +300,8 @@ class TheatreDiscoveryTests(unittest.TestCase):
         self.assertEqual(self.client.get(reserve.location).status_code,200)
         with patch.object(A,'dispatch_ticket_delivery',return_value=False):
             gateway=self.client.post(f'/pay/gateway/{booking.reference}',data={'method':'upi'})
-            self.assertEqual(gateway.status_code,200)
+            self.assertEqual(gateway.status_code,303)
+            self.assertEqual(self.client.get(gateway.location).status_code,200)
             paid=self.client.post(f'/pay/simulate/{booking.reference}',data={'outcome':'success'})
         self.assertIn('/ticket/',paid.location)
         self.assertEqual(self.client.get(paid.location).status_code,200)

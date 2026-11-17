@@ -1,5 +1,6 @@
 /* CineWave coastal design system: shared shell, live listings and checkout. */
 :root { --cw-bg:#faf5ee; --cw-soft:#f5efe7; --cw-surface:#fff; --cw-ink:#30251e; --cw-muted:#796f66; --cw-primary:#c26529; --cw-primary-dark:#a84d16; --cw-line:#ece3d8; --cw-hero:#ece6dc; --cine-gold:#c26529; --cine-gold-light:#a84d16; }
+html { color-scheme:light dark; }
 * { box-sizing:border-box; }
 html { scroll-behavior:smooth; scroll-padding-top:100px; }
 body#app-body { font-family:'Manrope',sans-serif; background:var(--cw-bg)!important; color:var(--cw-ink); font-size:13px; }
@@ -270,6 +271,27 @@ body#app-body .cw-bill-title h2 { font:500 11px 'Manrope',sans-serif; text-trans
 .cw-payment-cta>p { font-size:9px; color:var(--cw-muted); margin-top:23px; }
 .cw-payment-cta>p i { color:var(--cw-primary); margin-right:4px; }
 .cw-payment-cta>small { display:block; font-size:8px; margin-top:6px; color:var(--cw-muted); }
+.cw-auth-shell .cw-header,.cw-auth-shell .cw-demo-notice,.cw-auth-shell .cw-footer { display:none!important; }
+.cw-auth-brandbar { display:flex; justify-content:center; padding:16px; }
+.cw-auth-shell .cw-main-wrap { width:min(100% - 32px,480px); padding-top:7vh; }
+.cw-auth-remember { display:flex; align-items:center; gap:9px; color:var(--cw-muted); font-size:11px; }
+.cw-auth-remember input { width:16px; height:16px; accent-color:var(--cw-primary); }
+.cw-book-chooser { position:relative; }
+.cw-book-chooser>summary { list-style:none; cursor:pointer; }
+.cw-book-chooser>summary::-webkit-details-marker { display:none; }
+.cw-book-chooser-menu { position:absolute; z-index:20; top:calc(100% + 8px); left:0; width:min(340px,calc(100vw - 36px)); padding:10px; border:1px solid var(--cw-line); border-radius:12px; background:var(--cw-surface); color:var(--cw-ink); box-shadow:0 12px 28px #33211425; }
+.cw-book-chooser-menu>strong { display:block; padding:7px; font-size:11px; }
+.cw-book-chooser-menu>a { display:block; padding:9px; border-radius:8px; color:var(--cw-ink); }
+.cw-book-chooser-menu>a:hover { background:var(--cw-soft); }
+.cw-book-chooser-menu>a>span,.cw-book-chooser-menu>a>small { display:block; }
+.cw-book-chooser-menu>a>small { margin-top:3px; color:var(--cw-muted); font-size:9px; }
+.cw-filter-tabs>a { display:inline-flex; align-items:center; gap:5px; padding:7px 9px; border:1px solid var(--cw-line); border-radius:7px; color:var(--cw-muted); font-size:9px; }
+.cw-filter-tabs>a.is-active { color:var(--cw-ink); background:var(--cw-surface); box-shadow:inset 0 1px 2px #33211412,0 2px 6px #33211408; }
+* { scrollbar-color:var(--cw-muted) var(--cw-soft); scrollbar-width:thin; }
+::-webkit-scrollbar { width:10px; height:10px; }
+::-webkit-scrollbar-track { background:var(--cw-soft); }
+::-webkit-scrollbar-thumb { background:var(--cw-muted); border:2px solid var(--cw-soft); border-radius:8px; }
+@media(forced-colors:active) { * { scrollbar-color:auto; } }
 /* Harmonize existing account, administration and seat-selection templates. */
 body.light-mode { --cine-border:#e1d2c1; }
 body.light-mode .glass-card,body.light-mode .cine-card { background:var(--cw-surface)!important; border-color:var(--cw-line)!important; color:var(--cw-ink)!important; box-shadow:0 4px 16px #53351404!important; }
@@ -299,3 +321,31 @@ body:not(.light-mode) .cw-hold { background:#482e1d; color:#efb17f; }
   html { scroll-padding-top:120px; } .cw-container { width:calc(100% - 36px); } .cw-header-inner { min-height:106px; gap:14px; flex-wrap:wrap; padding-block:12px; } .cw-brand { font-size:23px; } .cw-logo { width:31px; height:31px; font-size:15px; } .cw-nav { margin-left:auto; font-size:10px; gap:13px; } .cw-nav>a:last-child { display:none; } .cw-account { gap:12px; } .cw-wallet { font-size:10px; padding:7px 9px; } .cw-search { order:5; flex:0 0 100%; } .cw-search input { padding-block:8px; } .cw-search>i { top:10px; } .cw-bookings-link { display:none; } .cw-main-wrap:has(.cw-home)>:not(.cw-home) { width:calc(100% - 36px); } .cw-demo-notice { font-size:9px!important; } .cw-hero-grid { grid-template-columns:1fr; gap:30px; padding-block:38px; } .cw-hero h1 { font-size:49px; } .cw-hero-copy { gap:20px; } .cw-credits { font-size:10px; } .cw-editorial-quote>p { font-size:15px; } .cw-hero-art { aspect-ratio:5/4; max-height:380px; } .cw-hero-art>img { object-position:center; } .cw-art-caption { left:14px; right:14px; bottom:14px; padding:13px; } .cw-hero-proof>p { display:block; font-size:9px; } .cw-hero-actions { gap:9px; } .cw-hero-actions>.cw-button { padding:13px 16px; } .cw-date-inner { padding-block:17px; } .cw-date { min-width:63px; padding:9px 8px; } .cw-dates { gap:7px; } .cw-date small { font-size:7px; } .cw-screen-formats { display:none; } .cw-section-pad { padding-block:38px; } .cw-section-heading { flex-wrap:wrap; gap:17px; margin-bottom:22px; } .cw-section-heading h2 { font-size:29px; } .cw-overline { font-size:8px; } .cw-theatre-grid { grid-template-columns:1fr; gap:16px; } .cw-theatre-card { padding:21px; } .cw-theatre-card h3 { font-size:26px; } .cw-show>strong { font-size:12px; } .cw-show>span { font-size:10px; } .cw-show>small { font-size:9px; } .cw-movie-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; } .cw-movie-card { padding:8px; border-radius:9px; } .cw-movie-info { padding:10px 2px 2px; } .cw-movie-info h3 { font-size:20px; } .cw-movie-info>p { font-size:8px; } .cw-movie-book { font-size:9px; padding:9px 4px; margin-top:12px; } .cw-movie-toolbar { gap:10px; align-items:flex-start; } .cw-mood-filters { gap:3px; } .cw-mood-filters>button { font-size:8px; padding:6px; } #movie-filter-status { font-size:8px; flex-shrink:0; padding-top:5px; } .cw-standard .cw-section-pad { padding-block:48px 64px; } .cw-standard-intro { margin-bottom:28px; } .cw-standard-intro h2 { font-size:32px; } .cw-standard-intro>p:last-child { font-size:11px; } .cw-perks { grid-template-columns:1fr; gap:14px; } .cw-perks>article { padding:25px; } .cw-perks h3 { margin-top:16px; font-size:25px; } .cw-perks p { font-size:12px; } .cw-perks a { font-size:11px; } .cw-stats { grid-template-columns:1fr 1fr; gap:25px 10px; padding:26px 15px; margin-top:25px; } .cw-stats strong { font-size:32px; } .cw-stats span { font-size:7px; } .cw-footer { padding-block:40px 25px; } .cw-footer-grid { grid-template-columns:1fr 1fr; gap:30px 20px; } .cw-footer-grid>div:first-child { grid-column:1/-1; } .cw-footer-grid>div:last-child { grid-column:auto; } .cw-footer-about>p { max-width:100%; } .cw-footer-bottom { padding-top:35px; flex-direction:column; align-items:flex-start; gap:10px; font-size:8px; } .cw-main-wrap:has(.cw-checkout) { width:calc(100% - 36px); padding-bottom:55px; } .cw-security-band { padding:12px; align-items:flex-start; gap:10px; } .cw-security-badges { gap:5px; } .cw-security-badges>span { font-size:8px; padding:5px 6px; } .cw-security-badges>span:nth-child(2) { display:none; } .cw-hold { font-size:9px; padding:6px 8px; } .cw-checkout-heading { padding-block:25px; gap:14px; } .cw-checkout-heading h1 { font-size:34px; } .cw-checkout-heading .cw-overline { font-size:7px; letter-spacing:.14em; } .cw-checkout-grid { display:flex; flex-direction:column; gap:24px; } .cw-checkout-main,.cw-checkout-aside { width:100%; gap:20px; } .cw-checkout-aside { position:static; } .cw-panel { padding:20px; } .cw-order,.cw-bill { padding:0; } .cw-snack-grid { grid-template-columns:1fr 1fr; gap:10px; } .cw-snack { padding:12px; } .cw-snack-top strong { font-size:10px; } .cw-snack .cw-perk-icon { width:27px; height:27px; font-size:11px; } body#app-body .cw-snack h3 { font-size:11px; } .cw-snack>p { font-size:9px; } .cw-snack-bottom { flex-wrap:wrap; margin-top:14px; gap:10px; } .cw-snack-bottom>span:first-child { font-size:7px; } .cw-eyebrow { font-size:9px; } .cw-panel-heading h2 { font-size:25px; } .cw-panel-heading>.cw-muted { font-size:8px; white-space:nowrap; } .cw-option-title strong { font-size:11px; } .cw-payment-option { gap:10px; padding:16px 10px; } .cw-payment-option p { font-size:10px; } .cw-payment-option .cw-option-title>span { font-size:8px; } .cw-order-film { flex-wrap:nowrap; } .cw-order-film>img,.cw-order-placeholder { width:68px; height:95px; } .cw-order-film h2 { font-size:25px; } .cw-order-film p { font-size:10px; } .cw-order-venue { padding:16px 20px; } .cw-bill-content,.cw-payment-cta { padding:24px; } .cw-total { padding:22px 24px; } .cw-total>strong { font-size:27px; } .cw-payment-cta>.cw-button { padding:16px 12px; font-size:11px; }
 }
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } *,*::before,*::after { animation:none!important; transition:none!important; } }
+@media(max-width:650px) {
+  .cw-hero-grid { padding-block:20px 24px; gap:12px; }
+  .cw-hero-copy { gap:12px; }
+  .cw-hero h1 { font-size:clamp(35px,10vw,43px); }
+  .cw-editorial-quote,.cw-hero-art,.cw-hero-proof>p,.cw-runtime { display:none; }
+  .cw-credits { margin-top:-4px; }
+  .cw-hero-actions { gap:7px; }
+  .cw-hero-actions>.cw-button,.cw-book-chooser>summary { min-height:46px; padding:11px 13px; }
+  .cw-header-inner { min-height:70px; padding-block:8px; gap:8px; }
+  .cw-search { display:none; }
+}
+@media(max-width:390px) {
+  .cw-container { width:calc(100% - 28px); }
+  .cw-nav { gap:8px; font-size:9px; }
+  .cw-account { gap:7px; }
+  .cw-hero-grid { padding-block:14px 20px; }
+  .cw-hero h1 { font-size:35px; }
+  .cw-badges>.cw-badge:not(.cw-badge-solid),.cw-heritage { display:none; }
+  .cw-credits { font-size:9px; }
+}
+@media(max-width:320px) { .cw-brand { font-size:20px; } .cw-nav { gap:6px; } .cw-hero-actions>.cw-button { font-size:9px; padding-inline:9px; } }
+@media(max-width:650px) { .cw-home { display:flex; flex-direction:column; } .cw-home>.cw-hero { order:1; } .cw-home>.cw-showtimes { order:2; } .cw-home>.td-home-entry { order:3; } .cw-home>.cw-releases { order:4; } .cw-home>.cw-standard { order:5; } }
+.cw-hype-votes { display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
+.cw-hype-votes button { border:1px solid var(--cw-line); border-radius:999px; background:var(--cw-soft); color:var(--cw-ink); padding:5px 8px; font-size:10px; font-weight:700; cursor:pointer; }
+.cw-hype-votes button:hover,.cw-hype-votes button:focus-visible { border-color:var(--cw-primary); outline:2px solid color-mix(in srgb,var(--cw-primary) 35%,transparent); outline-offset:2px; }
+.cw-hype-votes button.is-selected { border-color:var(--cw-primary-dark); background:var(--cw-primary); color:#fff; }
+.cw-hype-votes button span { font-variant-numeric:tabular-nums; }
+@media(max-width:390px) { .cw-hype-votes button { font-size:9px; padding:5px 6px; } }

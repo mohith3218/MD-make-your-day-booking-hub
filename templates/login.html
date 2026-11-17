@@ -18,10 +18,11 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="cw-auth-field"><label for="login-username">Username</label><input id="login-username" type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
         <div class="cw-auth-field"><label for="login-password">Password</label><div class="cw-auth-password"><input id="login-password" type="password" name="password" autocomplete="current-password" required><button type="button" class="cw-password-toggle" data-password-toggle aria-controls="login-password" aria-pressed="false">Show</button></div></div>
+        <label class="cw-auth-remember"><input type="checkbox" name="remember"> <span>Remember me on this device for 30 days</span></label>
         <button type="submit" class="cw-button cw-button-primary cw-auth-submit"><i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i> Sign in</button>
       </form>
       <p class="cw-auth-switch">New to CineWave? <a href="{{ url_for('register') }}">Create an account</a></p>
-      <p class="cw-auth-note">Forgot your password? Password reset is not available in this demo. Contact the project administrator for help.</p>
+      <p class="cw-auth-note"><a href="{{ url_for('forgot_password') }}">Forgot your password?</a></p>
     </div>
   </div>
 </section>

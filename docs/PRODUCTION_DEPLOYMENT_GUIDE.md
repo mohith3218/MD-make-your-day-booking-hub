@@ -24,6 +24,10 @@ DATABASE_URL=<existing private Supabase PostgreSQL Session pooler URI>
 DATABASE_SSLMODE=require
 SECRET_KEY=<private random value of at least 32 characters>
 DEMO_PAYMENTS_ENABLED=true
+BREVO_API_KEY=<private Brevo API v3 key>
+BREVO_SENDER_EMAIL=<verified sender address>
+BREVO_SENDER_NAME=CineWave
+PASSWORD_RESET_ORIGIN=https://<your-render-service>.onrender.com
 ```
 
 Store the real DATABASE_URL and SECRET_KEY only in Render's environment settings.
@@ -31,7 +35,10 @@ Use the existing pooler connection from Supabase Connect; encode its password
 correctly and preserve TLS. Do not paste credentials into tracked files or logs.
 The true demo setting is required to offer checkout; omitting it or setting false
 keeps the production website available but blocks all demo payment/recharge routes.
-Secure session cookies and HSTS stay enabled. No provider secrets are required.
+Secure session and remembered-login cookies and HSTS stay enabled. Password
+recovery requires a Brevo API v3 key, a verified sender, and the exact trusted
+HTTPS origin. Without those values, the page reports that recovery email is
+unavailable and does not claim to have sent a message.
 
 Optional: `TMDB_API_KEY` for movie import and cast lookup. It is unnecessary for
 browsing stored movies. ADMIN_PASSWORD is not required for existing production
@@ -39,12 +46,13 @@ accounts. The development-only SQLite seeder is never used in production.
 
 ## Protect the existing database
 
-Do not run init/reseed/transfer scripts or an automatic migration as a build step.
+Back up the Supabase database before applying migrations. Do not run init/reseed/
+transfer scripts or an automatic migration as a build step.
 Existing IDs, users, movies, theatres, layouts, bookings, wallet values and payment
-history stay intact. This change needs no schema migration. Alembic remains at
-`20261110_01`; `python database_health.py` is read-only. If health reports a schema
-mismatch, back up and investigate against the existing baseline before any separately
-approved database change. Do not blindly run a baseline over populated tables.
+history stay intact. Apply the additive changes once from the service root with
+`alembic upgrade head`, then run `python database_health.py`; the expected head is
+`20261117_04`. Apply migrations as an operator step after reviewing the backup,
+never as a build command. Do not run a baseline over populated tables.
 
 Only a fresh local development database may be created using `python app.py` and
 an explicitly supplied ADMIN_PASSWORD. Development deliberately uses SQLite even
@@ -66,14 +74,13 @@ and cannot be completed by the simulator.
   SQLite in production. Uploaded trailers/reference photos stored on disk are not
   durable across restarts/redeploys. Already-committed static 3D assets remain part
   of each build. Durable upload storage is outside this focused change.
-- Render Free blocks outbound SMTP ports 25, 465 and 587. Existing web registration
-  creates demo accounts immediately; it does not send an OTP in the current route.
-  Optional ticket emails will fail with standard SMTP there; on-screen e-tickets
-  and QR downloads continue working. Email transport changes are not included.
+- Password recovery uses HTTPS to Brevo and does not depend on Render SMTP ports.
+  Optional ticket email still uses the separately configured SMTP relay; on-screen
+  e-tickets and QR downloads continue working when that relay is unavailable.
 - Free services may spin down when idle and take time to wake. No availability or
   hardware-performance guarantee is made for an academic demo.
-- An actual Linux/Gunicorn deployment, Supabase connectivity, database schema
-  health, login using existing users and browser/WebGL checks remain to be verified.
+- An actual Linux/Gunicorn deployment, Supabase connectivity and recovery delivery
+  with the live registered sender remain to be verified.
   Local tests must never use the real Supabase database.
 
 References: [Render Flask deployment](https://render.com/docs/deploy-flask),

@@ -13,14 +13,8 @@ os.environ.update(APP_ENV='testing', DATABASE_URL=_url, TEST_DATABASE_URL=_url,
                   SECRET_KEY='isolated-admin-deletion-fixture', SMTP_HOST='', TMDB_API_KEY='')
 
 import app as A
-from flask import g
 from sqlalchemy import event, text
 from sqlalchemy.exc import IntegrityError
-
-
-@A.app.before_request
-def clear_fixture_identity():
-    g.pop('_login_user', None)
 
 
 def now():
@@ -51,7 +45,8 @@ class AdminMovieDeletionTests(unittest.TestCase):
         A.app.config['TESTING'] = True
         self.admin = A.User(username='admin_fixture', password_hash='fixture', is_admin=True)
         self.viewer = A.User(username='viewer_fixture', password_hash='fixture')
-        self.movie = A.Movie(title='Deletion fixture', description='Test', duration=120)
+        self.movie = A.Movie(title='Deletion fixture', description='Test', duration=120,
+                             is_upcoming=True)
         self.other = A.Movie(title='Keep this film', description='Unrelated', duration=120)
         venue = A.Theater(name='Fixture Cinema')
         screen = A.Screen(theater=venue, name='Screen 1', layout_json='{"classes":[]}')
@@ -69,7 +64,7 @@ class AdminMovieDeletionTests(unittest.TestCase):
     def client_for(self, user):
         client = A.app.test_client()
         with client.session_transaction() as state:
-            state['_user_id'] = str(user.id)
+            state['_user_id'] = user.alternative_id
             state['_fresh'] = True
         return client
 
@@ -91,6 +86,7 @@ class AdminMovieDeletionTests(unittest.TestCase):
                        expires_at=now() - timedelta(minutes=1)),
             A.Watchlist(movie=self.movie, user=self.viewer),
             A.MovieRating(movie=self.movie, user=self.viewer, rating=4),
+            A.MovieHypeVote(movie=self.movie, user=self.viewer, level='SUPER_HYPED'),
         ])
         A.db.session.commit()
         self.assertEqual(A.db.session.execute(text('PRAGMA foreign_keys')).scalar(), 1)
@@ -99,10 +95,25 @@ class AdminMovieDeletionTests(unittest.TestCase):
         self.assertIn('has been deleted', response.text)
         self.assertIsNone(A.db.session.get(A.Movie, self.movie_id))
         self.assertIsNone(A.db.session.get(A.Showtime, self.show_id))
-        for model in (A.PartyMember, A.PartySession, A.SeatLock, A.SeatHold, A.Watchlist, A.MovieRating):
+        for model in (A.PartyMember, A.PartySession, A.SeatLock, A.SeatHold,
+                      A.Watchlist, A.MovieRating, A.MovieHypeVote):
             self.assertEqual(model.query.count(), 0, model.__name__)
         self.assertIsNotNone(A.db.session.get(A.Movie, self.other_id))
         self.assertEqual(A.User.query.count(), 2)
+
+    def test_status_changes_preserve_hype_votes(self):
+        A.db.session.add(A.MovieHypeVote(movie=self.movie, user=self.viewer,
+                                         level='EXTREME_HYPED'))
+        A.db.session.commit()
+        response = self.client.get('/admin')
+        with self.client.session_transaction() as session:
+            csrf = session['_csrf_token']
+        response = self.client.post(f'/admin/toggle_movie_status/{self.movie_id}',
+                                    data={'csrf_token': csrf}, follow_redirects=False)
+        self.assertIn(response.status_code, (302, 303))
+        self.assertFalse(A.db.session.get(A.Movie, self.movie_id).is_upcoming)
+        vote = A.MovieHypeVote.query.filter_by(movie_id=self.movie_id).one()
+        self.assertEqual(vote.level, 'EXTREME_HYPED')
 
     def test_paid_booking_payment_and_split_history_are_preserved(self):
         booking = A.Booking(user=self.viewer, showtime=self.show, seats='A1',

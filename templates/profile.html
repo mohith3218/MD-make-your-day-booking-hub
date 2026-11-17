@@ -232,6 +232,7 @@
         <label class="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
         <input type="email" name="email" value="{{ current_user.email or '' }}" placeholder="your.name@example.com" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 focus:border-amber-400 text-white text-sm outline-none transition">
       </div>
+      <div><label class="block text-xs font-semibold text-slate-300 mb-1.5" for="profile-current-password">Current password (needed to change email)</label><input id="profile-current-password" type="password" name="current_password" autocomplete="current-password" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm"></div>
 
       <div>
         <label class="block text-xs font-semibold text-slate-300 mb-1.5">Phone Number</label>

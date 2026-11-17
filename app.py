@@ -48,6 +48,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -132,6 +133,10 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = APP_ENV == 'production' or os.environ.get('SESSION_COOKIE_SECURE', '').strip().lower() in {'1', 'true', 'yes'}
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_SECURE'] = app.config['SESSION_COOKIE_SECURE']
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['STARTUP_ID'] = secrets.token_urlsafe(10)
 app.config['SMTP_HOST'] = os.environ.get('SMTP_HOST', '').strip()
@@ -140,6 +145,10 @@ app.config['SMTP_USERNAME'] = os.environ.get('SMTP_USERNAME', '').strip()
 app.config['SMTP_PASSWORD'] = os.environ.get('SMTP_PASSWORD', '')
 app.config['SMTP_FROM_EMAIL'] = os.environ.get('SMTP_FROM_EMAIL', app.config['SMTP_USERNAME']).strip()
 app.config['SMTP_USE_SSL'] = os.environ.get('SMTP_USE_SSL', '').strip().lower() in {'1', 'true', 'yes'}
+app.config['BREVO_API_KEY'] = os.environ.get('BREVO_API_KEY', '').strip()
+app.config['BREVO_SENDER_EMAIL'] = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
+app.config['BREVO_SENDER_NAME'] = os.environ.get('BREVO_SENDER_NAME', 'CineWave').strip()
+app.config['PASSWORD_RESET_ORIGIN'] = os.environ.get('PASSWORD_RESET_ORIGIN', '').strip().rstrip('/')
 
 # TMDb API Key
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "").strip()
@@ -181,10 +190,25 @@ def enforce_production_configuration():
 
 
 @app.before_request
+def require_sign_in_for_application_routes():
+    """Protect direct page and data URLs, not only links in the interface."""
+    # Test clients and long-lived app contexts can reuse Flask-Login's cached user.
+    g.pop('_login_user', None)
+    public = {'static', 'login', 'register', 'verify_email', 'resend_email_otp',
+              'forgot_password', 'reset_password'}
+    if request.endpoint is None or request.endpoint in public or current_user.is_authenticated:
+        return None
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'authentication_required', 'message': 'Sign in to continue.'}), 401
+    next_url = safe_local_redirect(request.full_path.rstrip('?'))
+    return redirect(url_for('login', next=next_url) if next_url else url_for('login'))
+
+
+@app.before_request
 def enforce_demo_payment_setting():
-    if (request.endpoint in {'pay_with_wallet', 'pay_gateway', 'payment_callback',
+    if (request.endpoint in {'pay_with_wallet', 'pay_gateway', 'pay_mock_confirmation', 'payment_callback',
                             'simulate', 'start_split_payment', 'simulate_split_payment',
-                            'wallet_recharge', 'handle_recharge'}
+                            'wallet_recharge', 'wallet_convert_points', 'handle_recharge'}
             and not payments.mock_payments_enabled()):
         abort(403, description='Demo payments are disabled. No real payment is available.')
 
@@ -201,7 +225,8 @@ def current_csrf_token():
 @app.before_request
 def protect_account_forms():
     """Protect authentication and email-verification mutations from cross-site posts."""
-    protected = {'login', 'register', 'verify_email', 'resend_email_otp', 'logout'}
+    protected = {'login', 'register', 'verify_email', 'resend_email_otp', 'logout',
+                 'forgot_password', 'reset_password', 'wallet_convert_points', 'import_movie_add'}
     if request.method == 'POST' and request.endpoint in protected:
         expected = session.get('_csrf_token', '')
         supplied = request.form.get('csrf_token', '')
@@ -217,6 +242,9 @@ def add_security_headers(response):
     response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
     if app.config['APP_ENV'] == 'production':
         response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    if request.endpoint in {'forgot_password', 'reset_password'}:
+        response.headers['Cache-Control'] = 'no-store, max-age=0'
+        response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
 
@@ -237,6 +265,14 @@ class User(UserMixin, db.Model):
     points = db.Column(db.Integer, default=100)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     bio = db.Column(db.String(250), nullable=True, default='Cinema lover & movie enthusiast.')
+    alternative_id = db.Column(db.String(64), nullable=False,
+                               default=lambda: secrets.token_urlsafe(32))
+
+    __table_args__ = (db.UniqueConstraint('alternative_id', name='uq_user_alternative_id'),)
+
+    def get_id(self):
+        return self.alternative_id
+
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -335,6 +371,22 @@ class User(UserMixin, db.Model):
     def watchlist_movies(self):
         items = sorted(self.watchlist_items, key=lambda x: x.added_at, reverse=True)
         return [item.movie for item in items if item.movie]
+
+
+class PasswordReset(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
+    token_digest = db.Column(db.String(64), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+
+
+class PasswordResetThrottle(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    throttle_key = db.Column(db.String(64), nullable=False, unique=True)
+    window_started = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
 
 
 class Movie(db.Model):
@@ -469,6 +521,30 @@ class MovieRating(db.Model):
 
     user = db.relationship('User', backref=db.backref('movie_ratings', lazy=True, cascade='all, delete-orphan'))
     movie = db.relationship('Movie', backref=db.backref('user_ratings', lazy=True, cascade='all, delete-orphan'))
+
+
+class MovieHypeVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    movie_id = db.Column(db.Integer, db.ForeignKey('movie.id'), nullable=False)
+    level = db.Column(db.String(20), nullable=False)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
+                            onupdate=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('user_id', 'movie_id',
+                         name='uq_movie_hype_user_movie'),)
+    user = db.relationship('User', backref=db.backref('movie_hype_votes', lazy=True,
+                           cascade='all, delete-orphan'))
+    movie = db.relationship('Movie', backref=db.backref('hype_votes', lazy=True,
+                            cascade='all, delete-orphan'))
+
+    @classmethod
+    def counts_for(cls, movie_id):
+        counts = {level: 0 for level in ('HYPED', 'SUPER_HYPED', 'EXTREME_HYPED')}
+        for level, count in db.session.query(cls.level, sa_func.count(cls.id)).filter_by(
+                movie_id=movie_id).group_by(cls.level):
+            if level in counts:
+                counts[level] = count
+        return counts
 
 
 
@@ -856,6 +932,19 @@ class WalletTransaction(db.Model):
     wallet = db.relationship('Wallet', backref=db.backref('transactions', lazy=True))
 
 
+class WalletPointConversion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    idempotency_key = db.Column(db.String(64), nullable=False)
+    points = db.Column(db.Integer, nullable=False)
+    credit = db.Column(db.Float, nullable=False)
+    balance_after = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'idempotency_key',
+                                          name='uq_wallet_points_conversion_request'),)
+
+
 class RechargeRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -896,7 +985,7 @@ class PartyMember(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return User.query.filter_by(alternative_id=user_id).first()
 
 
 # ====================== HELPERS ======================
@@ -1004,6 +1093,49 @@ def send_email(message):
             if app.config['SMTP_USERNAME']:
                 server.login(app.config['SMTP_USERNAME'], app.config['SMTP_PASSWORD'])
             server.send_message(message)
+
+
+def password_recovery_is_configured():
+    origin = app.config.get('PASSWORD_RESET_ORIGIN', '')
+    parsed = urlparse(origin)
+    return bool(app.config.get('BREVO_API_KEY') and app.config.get('BREVO_SENDER_EMAIL')
+                and parsed.scheme == 'https' and parsed.netloc and not parsed.username
+                and not parsed.password and not parsed.query and not parsed.fragment)
+
+
+def send_password_recovery_email(user, token):
+    if not password_recovery_is_configured():
+        return False
+    recovery_url = app.config['PASSWORD_RESET_ORIGIN'] + '/reset-password#' + token
+    response = requests.post('https://api.brevo.com/v3/smtp/email',
+        headers={'api-key': app.config['BREVO_API_KEY'], 'accept': 'application/json',
+                 'content-type': 'application/json'},
+        json={'sender': {'name': app.config.get('BREVO_SENDER_NAME') or 'CineWave',
+                         'email': app.config['BREVO_SENDER_EMAIL']},
+              'to': [{'email': user.email}], 'subject': 'Reset your CineWave password',
+              'textContent': ('Use this link within 30 minutes to choose a new password. '
+                              'If you did not request this, ignore this email.\n\n' + recovery_url)},
+        timeout=(3.05, 8))
+    return 200 <= response.status_code < 300
+
+
+def password_reset_throttled(account_key, client_key):
+    now = datetime.utcnow()
+    for category, value in (('account', account_key), ('client', client_key)):
+        key = hashlib.sha256((category + ':' + value).encode()).hexdigest()
+        row = PasswordResetThrottle.query.filter_by(throttle_key=key).with_for_update().first()
+        if not row:
+            row = PasswordResetThrottle(throttle_key=key, window_started=now, attempts=0)
+            db.session.add(row)
+            db.session.flush()
+        if now - row.window_started >= timedelta(minutes=15):
+            row.window_started, row.attempts = now, 0
+        row.attempts += 1
+        if row.attempts > 5:
+            db.session.commit()
+            return True
+    db.session.commit()
+    return False
 
 
 def _otp_digest(code):
@@ -1159,7 +1291,7 @@ def commit_seats(booking):
     db.session.flush()
 
 
-def finalise_paid_booking(booking, payment):
+def finalise_paid_booking(booking, payment, *, wallet_debit_uncommitted=False):
     """Commit seats, mark paid, drop the lock. Returns (ok, message)."""
     if not payment.is_demo:
         return False, 'Only demo payments can be completed by this application.'
@@ -1188,9 +1320,10 @@ def finalise_paid_booking(booking, payment):
             if lock:
                 db.session.delete(lock)
 
-        # Deduct redeemed points first
+        account = User.query.filter_by(id=booking.user_id).with_for_update().first()
+        # Deduct redeemed points first while holding the balance row used by conversion.
         if booking.points_redeemed and booking.points_redeemed > 0:
-            booking.user.points = max(0, (booking.user.points or 0) - booking.points_redeemed)
+            account.points = max(0, (account.points or 0) - booking.points_redeemed)
 
         # CinePass points reward: 10 points per ₹100 spent (20 points/₹100 for Rewatch Champion bookings!)
         is_rewatch = False
@@ -1205,7 +1338,7 @@ def finalise_paid_booking(booking, payment):
         pts_multiplier = 2 if is_rewatch else 1
         earned_pts = int((booking.total_amount / 10) * pts_multiplier)
         if earned_pts > 0:
-            booking.user.points = (booking.user.points or 0) + earned_pts
+            account.points = (account.points or 0) + earned_pts
         db.session.commit()
         # Dispatch digital receipt / e-ticket
         dispatch_ticket_delivery(booking)
@@ -1213,6 +1346,22 @@ def finalise_paid_booking(booking, payment):
         return True, msg
     except IntegrityError:
         db.session.rollback()
+        if wallet_debit_uncommitted and payment.method == 'wallet':
+            failed_booking = db.session.get(Booking, booking.id)
+            if failed_booking:
+                failed_booking.status = 'FAILED'
+                failed_payment = db.session.get(Payment, payment.id) if payment.id else None
+                if not failed_payment:
+                    failed_payment = Payment(booking_id=failed_booking.id, gateway='wallet',
+                        method='wallet', amount=failed_booking.total_amount, status='FAILED',
+                        order_id=f'wallet_{failed_booking.reference}',
+                        error_message='Seat became unavailable; wallet debit was rolled back')
+                    db.session.add(failed_payment)
+                else:
+                    failed_payment.status = 'FAILED'
+                    failed_payment.error_message = 'Seat became unavailable; wallet debit was rolled back'
+                db.session.commit()
+            return False, 'A selected seat was taken. Your wallet was not charged; please choose again.'
         booking.status = 'FAILED'
         payment.status = 'REFUNDED'
         payment.error_message = 'Seat taken before capture - amount refunded'
@@ -1344,7 +1493,7 @@ def cine_match():
         preferences, negative_preferences, saved_ids, personalization_count = cinematch_preferences(current_user.id)
 
     results = []
-    if request.method == 'POST':
+    if request.method in {'GET', 'POST'}:
         candidates = []
         for movie in movies:
             movie_moods = {str(value).upper() for value in movie.moods}
@@ -1426,9 +1575,9 @@ def home():
     ).order_by(Movie.release_date.asc(), Movie.id.desc()).all()
 
     # The landing-page screening cards use the same live schedule as booking.
-    scheduled_shows = (Showtime.query.filter(Showtime.show_date >= date.today())
+    scheduled_shows = (Showtime.query.filter(Showtime.show_date >= cinema_now().date())
                        .order_by(Showtime.show_date, Showtime.id).all())
-    scheduled_shows = [show for show in scheduled_shows if show.status == 'upcoming']
+    scheduled_shows = [show for show in scheduled_shows if show.status == 'upcoming' and show.seats_left > 0]
     screening_dates = sorted({show.show_date for show in scheduled_shows})[:5]
     screening_groups = {}
     for show in scheduled_shows:
@@ -1437,12 +1586,32 @@ def home():
     current_movies = now_showing_releases + now_showing_rereleases
     spotlight = next((movie for movie in current_movies if 'devara' in movie.title.lower()),
                      current_movies[0] if current_movies else None)
+    spotlight_shows = [show for show in scheduled_shows if spotlight and show.movie_id == spotlight.id]
+    active_category = request.args.get('category', 'showing').strip().lower()
+    if active_category not in {'showing', 'upcoming'}:
+        active_category = 'showing'
+    upcoming_ids = [movie.id for movie in coming_soon_releases + coming_soon_rereleases]
+    hype_counts = {movie_id: {'HYPED': 0, 'SUPER_HYPED': 0, 'EXTREME_HYPED': 0}
+                   for movie_id in upcoming_ids}
+    if upcoming_ids:
+        for movie_id, level, count in db.session.query(
+                MovieHypeVote.movie_id, MovieHypeVote.level, sa_func.count(MovieHypeVote.id)
+        ).filter(MovieHypeVote.movie_id.in_(upcoming_ids)).group_by(
+                MovieHypeVote.movie_id, MovieHypeVote.level):
+            if level in hype_counts[movie_id]:
+                hype_counts[movie_id][level] = count
+    hype_mine = {vote.movie_id: vote.level for vote in MovieHypeVote.query.filter(
+        MovieHypeVote.user_id == current_user.id, MovieHypeVote.movie_id.in_(upcoming_ids)).all()} if upcoming_ids else {}
 
     return render_template(
         'index.html',
         spotlight=spotlight,
         screening_dates=screening_dates,
         screening_groups=screening_groups,
+        spotlight_shows=spotlight_shows,
+        active_category=active_category,
+        hype_counts=hype_counts,
+        hype_mine=hype_mine,
         theater_count=Theater.query.count(),
         screen_count=Screen.query.count(),
         now_showing_releases=now_showing_releases,
@@ -1455,6 +1624,27 @@ def home():
     )
 
 
+@app.route('/movies/<int:movie_id>/hype', methods=['POST'])
+@login_required
+def vote_movie_hype(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    if not movie.is_upcoming:
+        abort(404)
+    level = request.form.get('level', '').strip().upper()
+    if level not in {'HYPED', 'SUPER_HYPED', 'EXTREME_HYPED'}:
+        abort(400, description='Choose a valid hype level.')
+    vote = MovieHypeVote.query.filter_by(user_id=current_user.id, movie_id=movie.id).first()
+    if vote:
+        vote.level = level
+        vote.updated_at = datetime.utcnow()
+    else:
+        vote = MovieHypeVote(user_id=current_user.id, movie_id=movie.id, level=level)
+        db.session.add(vote)
+    db.session.commit()
+    flash(f'Your hype for {movie.title} is now {level.replace("_", " ").title()}.')
+    return redirect(url_for('home', category='upcoming') + '#movies', code=303)
+
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1465,13 +1655,80 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             session.clear()
-            login_user(user)
+            login_user(user, remember=request.form.get('remember') == 'on')
             get_wallet(user)
             return redirect(next_url or url_for('home'))
         flash('Invalid username or password')
         login_args = {'next': next_url} if next_url else {}
         return redirect(url_for('login', **login_args))
     return render_template('login.html')
+
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        address = request.form.get('email', '').strip().casefold()[:120]
+        client_ip = request.remote_addr or 'unknown'
+        if password_reset_throttled(address, client_ip):
+            flash('If an account matches that address, recovery instructions will be sent when available.')
+            return redirect(url_for('forgot_password'), code=303)
+        user = User.query.filter(db.func.lower(User.email) == address).first() if address else None
+        if not password_recovery_is_configured():
+            return render_template('forgot_password.html', unavailable=True)
+        if user and user.email:
+            token = secrets.token_urlsafe(32)
+            db.session.query(PasswordReset).filter_by(user_id=user.id, used_at=None).update(
+                {'used_at': datetime.utcnow()}, synchronize_session=False)
+            reset = PasswordReset(user_id=user.id,
+                token_digest=hashlib.sha256(token.encode()).hexdigest(),
+                expires_at=datetime.utcnow() + timedelta(minutes=30))
+            db.session.add(reset)
+            db.session.commit()
+            try:
+                delivered = send_password_recovery_email(user, token)
+            except requests.RequestException as error:
+                app.logger.warning('Password recovery mail delivery failed (%s)', type(error).__name__)
+                delivered = False
+            if not delivered:
+                reset.used_at = datetime.utcnow()
+                db.session.commit()
+                return render_template('forgot_password.html', unavailable=True)
+        flash('If an account matches that address, recovery instructions will be sent. Check your inbox shortly.')
+        return redirect(url_for('forgot_password'), code=303)
+    return render_template('forgot_password.html', unavailable=not password_recovery_is_configured())
+
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'GET':
+        return render_template('reset_password.html', token='')
+    token = request.form.get('token', '')
+    digest = hashlib.sha256(token.encode()).hexdigest() if re.fullmatch(r'[A-Za-z0-9_-]{40,60}', token) else ''
+    reset = PasswordReset.query.filter_by(token_digest=digest, used_at=None).with_for_update().first() if digest else None
+    now = datetime.utcnow()
+    if not reset or reset.expires_at <= now:
+        flash('That reset link is invalid or expired. Request a new one to continue.')
+        return redirect(url_for('forgot_password'), code=303)
+    password = request.form.get('password', '')
+    confirmation = request.form.get('confirm_password', '')
+    if len(password) < 10 or len(password) > 256 or password != confirmation:
+        return render_template('reset_password.html', token=token,
+            error='Use a password of at least 10 characters and enter it the same way twice.'), 400
+    user = db.session.get(User, reset.user_id)
+    if not user:
+        flash('That reset link is invalid or expired. Request a new one to continue.')
+        return redirect(url_for('forgot_password'), code=303)
+    user.set_password(password)
+    user.alternative_id = secrets.token_urlsafe(32)
+    reset.used_at = now
+    db.session.query(PasswordReset).filter(PasswordReset.user_id == user.id,
+        PasswordReset.id != reset.id, PasswordReset.used_at.is_(None)).update(
+            {'used_at': now}, synchronize_session=False)
+    db.session.commit()
+    logout_user()
+    session.clear()
+    flash('Your password has been reset. Sign in with your new password.')
+    return redirect(url_for('login'), code=303)
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -2222,6 +2479,10 @@ def start_split_payment(token):
     if contribution and contribution.status == 'PAID':
         flash('Your share has already been paid.')
         return redirect(url_for('split_pay', token=token))
+    if (contribution and contribution.status == 'CREATED' and contribution.gateway == 'mock'
+            and contribution.order_id):
+        return redirect(url_for('split_payment_confirmation', token=token,
+                                contribution_id=contribution.id), code=303)
     if not contribution:
         contribution = next((row for row in rows
                              if row.status == 'OPEN' and row.user_id is None), None)
@@ -2249,10 +2510,26 @@ def start_split_payment(token):
         SeatHold.query.filter_by(token=booking.lock_token).update(
             {SeatHold.expires_at: booking.expires_at}, synchronize_session=False)
     db.session.commit()
+    return redirect(url_for('split_payment_confirmation', token=token,
+                            contribution_id=contribution.id), code=303)
+
+
+@app.route('/split-pay/<token>/confirm/<int:contribution_id>')
+@login_required
+def split_payment_confirmation(token, contribution_id):
+    booking = Booking.query.filter_by(split_token=token).first_or_404()
+    contribution = SplitContribution.query.filter_by(id=contribution_id,
+        booking_id=booking.id, user_id=current_user.id).first_or_404()
+    if (booking.status != 'PENDING' or booking.is_expired
+            or contribution.status != 'CREATED' or contribution.gateway != 'mock'
+            or not (contribution.order_id or '').startswith('order_mock_')):
+        flash('This split payment is no longer active. Review the invite to continue.')
+        return redirect(url_for('split_pay', token=token), code=303)
+    order = {'order_id': contribution.order_id,
+             'amount_paise': int(round(contribution.amount * 100)), 'currency': 'INR'}
     return render_template('split_pay_mock.html', booking=booking,
-                           movie=booking.showtime.movie,
-                           contribution=contribution, order=order,
-                           user=current_user)
+        movie=booking.showtime.movie, contribution=contribution,
+        order=order, user=current_user)
 
 
 @app.route('/split-pay/<token>/simulate/<int:contribution_id>', methods=['POST'])
@@ -2348,7 +2625,11 @@ def update_booking_extras(reference):
             snacks_chosen.append(s)
             snack_total += s['price']
 
-    user_pts = max(0, current_user.points or 0)
+    user = User.query.filter_by(id=current_user.id).with_for_update().first()
+    reserved_elsewhere = (db.session.query(sa_func.coalesce(sa_func.sum(Booking.points_redeemed), 0))
+        .filter(Booking.user_id == user.id, Booking.status == 'PENDING',
+                Booking.expires_at > datetime.utcnow(), Booking.id != booking.id).scalar() or 0)
+    user_pts = max(0, (user.points or 0) - reserved_elsewhere)
     # Never let a crafted negative value increase a user's points at payment time.
     redeem_pts = min(max(0, requested_points), user_pts)
     discount = float(redeem_pts)
@@ -2404,9 +2685,7 @@ def pay_with_wallet(reference):
                       order_id=f'wallet_{booking.reference}',
                       payment_id=f'wal_{secrets.token_hex(6)}')
     db.session.add(payment)
-    db.session.commit()
-
-    ok, msg = finalise_paid_booking(booking, payment)
+    ok, msg = finalise_paid_booking(booking, payment, wallet_debit_uncommitted=True)
     flash(msg)
     return redirect(url_for('ticket', reference=reference) if ok
                     else url_for('book', showtime_id=booking.showtime_id))
@@ -2423,6 +2702,11 @@ def pay_gateway(reference):
     if booking.status != 'PENDING' or booking.is_expired:
         flash("This booking can no longer be paid.")
         return redirect(url_for('dashboard'))
+    existing_payment = booking.payment
+    if (existing_payment and existing_payment.gateway == 'mock'
+            and existing_payment.status == 'CREATED'
+            and existing_payment.amount == booking.total_amount):
+        return redirect(url_for('pay_mock_confirmation', reference=reference), code=303)
 
     method = request.form.get('method', 'upi')
     if method not in payments.DEMO_METHODS - {'split'}:
@@ -2447,11 +2731,28 @@ def pay_gateway(reference):
     payment.raw_response = order.get('raw')
     db.session.add(payment)
     db.session.commit()
+    return redirect(url_for('pay_mock_confirmation', reference=reference), code=303)
 
+
+@app.route('/pay/mock/<reference>')
+@login_required
+def pay_mock_confirmation(reference):
+    """Read-only continuation for an order already created by the POST route."""
+    booking = _load_pending(reference)
+    if booking.status == 'PAID':
+        return redirect(url_for('ticket', reference=reference))
+    payment = booking.payment
+    if (booking.status != 'PENDING' or booking.is_expired or not payment
+            or payment.gateway != 'mock' or payment.status != 'CREATED'
+            or payment.amount != booking.total_amount
+            or not (payment.order_id or '').startswith('order_mock_')):
+        flash('This demo payment is no longer active. Review checkout to continue.')
+        return redirect(url_for('checkout', reference=reference), code=303)
+    order = {'order_id': payment.order_id, 'amount_paise': int(round(payment.amount * 100)),
+             'currency': 'INR', 'gateway': payment.gateway}
     return render_template('pay_mock.html', booking=booking, order=order,
-                           movie=booking.showtime.movie,
-                           showtime=booking.showtime, method=method,
-                           user=current_user)
+        movie=booking.showtime.movie, showtime=booking.showtime, method=payment.method,
+        user=current_user)
 
 
 @app.route('/pay/callback', methods=['POST'])
@@ -2671,7 +2972,73 @@ def wallet_page():
             .order_by(WalletTransaction.timestamp.desc()).limit(20).all())
     reqs = (RechargeRequest.query.filter_by(user_id=current_user.id)
             .order_by(RechargeRequest.created_at.desc()).limit(10).all())
-    return render_template('wallet.html', wallet=wallet, txns=txns, requests=reqs)
+    reserved_points = (db.session.query(sa_func.coalesce(sa_func.sum(Booking.points_redeemed), 0))
+        .filter(Booking.user_id == current_user.id, Booking.status == 'PENDING',
+                Booking.expires_at > datetime.utcnow()).scalar() or 0)
+    available_points = max(0, (current_user.points or 0) - reserved_points)
+    return render_template('wallet.html', wallet=wallet, txns=txns, requests=reqs,
+                           available_points=available_points,
+                           conversion_key=secrets.token_urlsafe(24))
+
+
+@app.route('/wallet/convert-points', methods=['POST'])
+@login_required
+def wallet_convert_points():
+    raw_key = request.form.get('idempotency_key', '')
+    key = raw_key.strip()
+    try:
+        points = int(request.form.get('points', ''))
+    except (TypeError, ValueError):
+        flash('Enter a whole number of CinePass points to convert.')
+        return redirect(url_for('wallet_page'), code=303)
+    if not re.fullmatch(r'[A-Za-z0-9_-]{24,64}', key) or points <= 0 or points > 100000:
+        flash('Enter a valid conversion amount and retry from your wallet.')
+        return redirect(url_for('wallet_page'), code=303)
+
+    db.session.rollback()
+    try:
+        with db.session.begin():
+            existing = WalletPointConversion.query.filter_by(
+                user_id=current_user.id, idempotency_key=key).first()
+            if existing:
+                result = existing
+            else:
+                user = User.query.filter_by(id=current_user.id).with_for_update().first()
+                reserved = (db.session.query(sa_func.coalesce(sa_func.sum(Booking.points_redeemed), 0))
+                    .filter(Booking.user_id == user.id, Booking.status == 'PENDING',
+                            Booking.expires_at > datetime.utcnow()).scalar() or 0)
+                available = max(0, (user.points or 0) - reserved)
+                if points > available:
+                    raise ValueError(f'Only {available} unreserved points are available. Review checkout and retry.')
+                deducted = User.query.filter(User.id == user.id,
+                    User.points >= reserved + points).update(
+                        {User.points: User.points - points}, synchronize_session=False)
+                if deducted != 1:
+                    raise ValueError('Your points changed during conversion. Review your wallet and retry.')
+                wallet = Wallet.query.filter_by(user_id=user.id).with_for_update().first()
+                if not wallet:
+                    wallet = Wallet(user_id=user.id, balance=0)
+                    db.session.add(wallet)
+                    db.session.flush()
+                wallet.balance = round((wallet.balance or 0) + points, 2)
+                result = WalletPointConversion(user_id=user.id, idempotency_key=key,
+                    points=points, credit=float(points), balance_after=wallet.balance)
+                db.session.add(result)
+                db.session.add(WalletTransaction(wallet_id=wallet.id, amount=float(points),
+                    type='CONVERT', description=f'{points} CinePass points converted to wallet credit'))
+        flash(f'{result.points} points converted to ₹{result.credit:.0f}. Wallet balance: ₹{result.balance_after:.2f}.')
+    except ValueError as error:
+        db.session.rollback()
+        flash(str(error))
+    except IntegrityError:
+        db.session.rollback()
+        result = WalletPointConversion.query.filter_by(
+            user_id=current_user.id, idempotency_key=key).first()
+        if result:
+            flash(f'Request already completed: {result.points} points became ₹{result.credit:.0f}.')
+        else:
+            flash('The conversion could not be completed. Refresh your wallet and try again.')
+    return redirect(url_for('wallet_page'), code=303)
 
 
 @app.route('/wallet/recharge', methods=['POST'])
@@ -2734,11 +3101,18 @@ def edit_profile():
 
     # Check email uniqueness if changed
     if email and email != current_user.email:
+        password_check = request.form.get('current_password', '')
+        if not password_check or not current_user.check_password(password_check):
+            flash('Enter your current password to change the recovery address.')
+            return redirect(url_for('profile'), code=303)
         existing = User.query.filter_by(email=email).first()
         if existing and existing.id != current_user.id:
             flash('This email address is already in use by another account.')
-            return redirect(url_for('profile'))
+            return redirect(url_for('profile'), code=303)
         current_user.email = email
+        current_user.email_verified = False
+        db.session.query(PasswordReset).filter_by(user_id=current_user.id, used_at=None).update(
+            {'used_at': datetime.utcnow()}, synchronize_session=False)
 
     if phone:
         current_user.phone = phone
@@ -2747,7 +3121,7 @@ def edit_profile():
 
     db.session.commit()
     flash('Your profile has been updated!')
-    return redirect(url_for('profile'))
+    return redirect(url_for('profile'), code=303)
 
 
 @app.route('/api/watchlist/toggle/<int:movie_id>', methods=['POST'])
@@ -2933,30 +3307,40 @@ def update_movie_trailer(movie_id):
     return redirect(url_for('admin'))
 
 
-@app.route('/admin/import_movie', methods=['GET', 'POST'])
+@app.route('/admin/import_movie', methods=['GET'])
 @login_required
 def import_movie():
     guard = admin_required()
     if guard:
         return guard
-    results, query = [], ""
-    if request.method == 'POST':
-        query = request.form.get('query', '').strip()
-        if query:
+    results, query = [], request.args.get('query', '').strip()[:120]
+    if query:
+        if not TMDB_API_KEY:
+            flash('TMDb search is unavailable because TMDB_API_KEY is not configured.')
+        else:
             try:
-                res = requests.get(f"{TMDB_BASE_URL}/search/movie",
-                                   params={'api_key': TMDB_API_KEY, 'query': query},
-                                   timeout=10).json()
-                for item in res.get('results', [])[:8]:
+                response = requests.get(f"{TMDB_BASE_URL}/search/movie",
+                    params={'api_key': TMDB_API_KEY, 'query': query}, timeout=(3.05, 8))
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict) or not isinstance(payload.get('results'), list):
+                    raise ValueError('TMDb returned an invalid search response.')
+                for item in payload['results'][:8]:
+                    if not isinstance(item, dict) or not item.get('id') or not item.get('title'):
+                        continue
                     poster_path = item.get('poster_path')
-                    release_date = item.get('release_date', '')
+                    release_date = item.get('release_date', '') or ''
+                    try:
+                        release = date.fromisoformat(release_date[:10]) if release_date else None
+                    except ValueError:
+                        release = None
                     results.append({'tmdb_id': item['id'], 'title': item['title'],
-                                    'overview': item.get('overview', ''),
-                                    'poster_url': f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
-                                    'release_date': release_date,
-                                    'year': release_date[:4] if release_date else ''})
-            except Exception as e:
-                flash(f"Error fetching from TMDb: {e}")
+                        'overview': item.get('overview', ''),
+                        'poster_url': f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
+                        'release_date': release_date, 'year': release_date[:4] if release_date else '',
+                        'suggested_category': 'upcoming' if release and release > date.today() else 'showing'})
+            except (requests.RequestException, ValueError, TypeError):
+                flash('TMDb could not complete the search. Check the credentials or try again shortly.')
     return render_template('import_movie.html', results=results, query=query)
 
 
@@ -3014,6 +3398,10 @@ def import_movie_add(tmdb_id):
     if guard:
         return guard
     try:
+        existing = Movie.query.filter_by(tmdb_id=tmdb_id).first()
+        if existing:
+            flash(f'"{existing.title}" is already stored in CineWave.')
+            return redirect(url_for('movie_detail', movie_id=existing.id), code=303)
         try:
             trailer_path = save_trailer_upload(request.files.get('trailer_video'))
         except ValueError as exc:
@@ -3021,11 +3409,19 @@ def import_movie_add(tmdb_id):
             return redirect(url_for('admin'))
         trailer_key = ('' if trailer_path else
                        parse_youtube_video_key(request.form.get('youtube_trailer')))
-        if trailer_key is None and not trailer_path:
+        raw_trailer = request.form.get('youtube_trailer', '').strip()
+        if raw_trailer and trailer_key is None and not trailer_path:
             flash('Enter a valid YouTube video link or 11-character video ID.')
-            return redirect(url_for('admin'))
-        res = requests.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}",
-                           params={'api_key': TMDB_API_KEY}, timeout=10).json()
+            return redirect(url_for('import_movie', query=request.form.get('query', '')), code=303)
+        if not TMDB_API_KEY:
+            flash('TMDb import is unavailable because TMDB_API_KEY is not configured.')
+            return redirect(url_for('import_movie'), code=303)
+        detail_response = requests.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}",
+                           params={'api_key': TMDB_API_KEY}, timeout=(3.05, 8))
+        detail_response.raise_for_status()
+        res = detail_response.json()
+        if not isinstance(res, dict) or res.get('id') != tmdb_id or not res.get('title'):
+            raise ValueError('TMDb returned invalid movie details.')
         poster_path = res.get('poster_path')
         category = request.form.get('category', 'showing')
         is_upcoming = (category == 'upcoming')
@@ -3053,20 +3449,26 @@ def import_movie_add(tmdb_id):
         db.session.add(movie)
         db.session.commit()
 
-        # pull cast + director along with the import (falls back to title search)
+        # Credits are fetched for the exact selected TMDb ID.
         cast_saved = _store_movie_cast(movie, tmdb_id)
-        if not cast_saved:
-            found = _tmdb_find_id(movie.title)
-            if found:
-                cast_saved = _store_movie_cast(movie, found)
 
         cat_label = 'Coming Soon' if is_upcoming else 'Now Showing'
         rel_label = ' (Re-Release)' if is_rerelease else ''
         cast_note = ' with cast' if cast_saved else ''
-        flash(f'Imported "{movie.title}" as {cat_label}{rel_label}{cast_note}!')
-    except Exception as e:
-        flash(f"Failed to import movie: {e}")
-    return redirect(url_for('admin'))
+        flash(f'Imported "{movie.title}" as {cat_label}{rel_label}{cast_note}.')
+        return redirect(url_for('movie_detail', movie_id=movie.id), code=303)
+    except (requests.RequestException, ValueError, TypeError):
+        db.session.rollback()
+        flash('TMDb did not return usable details. The film was not imported; try again shortly.')
+        return redirect(url_for('import_movie'), code=303)
+    except IntegrityError:
+        db.session.rollback()
+        existing = Movie.query.filter_by(tmdb_id=tmdb_id).first()
+        if existing:
+            flash(f'"{existing.title}" is already stored in CineWave.')
+            return redirect(url_for('movie_detail', movie_id=existing.id), code=303)
+        flash('The import conflicted with another update. Search again and retry.')
+        return redirect(url_for('import_movie'), code=303)
 
 
 @app.route('/admin/toggle_movie_status/<int:movie_id>', methods=['POST'])
@@ -3819,6 +4221,7 @@ def auto_migrate():
                  ('email_otp_expires_at', 'DATETIME'),
                  ('email_otp_sent_at', 'DATETIME'),
                  ('email_otp_attempts', 'INTEGER DEFAULT 0'),
+                 ('alternative_id', 'VARCHAR(64)'),
                  ('created_at', 'DATETIME'), ('bio', "VARCHAR(250) DEFAULT 'Cinema lover & movie enthusiast.'")],
         'movie': [('language', "VARCHAR(50)"), ('certificate', "VARCHAR(10)"),
                   ('rating', 'FLOAT DEFAULT 8.5'),
@@ -3849,7 +4252,15 @@ def auto_migrate():
             if col not in existing:
                 db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {coltype}'))
                 print(f"  migrated: {table}.{col}")
+    for account in User.query.filter((User.alternative_id.is_(None)) | (User.alternative_id == '')).all():
+        account.alternative_id = secrets.token_urlsafe(32)
     db.session.commit()
+    inspector = inspect(db.engine)
+    if not any(set(item.get('column_names') or ()) == {'alternative_id'}
+               for item in inspector.get_unique_constraints('user')):
+        db.session.execute(text(
+            'CREATE UNIQUE INDEX IF NOT EXISTS uq_user_alternative_id ON "user" (alternative_id)'))
+        db.session.commit()
 
     # Backfill active legacy CSV locks into normalized per-seat holds. If old
     # overlapping locks exist, the first hold wins and the unique key preserves safety.

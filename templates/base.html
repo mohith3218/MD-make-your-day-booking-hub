@@ -171,9 +171,20 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/coastal.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body id="app-body" class="light-mode bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
+<body id="app-body" class="{% if request.endpoint in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}cw-auth-shell {% endif %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
+  <script>
+    (() => {
+      let choice = null;
+      try { choice = localStorage.getItem('cw_theme_override'); } catch { /* Follow the OS. */ }
+      const light = choice ? choice === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
+      document.body.classList.toggle('light-mode', light);
+    })();
+  </script>
   <a class="cine-skip" href="#main-content">Skip to content</a>
 
+  {% if request.endpoint in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}
+  <header class="cw-auth-brandbar"><a href="{{ url_for('login') }}" class="cw-brand" aria-label="CineWave"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a></header>
+  {% else %}
   <header class="cw-header">
     <div class="cw-container cw-header-inner">
       <a href="{{ url_for('home') }}" class="cw-brand" aria-label="CineWave home"><span id="site-logo-mark" class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
@@ -189,10 +200,11 @@
       </div>
     </div>
   </header>
+  {% endif %}
 
   <main id="main-content" tabindex="-1" class="flex-1 w-full">
     <div class="cw-main-wrap max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6">
-      <div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>
+      {% if request.endpoint not in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}<div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>{% endif %}
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           {% for m in messages %}
@@ -204,7 +216,7 @@
     </div>
   </main>
 
-  <footer class="cw-footer">
+  {% if request.endpoint not in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}<footer class="cw-footer">
     <div class="cw-container">
       <div class="cw-footer-grid">
         <div class="cw-footer-about"><a href="{{ url_for('home') }}" class="cw-brand"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave Vizag</span></a><p>Curating cinematic journeys along the coast of Visakhapatnam. From heritage theatres at Jagadamba Junction to waterfront multiplexes on Beach Road.</p><small>PORT OF CINEMA · EST. 2024</small></div>
@@ -214,7 +226,7 @@
       </div>
       <div class="cw-footer-bottom"><span>© {{ 2026 }} CineWave. Crafted for Visakhapatnam cinephiles.</span><span>Demo tickets are not valid for theatre admission.</span></div>
     </div>
-  </footer>
+  </footer>{% endif %}
 
   <script>
     function applyTheme(isLight) {
@@ -237,11 +249,14 @@
     function toggleTheme() {
       const isLight = !document.getElementById('app-body').classList.contains('light-mode');
       applyTheme(isLight);
-      try { localStorage.setItem('cinewave_theme', isLight ? 'light' : 'dark'); } catch { /* Theme still works when storage is disabled. */ }
+      try { localStorage.setItem('cw_theme_override', isLight ? 'light' : 'dark'); } catch { /* Theme still works when storage is disabled. */ }
     }
 
-    // Load theme on startup
-    try { applyTheme(localStorage.getItem('cinewave_theme') !== 'dark'); } catch { applyTheme(true); }
+    let themeChoice = null;
+    try { themeChoice = localStorage.getItem('cw_theme_override'); } catch { /* Use the OS preference. */ }
+    const themePreference = window.matchMedia('(prefers-color-scheme: light)');
+    applyTheme(themeChoice ? themeChoice === 'light' : themePreference.matches);
+    themePreference.addEventListener?.('change', event => { if (!themeChoice) applyTheme(event.matches); });
   </script>
 
   {% block scripts %}{% endblock %}

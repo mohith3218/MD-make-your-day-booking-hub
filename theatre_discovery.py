@@ -5,7 +5,6 @@ import math
 import re
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
-from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -116,28 +115,25 @@ def create_theatre_blueprint(db, models, price_map):
 
     @bp.route('/theatres')
     def index():
-        filters = {name: text_filter(name) for name in ('q', 'city', 'area')}
-        locations = db.session.query(Theater.city, Theater.location).distinct().all()
-        cities = sorted({city for city, area in locations if city})
-        areas = sorted({area for city, area in locations if area and (not filters['city'] or city == filters['city'])})
+        filters = {'q': text_filter('q')}
         query = Theater.query.options(selectinload(Theater.screens))
         if filters['q']:
             literal = filters['q'].replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
             pattern = '%' + literal + '%'
-            query = query.filter(or_(*(column.ilike(pattern, escape='\\') for column in
-                                      (Theater.name, Theater.location, Theater.address, Theater.city))))
-        if filters['city']:
-            query = query.filter(Theater.city == filters['city'])
-        if filters['area']:
-            query = query.filter(Theater.location == filters['area'])
-        theatres = query.order_by(Theater.name, Theater.id).all()
+            query = query.filter(Theater.name.ilike(pattern, escape='\\'))
+        theatres = query.all()
+        folded = filters['q'].casefold()
+        theatres.sort(key=lambda theatre: (
+            0 if folded and theatre.name.casefold() == folded else
+            1 if folded and theatre.name.casefold().startswith(folded) else 2,
+            theatre.name.casefold(), theatre.id))
         shows = scheduled()
         summary = defaultdict(lambda: {'shows': 0, 'movies': set()})
         for show in shows:
             summary[show.screen.theater_id]['shows'] += 1
             summary[show.screen.theater_id]['movies'].add(show.movie_id)
         return render_template('theatres.html', theatres=theatres, filters=filters,
-                               cities=cities, areas=areas, summary=summary)
+                               summary=summary)
 
     @bp.route('/theatres/<int:theatre_id>', defaults={'movie_id': None})
     @bp.route('/theatres/<int:theatre_id>/movies/<int:movie_id>')

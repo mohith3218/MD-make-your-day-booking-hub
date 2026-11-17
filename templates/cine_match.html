@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}CineMatch · CineWave Vizag{% endblock %}
+{% block title %}CineWatch · CineWave Vizag{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/cinematch.css') }}">{% endblock %}
 
 {% block content %}
@@ -7,15 +7,14 @@
   <header class="cm-intro">
     <div>
       <p class="cm-eyebrow">A QUICK WAY TO DECIDE</p>
-      <h1 id="cm-title">Find your next <em>film match.</em></h1>
+      <h1 id="cm-title">CineWatch: find your next <em>film.</em></h1>
       <p>Choose what fits tonight. We’ll find a few films from the CineWave catalog that match your mood, language and time.</p>
     </div>
     <div class="cm-intro-mark" aria-hidden="true"><i class="fa-solid fa-clapperboard"></i><span>MADE FOR YOUR MOVIE NIGHT</span></div>
   </header>
 
   <div class="cm-layout">
-    <form class="cm-form" method="post" action="{{ url_for('cine_match') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <form class="cm-form" method="get" action="{{ url_for('cine_match') }}">
       <fieldset class="cm-mood-field">
         <legend>What are you in the mood for?</legend>
         <div class="cm-moods">
@@ -75,7 +74,7 @@
         {% endfor %}
       </div>
     </section>
-  {% elif request.method == 'POST' %}
+  {% elif request.args %}
     <section class="cm-empty" role="status"><span><i class="fa-solid fa-film" aria-hidden="true"></i></span><h2>No films match those choices yet.</h2><p>Try a different mood or clear one of the filters.</p><a class="cw-button cw-button-white" href="{{ url_for('cine_match') }}">Clear filters</a></section>
   {% else %}
     <section class="cm-first-use"><span><i class="fa-regular fa-lightbulb" aria-hidden="true"></i></span><p>Your picks will appear here. Start with a mood, or leave everything open for a broad selection.</p></section>

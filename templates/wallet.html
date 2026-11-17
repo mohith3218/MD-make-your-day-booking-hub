@@ -25,6 +25,29 @@
       </button>
       <p class="text-[10px] text-slate-500 leading-relaxed">New accounts start with a ₹500 welcome bonus. An admin approves recharges, then the balance is credited instantly.</p>
     </form>
+
+    <section class="rounded-2xl border border-amber-200/60 bg-amber-50/50 p-4 space-y-3 text-slate-800" aria-labelledby="convert-points-title">
+      <div><h2 id="convert-points-title" class="text-sm font-bold">Convert CinePass points</h2><p class="text-[11px] text-slate-600">Available: <strong id="points-available">{{ available_points }}</strong> points · 1 point = ₹1 demo wallet credit</p></div>
+      <form method="post" action="{{ url_for('wallet_convert_points') }}" class="space-y-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_key" value="{{ conversion_key }}">
+        <label class="block text-xs font-semibold" for="points-to-convert">Whole points to convert</label>
+        <input id="points-to-convert" name="points" type="number" min="1" max="{{ available_points }}" step="1" inputmode="numeric" required {% if not available_points or not demo_payments_enabled %}disabled{% endif %} class="w-full rounded-xl border border-amber-800/30 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700">
+        <p class="text-xs">Expected credit: <strong>₹<span id="expected-credit">0</span></strong></p>
+        <p class="text-[10px] text-slate-600">After conversion: wallet ₹<span id="wallet-after">{{ '%.2f'|format(wallet.balance) }}</span> · points <span id="points-after">{{ available_points }}</span></p>
+        <button type="submit" {% if not available_points or not demo_payments_enabled %}disabled{% endif %} class="w-full rounded-xl bg-amber-700 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50">Convert points</button>
+        {% if not demo_payments_enabled %}<p class="text-[10px] text-rose-800">Demo wallet changes are currently disabled.</p>{% endif %}
+      </form>
+      <script>
+        (() => { const input=document.getElementById('points-to-convert'); if(!input)return;
+          const available=Number(document.getElementById('points-available').textContent)||0;
+          const balance={{ wallet.balance|tojson }};
+          const render=()=>{const points=Math.max(0,Math.min(available,Number(input.value)||0));
+            document.getElementById('expected-credit').textContent=String(points);
+            document.getElementById('wallet-after').textContent=(balance+points).toFixed(2);
+            document.getElementById('points-after').textContent=String(available-points);};
+          input.addEventListener('input',render);render();})();
+      </script>
+    </section>
   </div>
 
   <div class="lg:col-span-2 space-y-6">

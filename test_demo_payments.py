@@ -76,12 +76,14 @@ with patch.object(socket.socket, 'connect', side_effect=AssertionError('Network 
             assert health.call_count == 1
     client = A.app.test_client()
     result = client.get('/__production_probe')
-    assert result.status_code == 200
+    assert result.status_code == 302
+    assert result.location.startswith('/login?next=')
     assert 'Strict-Transport-Security' in result.headers
     if not A.payments.mock_payments_enabled():
-        assert client.post('/pay/simulate/missing').status_code == 403
+        assert client.post('/pay/simulate/missing').status_code == 302
     assert client.post('/pay/webhook').status_code == 404
-    print(json.dumps(result.get_json()))
+    print(json.dumps({'mode': A.payments.gateway_name(),
+                      'secure': A.app.config['SESSION_COOKIE_SECURE']}))
 '''
         for enabled, mode in (('true', 'mock'), ('', 'disabled')):
             env = dict(os.environ, APP_ENV='production', DEMO_PAYMENTS_ENABLED=enabled,

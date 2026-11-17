@@ -46,7 +46,10 @@ class MigrationTests(unittest.TestCase):
             with legacy.begin() as conn:
                 cfg.attributes['connection'] = conn
                 command.upgrade(cfg, '20261110_01')
-                conn.execute(db.metadata.tables['user'].insert(), dict(id=1, username='Host', password_hash='unchanged'))
+                conn.execute(__import__('sqlalchemy').text(
+                    'INSERT INTO "user" (id, username, password_hash, email_verified, email_otp_attempts) '
+                    'VALUES (1, :name, :password, 1, 0)'),
+                    {'name': 'Host', 'password': 'unchanged'})
                 conn.execute(db.metadata.tables['theater'].insert(), dict(id=1, name='Jagadamba Theatre'))
                 conn.execute(db.metadata.tables['movie'].insert(), dict(id=1, title='Fixture', description='Fixture', duration=120))
                 conn.execute(db.metadata.tables['screen'].insert(), [dict(id=1, theater_id=1, name='70MM Main', layout_json=json.dumps(layout)),
@@ -106,7 +109,7 @@ class MigrationTests(unittest.TestCase):
     def test_copy_and_exact_rerun_preserve_every_column(self):
         for _ in range(2):
             report = transfer(self.engine, db.metadata, self.data)
-            self.assertEqual(len(report), 18)
+            self.assertEqual(len(report), len(db.metadata.tables))
             self.assertTrue(all(r['source'] == r['target'] and r['content_verified'] for r in report.values()))
         with self.engine.connect() as conn:
             user = conn.execute(select(db.metadata.tables['user'])).mappings().one()
