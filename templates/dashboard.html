@@ -4,7 +4,7 @@
 {% block content %}
 <div class="flex items-center justify-between gap-3">
   <div><h1 class="text-2xl font-black text-white">My Bookings</h1><p class="text-xs text-slate-400 mt-1">Your tickets and pending reservations in one place.</p></div>
-  <a href="{{ url_for('wallet_page') }}" class="text-xs text-slate-400 hover:text-white">Wallet ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
+  <a href="{{ url_for('wallet.wallet_page') }}" class="text-xs text-slate-400 hover:text-white">Wallet ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
 </div>
 
 {% if bookings %}
@@ -30,9 +30,9 @@
             <p class="text-[10px] text-slate-500">{{ b.booked_at.strftime('%d %b %Y, %I:%M %p') }}</p>
           </div>
           {% if b.status == 'PAID' %}
-            <a href="{{ url_for('ticket', reference=b.reference) }}" class="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">View ticket</a>
+            <a href="{{ url_for('booking.ticket', reference=b.reference) }}" class="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">View ticket</a>
           {% elif b.status == 'PENDING' and b.seconds_left > 0 %}
-            <a href="{{ url_for('checkout', reference=b.reference) }}" class="inline-block px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">
+            <a href="{{ url_for('booking.checkout', reference=b.reference) }}" class="inline-block px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">
               Pay now · {{ b.seconds_left // 60 }}m left
             </a>
           {% endif %}
@@ -45,7 +45,7 @@
     <span class="cine-empty-icon" aria-hidden="true"><i class="fa-solid fa-ticket text-xl"></i></span>
     <h2 class="text-xl text-white">Your next movie awaits</h2>
     <p class="text-sm text-slate-400">Your tickets will appear here after you reserve seats.</p>
-    <a href="{{ url_for('home') }}" class="inline-block px-6 py-2.5 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">Browse movies</a>
+    <a href="{{ url_for('main.home') }}" class="inline-block px-6 py-2.5 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">Browse movies</a>
   </div>
 {% endif %}
 {% endblock %}

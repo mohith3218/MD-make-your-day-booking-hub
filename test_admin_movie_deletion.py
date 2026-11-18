@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent
-_temporary = tempfile.TemporaryDirectory(prefix='admin-delete-', dir=ROOT / 'instance')
+_temporary = tempfile.TemporaryDirectory(prefix='admin-delete-')
 _url = 'sqlite:///' + (Path(_temporary.name) / 'test.db').as_posix()
 os.environ.update(APP_ENV='testing', DATABASE_URL=_url, TEST_DATABASE_URL=_url,
                   SECRET_KEY='isolated-admin-deletion-fixture', SMTP_HOST='', TMDB_API_KEY='')
@@ -42,7 +42,7 @@ class AdminMovieDeletionTests(unittest.TestCase):
         self.context.push()
         A.db.drop_all()
         A.db.create_all()
-        A.app.config['TESTING'] = True
+        A.app.config.update(TESTING=True, SESSION_PROTECTION='basic')
         self.admin = A.User(username='admin_fixture', password_hash='fixture', is_admin=True)
         self.viewer = A.User(username='viewer_fixture', password_hash='fixture')
         self.movie = A.Movie(title='Deletion fixture', description='Test', duration=120,

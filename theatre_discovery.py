@@ -9,13 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 
 import seat_layout as sl
-
-CINEMA_TIMEZONE = timezone(timedelta(hours=5, minutes=30), name='Asia/Kolkata')
-
-
-def cinema_now():
-    """Stored show dates/times are Visakhapatnam wall time, not host UTC."""
-    return datetime.now(CINEMA_TIMEZONE).replace(tzinfo=None)
+from cinewave.time import CINEMA_TIMEZONE, cinema_now
 
 
 def text_filter(name, maximum=120):
@@ -61,6 +55,7 @@ def create_theatre_blueprint(db, models, price_map):
         query = (Showtime.query.join(Screen, Showtime.screen_id == Screen.id)
                  .join(Theater, Screen.theater_id == Theater.id)
                  .join(Movie, Showtime.movie_id == Movie.id)
+                 .filter(Movie.is_archived.is_(False))
                  .options(joinedload(Showtime.movie),
                           joinedload(Showtime.screen).joinedload(Screen.theater))
                  .filter(Showtime.show_date >= cinema_now().date()))
@@ -197,7 +192,7 @@ def create_theatre_blueprint(db, models, price_map):
         if not availability([show])[0]['bookable']:
             return render_template('theatre_discovery_error.html',
                                    message='This screening has no bookable seats. Choose another showtime.'), 409
-        return redirect(url_for('book', showtime_id=show.id, theatre_id=theatre_id,
+        return redirect(url_for('booking.book', showtime_id=show.id, theatre_id=theatre_id,
                                 screen_id=show.screen_id, movie_id=show.movie_id))
 
     return bp

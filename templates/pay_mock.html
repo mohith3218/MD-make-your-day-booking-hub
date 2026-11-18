@@ -29,7 +29,7 @@
     <p class="text-xs text-slate-400 text-center">Netbanking simulation. No bank website is opened and no credentials are needed.</p>
   {% endif %}
 
-  <form method="POST" action="{{ url_for('simulate', reference=booking.reference) }}" class="space-y-3">
+  <form method="POST" action="{{ url_for('booking.simulate', reference=booking.reference) }}" class="space-y-3">
     <button type="submit" name="outcome" value="success"
             class="w-full py-3 bg-[#C9A84C] hover:bg-amber-600 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-amber-600/30">
       Simulate success · ₹{{ '%.2f'|format(booking.total_amount) }}

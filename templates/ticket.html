@@ -29,9 +29,7 @@
   <!-- ticket -->
   <div class="glass-card rounded-3xl overflow-hidden">
     <div class="p-6 flex gap-4">
-      {% if movie.poster %}
-        <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-24 rounded-xl border border-slate-800 shrink-0">
-      {% endif %}
+      <div class="cw-ticket-poster">{% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><div class="cw-poster-placeholder" hidden aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ movie.title }}</span></div>{% else %}<div class="cw-poster-placeholder" aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ movie.title }}</span></div>{% endif %}</div>
       <div class="min-w-0 space-y-1">
         <h2 class="text-lg font-black text-white break-words leading-tight">{{ movie.title }}</h2>
         <p class="text-[11px] text-slate-400">{{ movie.language or '' }}{% if movie.certificate %} · {{ movie.certificate }}{% endif %} · {{ movie.duration }} min</p>
@@ -87,7 +85,7 @@
           </p>
         {% endif %}
       </div>
-      <img src="{{ url_for('ticket_qr', reference=booking.reference) }}" alt="QR code"
+      <img src="{{ url_for('booking.ticket_qr', reference=booking.reference) }}" alt="QR code"
            class="w-24 h-24 rounded-lg bg-white p-1 shrink-0">
     </div>
   </div>
@@ -119,7 +117,7 @@
     <a href="https://api.whatsapp.com/send?text={{ wa_text|urlencode }}" target="_blank" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5">
       <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
     </a>
-    <form action="{{ url_for('resend_ticket_delivery', reference=booking.reference) }}" method="POST" class="inline">
+    <form action="{{ url_for('booking.resend_ticket_delivery', reference=booking.reference) }}" method="POST" class="inline">
       <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5">
         <i class="fa-solid fa-envelope text-sm"></i> Resend E-Ticket
       </button>
@@ -128,14 +126,14 @@
       <i class="fa-solid fa-print mr-1"></i> Print
     </button>
     {% if booking.status == 'PAID' and not showtime.is_past %}
-    <form action="{{ url_for('refund_booking', reference=booking.reference) }}" method="POST" onsubmit="return confirm('Cancel this booking and get a 90% refund (₹{{ '%.2f'|format(booking.ticket_amount * 0.9) }}) credited immediately to your CineWave Wallet?');" class="inline">
+    <form action="{{ url_for('booking.refund_booking', reference=booking.reference) }}" method="POST" onsubmit="return confirm('Cancel this booking and get a 90% refund (₹{{ '%.2f'|format(booking.ticket_amount * 0.9) }}) credited immediately to your CineWave Wallet?');" class="inline">
       <button type="submit" class="px-4 py-2 bg-amber-600/20 hover:bg-amber-600 border border-amber-500/40 hover:border-transparent text-amber-300 hover:text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5">
         <i class="fa-solid fa-rotate-left"></i> Cancel & Refund
       </button>
     </form>
     {% endif %}
-    <a href="{{ url_for('dashboard') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">My bookings</a>
-    <a href="{{ url_for('home') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">Book another</a>
+    <a href="{{ url_for('profile.dashboard') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">My bookings</a>
+    <a href="{{ url_for('main.home') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">Book another</a>
   </div>
 </div>
 {% endblock %}

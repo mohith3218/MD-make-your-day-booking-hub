@@ -14,7 +14,7 @@
   </header>
 
   <div class="cm-layout">
-    <form class="cm-form" method="get" action="{{ url_for('cine_match') }}">
+    <form class="cm-form" method="get" action="{{ url_for('movies.cine_match') }}">
       <fieldset class="cm-mood-field">
         <legend>What are you in the mood for?</legend>
         <div class="cm-moods">
@@ -36,7 +36,7 @@
         </label>
       </div>
 
-      <div class="cm-form-actions"><button class="cw-button cw-button-primary" type="submit"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Find my matches</button><a href="{{ url_for('cine_match') }}">Reset filters</a></div>
+      <div class="cm-form-actions"><button class="cw-button cw-button-primary" type="submit"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Find my matches</button><a href="{{ url_for('movies.cine_match') }}">Reset filters</a></div>
     </form>
 
     <aside class="cm-note">
@@ -44,9 +44,9 @@
       {% if current_user.is_authenticated and personalization_count %}
         <h2>Your taste, included</h2><p>Your {{ personalization_count }} saved or highly rated film{% if personalization_count != 1 %}s{% endif %} help sort films that fit your preferences.</p>
       {% elif current_user.is_authenticated %}
-        <h2>Start your taste profile</h2><p>Save a film or rate one you’ve seen. Those choices will help shape future matches.</p><a href="{{ url_for('home') }}#movies">Browse films <span aria-hidden="true">→</span></a>
+        <h2>Start your taste profile</h2><p>Save a film or rate one you’ve seen. Those choices will help shape future matches.</p><a href="{{ url_for('main.home') }}#movies">Browse films <span aria-hidden="true">→</span></a>
       {% else %}
-        <h2>Make it personal</h2><p>Sign in to let your watchlist and ratings help shape your matches.</p><a href="{{ url_for('login', next=request.path) }}">Sign in to CineWave <span aria-hidden="true">→</span></a>
+        <h2>Make it personal</h2><p>Sign in to let your watchlist and ratings help shape your matches.</p><a href="{{ url_for('auth.login', next=request.path) }}">Sign in to CineWave <span aria-hidden="true">→</span></a>
       {% endif %}
       <small>Matches come from the films listed in this booking hub.</small>
     </aside>
@@ -59,23 +59,23 @@
         {% for result in results %}
           {% set movie = result.movie %}
           <article class="cm-card">
-            <a class="cm-poster" href="{{ url_for('movie_detail', movie_id=movie.id) }}" aria-label="Explore {{ movie.title }}">
+            <a class="cm-poster" href="{{ url_for('movies.movie_detail', movie_id=movie.id) }}" aria-label="Explore {{ movie.title }}">
               {% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster" loading="lazy" decoding="async" onerror="this.hidden=true;this.parentElement.classList.add('cm-poster-fallback');this.parentElement.querySelector('.cm-poster-placeholder').hidden=false">
               {% endif %}<span class="cm-poster-placeholder" {% if movie.poster %}hidden{% endif %}><i class="fa-solid fa-film" aria-hidden="true"></i><strong>{{ movie.title }}</strong><small>Poster unavailable</small></span>
               <span class="cm-rating">★ {{ '%.1f'|format(movie.display_rating) }}</span>
             </a>
             <div class="cm-card-body">
               <div class="cm-card-meta"><span>{{ movie.language or 'Language not listed' }}</span><span>{{ movie.duration }} min</span></div>
-              <h3><a href="{{ url_for('movie_detail', movie_id=movie.id) }}">{{ movie.title }}</a></h3>
+              <h3><a href="{{ url_for('movies.movie_detail', movie_id=movie.id) }}">{{ movie.title }}</a></h3>
               {% if result.why %}<p class="cm-why">{{ result.why|join(' · ') }}</p>{% endif %}
-              <a class="cm-card-link" href="{{ url_for('movie_detail', movie_id=movie.id) }}">Explore film &amp; showtimes <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+              <a class="cm-card-link" href="{{ url_for('movies.movie_detail', movie_id=movie.id) }}">Explore film &amp; showtimes <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
             </div>
           </article>
         {% endfor %}
       </div>
     </section>
   {% elif request.args %}
-    <section class="cm-empty" role="status"><span><i class="fa-solid fa-film" aria-hidden="true"></i></span><h2>No films match those choices yet.</h2><p>Try a different mood or clear one of the filters.</p><a class="cw-button cw-button-white" href="{{ url_for('cine_match') }}">Clear filters</a></section>
+    <section class="cm-empty" role="status"><span><i class="fa-solid fa-film" aria-hidden="true"></i></span><h2>No films match those choices yet.</h2><p>Try a different mood or clear one of the filters.</p><a class="cw-button cw-button-white" href="{{ url_for('movies.cine_match') }}">Clear filters</a></section>
   {% else %}
     <section class="cm-first-use"><span><i class="fa-regular fa-lightbulb" aria-hidden="true"></i></span><p>Your picks will appear here. Start with a mood, or leave everything open for a broad selection.</p></section>
   {% endif %}

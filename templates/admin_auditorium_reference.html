@@ -4,7 +4,7 @@
 <main class="max-w-7xl mx-auto space-y-5">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <a href="{{ url_for('edit_layout', screen_id=screen.id) }}" class="text-xs text-slate-400 hover:text-white">← Seating layout</a>
+      <a href="{{ url_for('admin.edit_layout', screen_id=screen.id) }}" class="text-xs text-slate-400 hover:text-white">← Seating layout</a>
       <h1 class="mt-1 text-2xl font-black text-white">{{ screen.full_name }} · visual profile</h1>
       <p class="text-xs text-slate-400">Use auditorium interior photos only. Confirm screen identity and date before marking a photo verified or approved.</p>
     </div>

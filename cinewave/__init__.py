@@ -1,0 +1,1 @@
+"""CineWave application package."""

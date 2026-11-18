@@ -3,13 +3,10 @@
 
 {% block content %}
 <div class="glass-card rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row gap-8 items-start">
-  {% if movie.poster %}
-    <img src="{{ movie.poster }}" alt="{{ movie.title }}" class="w-full md:w-56 aspect-[2/3] object-cover rounded-2xl border border-slate-800">
-  {% else %}
-    <div class="w-full md:w-56 aspect-[2/3] bg-slate-900 rounded-2xl flex items-center justify-center text-slate-600 border border-slate-800">
-      <i class="fa-solid fa-film text-5xl"></i>
-    </div>
-  {% endif %}
+  <div class="cw-detail-poster">
+    {% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster" loading="eager" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><div class="cw-poster-placeholder" hidden aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ movie.title }}</span></div>
+    {% else %}<div class="cw-poster-placeholder" aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ movie.title }}</span></div>{% endif %}
+  </div>
 
   <div class="space-y-3 flex-1 min-w-0">
     <div class="flex items-start justify-between gap-4 flex-wrap">
@@ -146,7 +143,7 @@
               {% else %}
                 {# ---- UPCOMING: normal booking card with countdown ---- #}
                 {% if current_user.is_authenticated %}
-                  <a href="{{ url_for('book', showtime_id=s.id) }}"
+                  <a href="{{ url_for('booking.book', showtime_id=s.id) }}"
                      class="relative px-4 py-2.5 rounded-xl border border-slate-700 hover:border-[#C9A84C] bg-slate-900 hover:bg-slate-800 transition text-center group">
                     <p class="text-sm font-bold text-white">{{ s.show_time }}</p>
                     <p class="text-[10px] text-slate-500">
@@ -162,7 +159,7 @@
                     {% endif %}
                   </a>
                 {% else %}
-                  <a href="{{ url_for('login') }}"
+                  <a href="{{ url_for('auth.login') }}"
                      class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-center">
                     <p class="text-sm font-bold text-slate-300">{{ s.show_time }}</p>
                     <p class="text-[10px] text-slate-500">Login to book</p>
@@ -344,7 +341,7 @@
 
   async function toggleWatchlistDetail(movieId, btn) {
     {% if not current_user.is_authenticated %}
-      window.location.href = "{{ url_for('login') }}";
+      window.location.href = "{{ url_for('auth.login') }}";
       return;
     {% endif %}
 
@@ -399,7 +396,7 @@
 
   async function submitRating(movieId, score) {
     {% if not current_user.is_authenticated %}
-      window.location.href = "{{ url_for('login') }}";
+      window.location.href = "{{ url_for('auth.login') }}";
       return;
     {% endif %}
 
@@ -431,7 +428,7 @@
 
   function openReviewModal() {
     {% if not current_user.is_authenticated %}
-      window.location.href = "{{ url_for('login') }}";
+      window.location.href = "{{ url_for('auth.login') }}";
       return;
     {% endif %}
     document.getElementById('reviewModal').classList.remove('hidden');

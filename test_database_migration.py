@@ -6,9 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-_instance = Path(__file__).resolve().parent / 'instance'
-_instance.mkdir(exist_ok=True)
-_temp = tempfile.TemporaryDirectory(prefix='migration-tests-', dir=_instance)
+_temp = tempfile.TemporaryDirectory(prefix='migration-tests-')
 os.environ['APP_ENV'] = 'testing'
 os.environ['DATABASE_URL'] = 'sqlite:///' + (Path(_temp.name) / 'app-test.db').as_posix()
 os.environ['TEST_DATABASE_URL'] = os.environ['DATABASE_URL']
@@ -17,7 +15,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -50,10 +48,15 @@ class MigrationTests(unittest.TestCase):
                     'INSERT INTO "user" (id, username, password_hash, email_verified, email_otp_attempts) '
                     'VALUES (1, :name, :password, 1, 0)'),
                     {'name': 'Host', 'password': 'unchanged'})
-                conn.execute(db.metadata.tables['theater'].insert(), dict(id=1, name='Jagadamba Theatre'))
-                conn.execute(db.metadata.tables['movie'].insert(), dict(id=1, title='Fixture', description='Fixture', duration=120))
-                conn.execute(db.metadata.tables['screen'].insert(), [dict(id=1, theater_id=1, name='70MM Main', layout_json=json.dumps(layout)),
-                             dict(id=2, theater_id=1, name='Other screen', layout_json='{"classes":[]}')])
+                conn.execute(text('INSERT INTO theater (id, name) VALUES (1, :name)'),
+                             {'name': 'Jagadamba Theatre'})
+                conn.execute(text('INSERT INTO movie (id, title, description, duration) '
+                                  'VALUES (1, :title, :description, :duration)'),
+                             {'title': 'Fixture', 'description': 'Fixture', 'duration': 120})
+                conn.execute(text('INSERT INTO screen (id, theater_id, name, layout_json) '
+                                  'VALUES (:id, 1, :name, :layout)'), [
+                    {'id': 1, 'name': '70MM Main', 'layout': json.dumps(layout)},
+                    {'id': 2, 'name': 'Other screen', 'layout': '{"classes":[]}'}])
                 from datetime import date, datetime
                 conn.execute(db.metadata.tables['showtime'].insert(), dict(id=1, movie_id=1, screen_id=1,
                              theater='Jagadamba Theatre', show_date=date.today(), show_time='18:30'))
@@ -64,6 +67,14 @@ class MigrationTests(unittest.TestCase):
             with legacy.begin() as conn:
                 cfg.attributes['connection'] = conn
                 command.upgrade(cfg, 'head')
+                self.assertFalse(conn.execute(select(db.metadata.tables['movie'].c.is_archived)
+                                              .where(db.metadata.tables['movie'].c.id == 1)).scalar_one())
+                self.assertEqual(conn.execute(select(db.metadata.tables['theater'].c.verification_status)
+                                               .where(db.metadata.tables['theater'].c.id == 1)).scalar_one(),
+                                 'unverified')
+                self.assertEqual(conn.execute(select(db.metadata.tables['screen'].c.verification_status)
+                                               .where(db.metadata.tables['screen'].c.id == 1)).scalar_one(),
+                                 'unverified')
                 raw = conn.execute(select(db.metadata.tables['screen'].c.layout_json).where(
                     db.metadata.tables['screen'].c.id == 1)).scalar_one()
                 corrected = json.loads(raw)

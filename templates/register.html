@@ -14,7 +14,7 @@
 
     <div class="cw-auth-card">
       <header class="cw-auth-heading"><p class="cw-overline">Join the CineWave community</p><h1 id="auth-title">Create your account</h1><p>Your next movie day is a few details away.</p></header>
-      <form method="POST" action="{{ url_for('register') }}" class="cw-auth-form" data-auth-form>
+      <form method="POST" action="{{ url_for('auth.register') }}" class="cw-auth-form" data-auth-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="cw-auth-field"><label for="register-username">Username</label><input id="register-username" type="text" name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_.-]+" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="username-help"><small id="username-help">3–30 characters: letters, numbers, dots, underscores or hyphens.</small></div>
         <div class="cw-auth-field"><label for="register-email">Email address</label><input id="register-email" type="email" name="email" autocomplete="email" maxlength="120" autocapitalize="none" required></div>
@@ -22,7 +22,7 @@
         <div class="cw-auth-field"><label for="register-password">Password</label><div class="cw-auth-password"><input id="register-password" type="password" name="password" minlength="6" maxlength="256" autocomplete="new-password" required aria-describedby="password-help"><button type="button" class="cw-password-toggle" data-password-toggle aria-controls="register-password" aria-pressed="false">Show</button></div><small id="password-help">Use 6–256 characters. Avoid reusing a password from another site.</small></div>
         <button type="submit" class="cw-button cw-button-primary cw-auth-submit"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Create account</button>
       </form>
-      <p class="cw-auth-switch">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+      <p class="cw-auth-switch">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
     </div>
   </div>
 </section>

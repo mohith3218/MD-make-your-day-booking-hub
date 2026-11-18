@@ -12,7 +12,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent
-_temporary = tempfile.TemporaryDirectory(prefix='theatre-discovery-', dir=ROOT / 'instance')
+_temporary = tempfile.TemporaryDirectory(prefix='theatre-discovery-')
 _url = 'sqlite:///' + (Path(_temporary.name) / 'test.db').as_posix()
 os.environ.update(APP_ENV='testing', DATABASE_URL=_url, TEST_DATABASE_URL=_url,
                   SECRET_KEY='isolated-theatre-discovery-fixture', SMTP_HOST='',
@@ -62,7 +62,7 @@ class TheatreDiscoveryTests(unittest.TestCase):
         A.db.session.remove()
         A.db.drop_all()
         A.db.create_all()
-        A.app.config['TESTING'] = True
+        A.app.config.update(TESTING=True, SESSION_PROTECTION='basic')
         self.today = cinema_now().date()
         self.day = self.today + timedelta(days=2)
         self.first = A.Theater(name='Coastal Cinema', location='Beach Road', city='Visakhapatnam', address='Waterfront')
@@ -247,7 +247,9 @@ class TheatreDiscoveryTests(unittest.TestCase):
     def test_started_and_invalid_time_cannot_be_booked(self):
         self.sign_in()
         fixed = self.show.show_datetime + timedelta(minutes=1)
-        with patch('app.cinema_now',return_value=fixed), patch('theatre_discovery.cinema_now',return_value=fixed):
+        with patch('cinewave.routes.main.cinema_now',return_value=fixed), \
+             patch('cinewave.models.catalog.cinema_now',return_value=fixed), \
+             patch('theatre_discovery.cinema_now',return_value=fixed):
             self.assertEqual(self.show.status,'live')
             self.assertEqual(self.client.get(f'{self.detail}/shows/{self.show.id}/book').status_code,409)
             self.assertEqual(self.client.post(f'/book/{self.show.id}',data={'selected_seats':'A1'}).status_code,302)
@@ -298,7 +300,7 @@ class TheatreDiscoveryTests(unittest.TestCase):
         self.assertEqual(booking.ticket_amount,A.price_seats(self.show,['A1'])[0])
         self.assertNotEqual(booking.total_amount,1)
         self.assertEqual(self.client.get(reserve.location).status_code,200)
-        with patch.object(A,'dispatch_ticket_delivery',return_value=False):
+        with patch('cinewave.services.seat.dispatch_ticket_delivery',return_value=False):
             gateway=self.client.post(f'/pay/gateway/{booking.reference}',data={'method':'upi'})
             self.assertEqual(gateway.status_code,303)
             self.assertEqual(self.client.get(gateway.location).status_code,200)

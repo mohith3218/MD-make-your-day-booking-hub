@@ -11,12 +11,12 @@
     </aside>
     <div class="cw-auth-card">
       <header class="cw-auth-heading"><p class="cw-overline">Email confirmation</p><h1 id="auth-title">Check your inbox</h1><p>Enter the six-digit code sent to <strong>{{ email }}</strong>.</p><p class="cw-auth-note">The code expires after 10 minutes. You have up to five attempts.</p></header>
-      <form method="POST" action="{{ url_for('verify_email') }}" class="cw-auth-form">
+      <form method="POST" action="{{ url_for('auth.verify_email') }}" class="cw-auth-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="cw-auth-field"><label for="verify-code">Verification code</label><input id="verify-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required aria-describedby="verify-code-help"><small id="verify-code-help">Enter all six digits from the email.</small></div>
         <button type="submit" class="cw-button cw-button-primary cw-auth-submit">Verify email</button>
       </form>
-      <form method="POST" action="{{ url_for('resend_email_otp') }}" class="cw-auth-resend"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Send a new code</button></form>
+      <form method="POST" action="{{ url_for('auth.resend_email_otp') }}" class="cw-auth-resend"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Send a new code</button></form>
     </div>
   </div>
 </section>

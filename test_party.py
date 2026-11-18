@@ -16,7 +16,7 @@ from unittest.mock import patch
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-_temp = tempfile.TemporaryDirectory(prefix='party-', dir=Path(__file__).resolve().parent / 'instance')
+_temp = tempfile.TemporaryDirectory(prefix='party-')
 _url = 'sqlite:///' + (Path(_temp.name) / 'party-test.db').as_posix()
 os.environ.update(APP_ENV='testing', DATABASE_URL=_url, TEST_DATABASE_URL=_url,
                   SECRET_KEY='isolated-party-test-key', SMTP_HOST='', TMDB_API_KEY='')
@@ -40,7 +40,7 @@ class PartyTests(unittest.TestCase):
         self.assertEqual(Path(A.db.engine.url.database).resolve(), Path(_temp.name, 'party-test.db').resolve())
         A.db.drop_all()
         A.db.create_all()
-        A.app.config['TESTING'] = True
+        A.app.config.update(TESTING=True, SESSION_PROTECTION='basic')
         venue = A.Theater(name='Jagadamba Theatre')
         screen = A.Screen(theater=venue, name='70MM Main', screen_type='70MM')
         layout = theaters.jagadamba_70mm()

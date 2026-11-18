@@ -26,14 +26,14 @@
 </div>
 
 <div class="flex flex-wrap gap-3">
-  <a href="{{ url_for('add_movie') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">+ Add Movie</a>
-  <a href="{{ url_for('import_movie') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-magnifying-glass mr-1"></i>TMDb Import</a>
-  <a href="{{ url_for('add_showtime') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Showtime</a>
-  <a href="{{ url_for('add_theater') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Theatre</a>
-  <a href="{{ url_for('screens') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Theatres &amp; Screens</a>
-  <a href="{{ url_for('admin_bookings') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Bookings</a>
-  <a href="{{ url_for('admin_analytics') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-chart-line mr-1"></i>Analytics</a>
-  <a href="{{ url_for('admin_recharges') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">
+  <a href="{{ url_for('admin.add_movie') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">+ Add Movie</a>
+  <a href="{{ url_for('admin.import_movie') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-magnifying-glass mr-1"></i>TMDb Import</a>
+  <a href="{{ url_for('admin.add_showtime') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Showtime</a>
+  <a href="{{ url_for('admin.add_theater') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Theatre</a>
+  <a href="{{ url_for('admin.screens') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Theatres &amp; Screens</a>
+  <a href="{{ url_for('admin.admin_bookings') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Bookings</a>
+  <a href="{{ url_for('admin.admin_analytics') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-chart-line mr-1"></i>Analytics</a>
+  <a href="{{ url_for('admin.admin_recharges') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">
     Recharges{% if pending_recharges %} <span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">{{ pending_recharges }}</span>{% endif %}
   </a>
 </div>
@@ -46,7 +46,7 @@
     </div>
     <div class="flex items-center gap-3">
       <input type="search" data-table-filter="theaters-table" aria-label="Search theatres" placeholder="Search theatres" class="w-44 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400">
-      <a href="{{ url_for('screens') }}" class="text-xs text-[#C9A84C] hover:underline whitespace-nowrap">Manage seating</a>
+      <a href="{{ url_for('admin.screens') }}" class="text-xs text-[#C9A84C] hover:underline whitespace-nowrap">Manage seating</a>
     </div>
   </div>
   <div class="overflow-x-auto">
@@ -78,7 +78,16 @@
       <h2 class="text-lg font-bold text-white">Movies <span class="text-sm text-slate-500">({{ movies|length }})</span></h2>
       <p class="text-[11px] text-slate-500 mt-0.5">Update listing status, cast, and trailer sources.</p>
     </div>
-    <input type="search" data-table-filter="movies-table" aria-label="Search movies" placeholder="Search movies" class="w-52 bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400">
+    <form method="get" action="{{ url_for('admin.admin') }}" class="cw-admin-movie-search">
+      <label class="sr-only" for="admin-movie-query">Search all movies, including archived</label>
+      <input id="admin-movie-query" type="search" name="q" value="{{ movie_search }}" placeholder="Search movies, including archived" class="cw-form-control">
+      <select name="visibility" aria-label="Movie listing status" class="cw-form-control">
+        <option value="active" {% if movie_visibility == 'active' %}selected{% endif %}>Active</option>
+        <option value="archived" {% if movie_visibility == 'archived' %}selected{% endif %}>Archived</option>
+        <option value="all" {% if movie_visibility == 'all' %}selected{% endif %}>All movies</option>
+      </select>
+      <button class="cw-button cw-button-primary cw-button-small" type="submit">Search</button>
+    </form>
   </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-xs text-slate-300">
@@ -89,7 +98,7 @@
         {% for m in movies %}
           <tr data-admin-row>
             <td class="p-3">{{ m.id }}</td>
-            <td class="p-3 font-semibold text-white">{{ m.title }}</td>
+            <td class="p-3 font-semibold text-white">{{ m.title }}{% if m.is_archived %}<span class="cw-badge cw-archive-badge">Archived</span>{% endif %}</td>
             <td class="p-3">{{ m.language or '—' }}</td>
             <td class="p-3">{{ m.duration }} min</td>
             <td class="p-3">
@@ -114,7 +123,7 @@
                     {% if m.trailer_video_path %}<span class="ml-1 text-emerald-400">· Uploaded video active</span>
                     {% elif m.youtube_trailer_key %}<span class="ml-1 text-slate-400">· YouTube link saved</span>{% endif %}
                   </summary>
-                  <form method="POST" enctype="multipart/form-data" action="{{ url_for('update_movie_trailer', movie_id=m.id) }}" class="mt-2 space-y-2">
+                  <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.update_movie_trailer', movie_id=m.id) }}" class="mt-2 space-y-2">
                     <label class="block text-[10px] text-slate-400">YouTube trailer link or ID
                       <input type="text" name="youtube_trailer" value="{% if m.youtube_trailer_key %}https://youtu.be/{{ m.youtube_trailer_key }}{% endif %}" placeholder="Paste a YouTube link" aria-label="YouTube trailer for {{ m.title }}" class="mt-1 w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-white">
                     </label>
@@ -125,24 +134,30 @@
                     <button type="submit" class="px-2.5 py-1.5 bg-amber-600/20 hover:bg-amber-600 text-amber-300 hover:text-white text-[10px] font-semibold rounded-lg">Save trailer</button>
                   </form>
                 </details>
-                <form method="POST" action="{{ url_for('toggle_movie_status', movie_id=m.id) }}">
+                <form method="POST" action="{{ url_for('admin.toggle_movie_status', movie_id=m.id) }}">
                   <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium rounded-lg transition">
                     {% if m.is_upcoming %}→ Now Showing{% else %}→ Coming Soon{% endif %}
                   </button>
                 </form>
-                <form method="POST" action="{{ url_for('toggle_rerelease', movie_id=m.id) }}">
+                <form method="POST" action="{{ url_for('admin.toggle_rerelease', movie_id=m.id) }}">
                   <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 text-[10px] font-medium rounded-lg transition">
                     {% if m.is_rerelease %}→ Fresh{% else %}→ Re-Release{% endif %}
                   </button>
                 </form>
-                <form method="POST" action="{{ url_for('fetch_cast', movie_id=m.id) }}"
+                <form method="POST" action="{{ url_for('admin.archive_movie', movie_id=m.id, q=movie_search) }}" class="cw-archive-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium rounded-lg transition">
+                    {% if m.is_archived %}Restore to catalogue{% else %}Archive{% endif %}
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.fetch_cast', movie_id=m.id) }}"
                       onsubmit="this.querySelector('button').textContent = 'Fetching…'">
                   <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-sky-300 text-[10px] font-medium rounded-lg transition"
                           title="Pull cast & director from TMDb">
                     🎭 {% if m.tmdb_id %}Update cast{% else %}Fetch cast{% endif %}
                   </button>
                 </form>
-                <form method="POST" action="{{ url_for('delete_movie', movie_id=m.id) }}"
+                <form method="POST" action="{{ url_for('admin.delete_movie', movie_id=m.id) }}"
                       data-confirm-delete="Delete {{ m.title }} and its showtimes, reviews, watchlist entries and inactive party rooms? Movies with bookings, active seat holds or active parties cannot be deleted."
                       onsubmit="return confirm(this.dataset.confirmDelete)">
                   <button type="submit" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-medium rounded-lg transition">

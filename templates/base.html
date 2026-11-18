@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" id="html-root">
+<html lang="en" id="html-root" data-theme="system">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,194 +9,64 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root { --cine-gold: #c9a84c; --cine-gold-light: #f0d78c; }
-    body { font-family: 'Manrope', sans-serif; background: #0d0d0d !important; }
-    h1, h2, h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: .035em; }
-    .cine-brand { color: var(--cine-gold-light); }
-    .cine-primary { background: var(--cine-gold); color: #111; }
-    .cine-primary:hover { background: var(--cine-gold-light); }
-    .cine-hero { background-image: radial-gradient(ellipse at 76% 38%, rgba(201,168,76,.16), transparent 34%), radial-gradient(ellipse at 86% 73%, rgba(22,108,132,.14), transparent 39%), linear-gradient(118deg, transparent 38%, rgba(201,168,76,.035) 49%, transparent 60%), linear-gradient(90deg, rgba(13,13,13,.96) 0%, rgba(13,13,13,.78) 42%, rgba(13,13,13,.2) 100%), linear-gradient(0deg, #0d0d0d 0%, transparent 35%), url('/static/images/cinewave-hero.jpg'); background-size: cover; background-position: center; }
-    .cine-card { background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); border: 1px solid rgba(201,168,76,.14); }
-    .cine-card:hover { border-color: rgba(201,168,76,.44); box-shadow: 0 14px 40px rgba(0,0,0,.28); }
-    [class*="bg-[#C9A84C]"] { color: #15130d !important; }
-    input:focus, select:focus, textarea:focus { --tw-ring-color: rgba(201,168,76,.55); }
-    ::selection { background: rgba(201,168,76,.35); color: #fff; }
-    .glass-card { background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); backdrop-filter: blur(12px); border: 1px solid rgba(201,168,76,.16); }
-    :root { --cine-radius: 1rem; --cine-border: rgba(201,168,76,.16); }
-    .cine-stat { min-width: 0; border-radius: var(--cine-radius); font-variant-numeric: tabular-nums; }
-    .cine-stat > p:first-child { color: #94a3b8; font-size: 11px; }
-    .cine-stat > p:nth-child(2) { overflow-wrap: anywhere; }
-    .cine-empty { padding: 2.5rem 1.5rem; text-align: center; border-radius: var(--cine-radius); }
-    .cine-empty-icon { display: grid; place-items: center; width: 3rem; height: 3rem; margin: 0 auto 1rem; border-radius: 50%; background: rgba(201,168,76,.1); color: var(--cine-gold-light); }
-    .cine-notice { display: flex; align-items: flex-start; gap: .75rem; padding: 1rem; border: 1px solid var(--cine-border); border-radius: var(--cine-radius); background: rgba(201,168,76,.07); color: #f0d78c; font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
-    .cine-table-scroll { overflow-x: auto; }
-    .cine-table-scroll table { min-width: 360px; font-variant-numeric: tabular-nums; }
-    .cine-table-scroll th:nth-last-child(-n+2), .cine-table-scroll td:nth-last-child(-n+2) { text-align: right; white-space: nowrap; }
-    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cine-gold); outline-offset: 3px; }
-    .cine-skip { position: fixed; top: .5rem; left: .5rem; z-index: 100; padding: .75rem 1rem; border-radius: .75rem; background: var(--cine-gold-light); color: #111; transform: translateY(-150%); }
-    .cine-skip:focus { transform: translateY(0); }
-    @media (max-width: 900px) {
-      .cine-header-inner { height: auto; min-height: 5rem; flex-wrap: wrap; padding-top: .75rem; padding-bottom: .75rem; }
-      .cine-nav { flex-wrap: wrap; row-gap: .75rem; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      #app-body, #app-body a, #app-body button, #app-body img { transition: none !important; }
-    }
-    .screen-glow { box-shadow: 0 15px 30px -5px rgba(201,168,76,0.4); }
-    .seat { width: 26px; height: 26px; border-radius: 6px 6px 3px 3px; font-size: 10px; line-height: 1; }
-    .seat-wide { width: 58px; }
-    .aisle { width: 18px; }
-    .pad { width: 13px; }
-    .seat-avail { background:#1e293b; color:#cbd5e1; border:1px solid #334155; }
-    .seat-avail:hover { background:#334155; }
-    .seat-sel { background:#C9A84C; color:#15130d; border:1px solid #C9A84C; }
-    .seat-booked { background:#0b1120; color:#475569; border:1px solid #1e293b; cursor:not-allowed; }
-    .seat-held { background:#3f2d1a; color:#b98a44; border:1px solid #6b4a20; cursor:not-allowed; }
-    .seat-blocked { background:transparent; border:1px dashed #1e293b; color:#1e293b; cursor:default; }
-    .rowscroll { overflow-x: auto; }
-    .rowscroll::-webkit-scrollbar { height: 6px; }
-    .rowscroll::-webkit-scrollbar-thumb { background:#334155; border-radius: 3px; }
-    #seating-viewport.is-3d { perspective: 1400px; background: radial-gradient(ellipse at 50% 100%, rgba(201,168,76,.12), transparent 58%), linear-gradient(180deg, #11131b, #08090d); border-color: rgba(201,168,76,.3); }
-    #seating-viewport.is-3d #seating-grid-container { transform: rotateX(-24deg) scale(.96); transform-origin: top center; transform-style: preserve-3d; filter: drop-shadow(0 28px 24px rgba(0,0,0,.62)); }
-    #seating-viewport.is-3d .seat-btn { position: relative; transform: translateZ(8px); box-shadow: 0 7px 10px rgba(0,0,0,.48), inset 0 2px 3px rgba(255,255,255,.14); transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease; }
-    #seating-viewport.is-3d .seat-btn:hover { z-index: 2; transform: translateZ(16px) scale(1.08); box-shadow: 0 12px 18px rgba(0,0,0,.56), 0 0 14px rgba(201,168,76,.18); }
-    #seating-viewport.is-3d .seat-sel { box-shadow: 0 0 16px rgba(201,168,76,.52), 0 7px 10px rgba(0,0,0,.48); }
-    @media (max-width: 640px) { #seating-viewport.is-3d #seating-grid-container { transform: rotateX(-12deg) scale(.9); } }
-    @media (prefers-reduced-motion: reduce) { #seating-viewport.is-3d .seat-btn { transition: none; } }
-
-    /* Light Theme Overrides */
-    body.light-mode {
-      background-color: #f1f5f9 !important;
-      color: #0f172a !important;
-    }
-    body.light-mode header {
-      background-color: rgba(255, 255, 255, 0.96) !important;
-      border-bottom-color: #cbd5e1 !important;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-    body.light-mode .glass-card {
-      background: #ffffff !important;
-      border-color: #cbd5e1 !important;
-      color: #0f172a !important;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06) !important;
-    }
-    body.light-mode .text-white {
-      color: #0f172a !important;
-    }
-    body.light-mode .text-slate-400,
-    body.light-mode .text-slate-500 {
-      color: #334155 !important;
-    }
-    body.light-mode .text-slate-300,
-    body.light-mode .text-slate-200,
-    body.light-mode .text-slate-100 {
-      color: #0f172a !important;
-    }
-    body.light-mode .text-slate-600 {
-      color: #475569 !important;
-    }
-    body.light-mode .bg-slate-900,
-    body.light-mode .bg-slate-900\/60,
-    body.light-mode .bg-slate-900\/80,
-    body.light-mode .bg-slate-900\/90,
-    body.light-mode .bg-slate-950 {
-      background-color: #f8fafc !important;
-      border-color: #cbd5e1 !important;
-      color: #0f172a !important;
-    }
-    body.light-mode .bg-slate-800,
-    body.light-mode .bg-slate-800\/80 {
-      background-color: #e2e8f0 !important;
-      color: #0f172a !important;
-      border-color: #cbd5e1 !important;
-    }
-    body.light-mode .bg-slate-800:hover {
-      background-color: #cbd5e1 !important;
-    }
-    body.light-mode .border-slate-800,
-    body.light-mode .border-slate-700,
-    body.light-mode .border-slate-700\/60,
-    body.light-mode .border-slate-800\/50,
-    body.light-mode .border-slate-800\/80 {
-      border-color: #cbd5e1 !important;
-    }
-    body.light-mode input,
-    body.light-mode select,
-    body.light-mode textarea {
-      background-color: #ffffff !important;
-      color: #0f172a !important;
-      border-color: #94a3b8 !important;
-    }
-    body.light-mode input::placeholder,
-    body.light-mode textarea::placeholder {
-      color: #64748b !important;
-    }
-    body.light-mode thead {
-      background-color: #e2e8f0 !important;
-      color: #0f172a !important;
-    }
-    body.light-mode tr {
-      border-color: #e2e8f0 !important;
-    }
-    body.light-mode #seat-inspector {
-      background-color: #ffffff !important;
-      border-color: #cbd5e1 !important;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
-    }
-    body.light-mode .seat-avail {
-      background: #e2e8f0 !important;
-      color: #0f172a !important;
-      border-color: #94a3b8 !important;
-      font-weight: 700 !important;
-    }
-    body.light-mode .seat-avail:hover {
-      background: #cbd5e1 !important;
-    }
-    body.light-mode .seat-booked {
-      background: #f1f5f9 !important;
-      color: #94a3b8 !important;
-      border-color: #e2e8f0 !important;
-    }
-    body.light-mode footer {
-      border-color: #cbd5e1 !important;
-      color: #475569 !important;
-    }
-    body.light-mode .cine-notice { color: #70531a; background: #fff8e5; border-color: #d5bd80; }
-    body.light-mode .cine-empty-icon { color: #70531a; }
-    body.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
-      border-color: #e2e8f0 !important;
-    }
-  </style>
+  <script src="{{ url_for('static', filename='js/cinewave-shell.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/coastal.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body id="app-body" class="{% if request.endpoint in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}cw-auth-shell {% endif %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
-  <script>
-    (() => {
-      let choice = null;
-      try { choice = localStorage.getItem('cw_theme_override'); } catch { /* Follow the OS. */ }
-      const light = choice ? choice === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
-      document.body.classList.toggle('light-mode', light);
-    })();
-  </script>
+<body id="app-body" class="{% if request.endpoint in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}cw-auth-shell {% endif %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
+
   <a class="cine-skip" href="#main-content">Skip to content</a>
 
-  {% if request.endpoint in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}
-  <header class="cw-auth-brandbar"><a href="{{ url_for('login') }}" class="cw-brand" aria-label="CineWave"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a></header>
+  {% if request.endpoint in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}
+  <header class="cw-auth-brandbar"><a href="{{ url_for('auth.login') }}" class="cw-brand" aria-label="CineWave"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a></header>
   {% else %}
   <header class="cw-header">
     <div class="cw-container cw-header-inner">
-      <a href="{{ url_for('home') }}" class="cw-brand" aria-label="CineWave home"><span id="site-logo-mark" class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
+      <a href="{{ url_for('main.home') }}" class="cw-brand" aria-label="CineWave home"><span id="site-logo-mark" class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
       <span class="cw-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Visakhapatnam <span>(Jagadamba)</span></span>
-      <form action="{{ url_for('home') }}#movies" class="cw-search" role="search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input name="q" aria-label="Search movies" placeholder="Search movies in Vizag…" value="{{ request.args.get('q', '') if request.endpoint == 'home' else '' }}"></form>
-      <nav class="cw-nav" aria-label="Main navigation"><a href="{{ url_for('home') }}#movies" {% if request.endpoint == 'home' %}aria-current="page"{% endif %}>Movies</a>{% if request.endpoint not in ('login', 'register', 'verify_email') %}<a href="{{ url_for('cine_match') }}" {% if request.endpoint == 'cine_match' %}aria-current="page"{% endif %}>CineMatch</a>{% endif %}<a href="{{ url_for('theatre_discovery.index') }}" {% if request.blueprint == 'theatre_discovery' %}aria-current="page"{% endif %}>Theatres</a><a href="{{ url_for('home') }}#coastal-standard">Experiences</a></nav>
+      <button id="cw-menu-toggle" class="cw-menu-toggle" type="button" aria-controls="cw-main-nav" aria-expanded="false" aria-label="Open navigation menu"><i class="fa-solid fa-bars" aria-hidden="true"></i><span>Menu</span></button>
+      <form method="get" action="{{ url_for('main.home') }}#movies" class="cw-search" role="search">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" name="q" aria-label="Search movies" placeholder="Search movies in Vizag…" value="{{ search_query if request.endpoint == 'main.home' else '' }}">
+        {% if request.endpoint == 'main.home' %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
+        <button type="submit" aria-label="Search"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+      </form>
+      <nav id="cw-main-nav" class="cw-nav" aria-label="Main navigation">
+        <a href="{{ url_for('main.home') }}#movies" {% if request.endpoint == 'main.home' %}aria-current="page"{% endif %}>Movies</a>
+        <a href="{{ url_for('movies.cine_match') }}" {% if request.endpoint == 'movies.cine_match' %}aria-current="page"{% endif %}>CineWatch</a>
+        <a href="{{ url_for('theatre_discovery.index') }}" {% if request.blueprint == 'theatre_discovery' %}aria-current="page"{% endif %}>Theatres</a>
+        <a href="{{ url_for('main.home') }}#coastal-standard">Offers</a>
+        <a href="{{ url_for('profile.dashboard') }}">SquadPay</a>
+      </nav>
       <div class="cw-account">
-      {% if current_user.is_authenticated %}
-        <a class="cw-wallet" href="{{ url_for('wallet_page') }}"><i class="fa-solid fa-wallet" aria-hidden="true"></i> ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
-        <a class="cw-bookings-link" href="{{ url_for('dashboard') }}" aria-label="My bookings" title="My bookings"><i class="fa-solid fa-ticket" aria-hidden="true"></i></a>
-        <details class="cw-profile"><summary aria-label="Account menu"><i class="fa-regular fa-user" aria-hidden="true"></i></summary><div class="cw-profile-menu"><a href="{{ url_for('profile') }}">My profile · {{ user_points }} Pts</a><a href="{{ url_for('dashboard') }}">My bookings</a>{% if current_user.is_admin %}<a href="{{ url_for('admin') }}">Admin dashboard</a>{% endif %}<button id="theme-toggle" onclick="toggleTheme()" aria-label="Use dark theme" aria-pressed="true" type="button"><i id="theme-icon" class="fa-solid fa-sun" aria-hidden="true"></i> Switch theme</button><form method="POST" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Log out</button></form></div></details>
-      {% else %}<a href="{{ url_for('login') }}" class="cw-login">Sign in</a><a href="{{ url_for('register') }}" class="cw-profile-link" aria-label="Create an account"><i class="fa-regular fa-user" aria-hidden="true"></i></a>{% endif %}
+        {% if current_user.is_authenticated %}
+          <a class="cw-wallet" href="{{ url_for('wallet.wallet_page') }}"><i class="fa-solid fa-wallet" aria-hidden="true"></i> ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
+          <a class="cw-bookings-link" href="{{ url_for('profile.dashboard') }}" aria-label="My bookings" title="My bookings"><i class="fa-solid fa-ticket" aria-hidden="true"></i></a>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}" class="cw-login">Sign in</a>
+        {% endif %}
+        <details class="cw-theme-menu">
+          <summary aria-label="Appearance settings" title="Appearance settings"><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i></summary>
+          <div class="cw-theme-options" role="group" aria-label="Color theme">
+            <strong>Appearance</strong>
+            <button type="button" data-theme-choice="system" aria-pressed="true">System default</button>
+            <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+            <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          </div>
+        </details>
+        {% if current_user.is_authenticated %}
+          <details class="cw-profile">
+            <summary aria-label="Account menu"><i class="fa-regular fa-user" aria-hidden="true"></i></summary>
+            <div class="cw-profile-menu">
+              <a href="{{ url_for('profile.profile') }}">My profile · {{ user_points }} Pts</a>
+              <a href="{{ url_for('profile.dashboard') }}">My bookings</a>
+              {% if current_user.is_admin %}<a href="{{ url_for('admin.admin') }}">Admin dashboard</a>{% endif %}
+              <form method="POST" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Log out</button></form>
+            </div>
+          </details>
+        {% else %}
+          <a href="{{ url_for('auth.register') }}" class="cw-profile-link" aria-label="Create an account"><i class="fa-regular fa-user" aria-hidden="true"></i></a>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -204,7 +74,7 @@
 
   <main id="main-content" tabindex="-1" class="flex-1 w-full">
     <div class="cw-main-wrap max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6">
-      {% if request.endpoint not in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}<div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>{% endif %}
+      {% if request.endpoint not in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}<div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>{% endif %}
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           {% for m in messages %}
@@ -216,48 +86,19 @@
     </div>
   </main>
 
-  {% if request.endpoint not in ('login', 'register', 'verify_email', 'forgot_password', 'reset_password') %}<footer class="cw-footer">
+  {% if request.endpoint not in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}<footer class="cw-footer">
     <div class="cw-container">
       <div class="cw-footer-grid">
-        <div class="cw-footer-about"><a href="{{ url_for('home') }}" class="cw-brand"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave Vizag</span></a><p>Curating cinematic journeys along the coast of Visakhapatnam. From heritage theatres at Jagadamba Junction to waterfront multiplexes on Beach Road.</p><small>PORT OF CINEMA · EST. 2024</small></div>
-        <div><h2>Vizag hubs</h2><a href="{{ url_for('home') }}#showtimes-section">Jagadamba Junction</a><a href="{{ url_for('home') }}#showtimes-section">Beach Road Promenades</a><a href="{{ url_for('home') }}#showtimes-section">Maddilapalem Multiplexes</a><a href="{{ url_for('home') }}#showtimes-section">Gajuwaka Screens</a><a href="{{ url_for('home') }}#showtimes-section">Madhurawada Cinemas</a></div>
-        <div><h2>Platform perks</h2><a href="{{ url_for('dashboard') }}">Squad Pay Split</a><a href="{{ url_for('profile') }}">CinePass Points</a><a href="{{ url_for('home') }}#coastal-standard">In-seat Snacks</a><a href="{{ url_for('wallet_page') }}">CineWave Wallet</a></div>
-        <div><h2>Your cinema, connected</h2><p>Made for Visakhapatnam</p><a href="{{ url_for('dashboard') }}">Manage your bookings</a><a href="{{ url_for('profile') }}">Your account</a><span class="cw-footer-demo">DEMO · No real money</span></div>
+        <div class="cw-footer-about"><a href="{{ url_for('main.home') }}" class="cw-brand"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave Vizag</span></a><p>Curating cinematic journeys along the coast of Visakhapatnam. From heritage theatres at Jagadamba Junction to waterfront multiplexes on Beach Road.</p><small>PORT OF CINEMA · EST. 2024</small></div>
+        <div><h2>Vizag hubs</h2><a href="{{ url_for('main.home') }}#showtimes-section">Jagadamba Junction</a><a href="{{ url_for('main.home') }}#showtimes-section">Beach Road Promenades</a><a href="{{ url_for('main.home') }}#showtimes-section">Maddilapalem Multiplexes</a><a href="{{ url_for('main.home') }}#showtimes-section">Gajuwaka Screens</a><a href="{{ url_for('main.home') }}#showtimes-section">Madhurawada Cinemas</a></div>
+        <div><h2>Platform perks</h2><a href="{{ url_for('profile.dashboard') }}">Squad Pay Split</a><a href="{{ url_for('profile.profile') }}">CinePass Points</a><a href="{{ url_for('main.home') }}#coastal-standard">In-seat Snacks</a><a href="{{ url_for('wallet.wallet_page') }}">CineWave Wallet</a></div>
+        <div><h2>Your cinema, connected</h2><p>Made for Visakhapatnam</p><a href="{{ url_for('profile.dashboard') }}">Manage your bookings</a><a href="{{ url_for('profile.profile') }}">Your account</a><span class="cw-footer-demo">DEMO · No real money</span></div>
       </div>
       <div class="cw-footer-bottom"><span>© {{ 2026 }} CineWave. Crafted for Visakhapatnam cinephiles.</span><span>Demo tickets are not valid for theatre admission.</span></div>
     </div>
   </footer>{% endif %}
 
-  <script>
-    function applyTheme(isLight) {
-      const body = document.getElementById('app-body');
-      const icon = document.getElementById('theme-icon');
-      const toggle = document.getElementById('theme-toggle');
-      if (toggle) toggle.setAttribute('aria-pressed', String(isLight));
-      if (toggle) toggle.setAttribute('aria-label', isLight ? 'Use dark theme' : 'Use light theme');
-      if (isLight) {
-        body.classList.add('light-mode');
-        if (icon) icon.classList.remove('fa-moon');
-        if (icon) icon.classList.add('fa-sun');
-      } else {
-        body.classList.remove('light-mode');
-        if (icon) icon.classList.remove('fa-sun');
-        if (icon) icon.classList.add('fa-moon');
-      }
-    }
 
-    function toggleTheme() {
-      const isLight = !document.getElementById('app-body').classList.contains('light-mode');
-      applyTheme(isLight);
-      try { localStorage.setItem('cw_theme_override', isLight ? 'light' : 'dark'); } catch { /* Theme still works when storage is disabled. */ }
-    }
-
-    let themeChoice = null;
-    try { themeChoice = localStorage.getItem('cw_theme_override'); } catch { /* Use the OS preference. */ }
-    const themePreference = window.matchMedia('(prefers-color-scheme: light)');
-    applyTheme(themeChoice ? themeChoice === 'light' : themePreference.matches);
-    themePreference.addEventListener?.('change', event => { if (!themeChoice) applyTheme(event.matches); });
-  </script>
 
   {% block scripts %}{% endblock %}
 </body>

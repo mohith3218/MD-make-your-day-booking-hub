@@ -5,13 +5,13 @@
 <div class="max-w-2xl mx-auto glass-card rounded-3xl p-8 space-y-6">
   <div class="flex items-center justify-between gap-3">
     <h1 class="text-xl font-bold text-white">Add Screen</h1>
-    <a href="{{ url_for('screens') }}" class="text-xs text-slate-400 hover:text-white">← Screens</a>
+    <a href="{{ url_for('admin.screens') }}" class="text-xs text-slate-400 hover:text-white">← Screens</a>
   </div>
 
   {% if not theaters %}
     <div class="text-center space-y-3 py-4">
       <p class="text-xs text-amber-400">Add a theatre first.</p>
-      <a href="{{ url_for('add_theater') }}" class="inline-block px-4 py-2 bg-[#C9A84C] text-white text-xs font-semibold rounded-xl">+ Add Theatre</a>
+      <a href="{{ url_for('admin.add_theater') }}" class="inline-block px-4 py-2 bg-[#C9A84C] text-white text-xs font-semibold rounded-xl">+ Add Theatre</a>
     </div>
   {% else %}
     <form method="POST" class="space-y-4">

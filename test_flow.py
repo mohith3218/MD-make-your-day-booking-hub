@@ -22,9 +22,7 @@ for _key in ('SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'TMDB_API_KEY'):
 os.environ['ADMIN_PASSWORD'] = 'isolated-test-admin-password'
 # Keep this integration test isolated from the app's local or
 # deployment database, even when DATABASE_URL is present in the shell.
-_test_instance = Path(__file__).resolve().parent / 'instance'
-_test_instance.mkdir(exist_ok=True)
-_test_dir = tempfile.TemporaryDirectory(prefix='flow-', dir=_test_instance)
+_test_dir = tempfile.TemporaryDirectory(prefix='flow-')
 os.environ['DATABASE_URL'] = 'sqlite:///' + (Path(_test_dir.name) / 'flow.db').as_posix()
 os.environ['TEST_DATABASE_URL'] = os.environ['DATABASE_URL']
 os.environ['APP_ENV'] = 'testing'
@@ -381,7 +379,8 @@ def main():
     assert not any(rule.rule.startswith('/api/ai') for rule in A.app.url_map.iter_rules())
     home_html = c1.get('/').get_data(as_text=True).lower()
     assert 'cinebot-widget' not in home_html and 'ai booking assistant' not in home_html
-    assert 'cinewave-hero.jpg' in home_html
+    assert 'coastal-spotlight.jpg' not in home_html
+    assert 'cw-art-placeholder' in home_html and 'pushpa 3 - the rampage' in home_html
     print("12. all pages render (admin + user)")
 
     # ---- 14. admin analytics page + CSV export ---------------------------

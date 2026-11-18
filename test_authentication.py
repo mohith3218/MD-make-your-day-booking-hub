@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent
-_temporary = tempfile.TemporaryDirectory(prefix='auth-audit-', dir=ROOT / 'instance')
+_temporary = tempfile.TemporaryDirectory(prefix='auth-audit-')
 _database_url = 'sqlite:///' + (Path(_temporary.name) / 'auth-test.db').as_posix()
 os.environ.update(
     APP_ENV='testing', DATABASE_URL=_database_url, TEST_DATABASE_URL=_database_url,
@@ -35,7 +35,7 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         self.context = A.app.app_context()
         self.context.push()
-        A.app.config.update(TESTING=True)
+        A.app.config.update(TESTING=True, SESSION_PROTECTION='basic')
         A.app.config.update(BREVO_API_KEY='', BREVO_SENDER_EMAIL='',
                             PASSWORD_RESET_ORIGIN='')
         A.db.drop_all()
@@ -218,7 +218,7 @@ class AuthenticationTests(unittest.TestCase):
         def capture(account, token):
             token_value['token'] = token
             return True
-        with patch.object(A, 'send_password_recovery_email', side_effect=capture):
+        with patch('cinewave.routes.auth.send_password_recovery_email', side_effect=capture):
             csrf = self.csrf('/forgot-password')
             response = self.client.post('/forgot-password', data={'csrf_token': csrf, 'email': user.email})
         self.assertEqual(response.status_code, 303)
