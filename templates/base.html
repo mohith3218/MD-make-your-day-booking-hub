@@ -13,68 +13,14 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/coastal.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body id="app-body" class="{% if request.endpoint in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}cw-auth-shell {% endif %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
-
+<body id="app-body" class="{% block body_class %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300{% endblock %}">
   <a class="cine-skip" href="#main-content">Skip to content</a>
 
-  {% if request.endpoint in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}
-  <header class="cw-auth-brandbar"><a href="{{ url_for('auth.login') }}" class="cw-brand" aria-label="CineWave"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a></header>
-  {% else %}
-  <header class="cw-header">
-    <div class="cw-container cw-header-inner">
-      <a href="{{ url_for('main.home') }}" class="cw-brand" aria-label="CineWave home"><span id="site-logo-mark" class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
-      <span class="cw-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Visakhapatnam <span>(Jagadamba)</span></span>
-      <button id="cw-menu-toggle" class="cw-menu-toggle" type="button" aria-controls="cw-main-nav" aria-expanded="false" aria-label="Open navigation menu"><i class="fa-solid fa-bars" aria-hidden="true"></i><span>Menu</span></button>
-      <form method="get" action="{{ url_for('main.home') }}#movies" class="cw-search" role="search">
-        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input type="search" name="q" aria-label="Search movies" placeholder="Search movies in Vizag…" value="{{ search_query if request.endpoint == 'main.home' else '' }}">
-        {% if request.endpoint == 'main.home' %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
-        <button type="submit" aria-label="Search"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
-      </form>
-      <nav id="cw-main-nav" class="cw-nav" aria-label="Main navigation">
-        <a href="{{ url_for('main.home') }}#movies" {% if request.endpoint == 'main.home' %}aria-current="page"{% endif %}>Movies</a>
-        <a href="{{ url_for('movies.cine_match') }}" {% if request.endpoint == 'movies.cine_match' %}aria-current="page"{% endif %}>CineWatch</a>
-        <a href="{{ url_for('theatre_discovery.index') }}" {% if request.blueprint == 'theatre_discovery' %}aria-current="page"{% endif %}>Theatres</a>
-        <a href="{{ url_for('main.home') }}#coastal-standard">Offers</a>
-        <a href="{{ url_for('profile.dashboard') }}">SquadPay</a>
-      </nav>
-      <div class="cw-account">
-        {% if current_user.is_authenticated %}
-          <a class="cw-wallet" href="{{ url_for('wallet.wallet_page') }}"><i class="fa-solid fa-wallet" aria-hidden="true"></i> ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
-          <a class="cw-bookings-link" href="{{ url_for('profile.dashboard') }}" aria-label="My bookings" title="My bookings"><i class="fa-solid fa-ticket" aria-hidden="true"></i></a>
-        {% else %}
-          <a href="{{ url_for('auth.login') }}" class="cw-login">Sign in</a>
-        {% endif %}
-        <details class="cw-theme-menu">
-          <summary aria-label="Appearance settings" title="Appearance settings"><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i></summary>
-          <div class="cw-theme-options" role="group" aria-label="Color theme">
-            <strong>Appearance</strong>
-            <button type="button" data-theme-choice="system" aria-pressed="true">System default</button>
-            <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-            <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
-          </div>
-        </details>
-        {% if current_user.is_authenticated %}
-          <details class="cw-profile">
-            <summary aria-label="Account menu"><i class="fa-regular fa-user" aria-hidden="true"></i></summary>
-            <div class="cw-profile-menu">
-              <a href="{{ url_for('profile.profile') }}">My profile · {{ user_points }} Pts</a>
-              <a href="{{ url_for('profile.dashboard') }}">My bookings</a>
-              {% if current_user.is_admin %}<a href="{{ url_for('admin.admin') }}">Admin dashboard</a>{% endif %}
-              <form method="POST" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Log out</button></form>
-            </div>
-          </details>
-        {% else %}
-          <a href="{{ url_for('auth.register') }}" class="cw-profile-link" aria-label="Create an account"><i class="fa-regular fa-user" aria-hidden="true"></i></a>
-        {% endif %}
-      </div>
-    </div>
-  </header>
-  {% endif %}
+  {% block site_header %}{% endblock %}
 
   <main id="main-content" tabindex="-1" class="flex-1 w-full">
-    <div class="cw-main-wrap max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6">
-      {% if request.endpoint not in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}<div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>{% endif %}
+    <div class="{% block main_wrap_class %}cw-main-wrap max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6{% endblock %}">
+      {% block demo_notice %}{% endblock %}
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           {% for m in messages %}
@@ -86,20 +32,7 @@
     </div>
   </main>
 
-  {% if request.endpoint not in ('auth.login', 'auth.register', 'auth.verify_email', 'auth.forgot_password', 'auth.reset_password') %}<footer class="cw-footer">
-    <div class="cw-container">
-      <div class="cw-footer-grid">
-        <div class="cw-footer-about"><a href="{{ url_for('main.home') }}" class="cw-brand"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave Vizag</span></a><p>Curating cinematic journeys along the coast of Visakhapatnam. From heritage theatres at Jagadamba Junction to waterfront multiplexes on Beach Road.</p><small>PORT OF CINEMA · EST. 2024</small></div>
-        <div><h2>Vizag hubs</h2><a href="{{ url_for('main.home') }}#showtimes-section">Jagadamba Junction</a><a href="{{ url_for('main.home') }}#showtimes-section">Beach Road Promenades</a><a href="{{ url_for('main.home') }}#showtimes-section">Maddilapalem Multiplexes</a><a href="{{ url_for('main.home') }}#showtimes-section">Gajuwaka Screens</a><a href="{{ url_for('main.home') }}#showtimes-section">Madhurawada Cinemas</a></div>
-        <div><h2>Platform perks</h2><a href="{{ url_for('profile.dashboard') }}">Squad Pay Split</a><a href="{{ url_for('profile.profile') }}">CinePass Points</a><a href="{{ url_for('main.home') }}#coastal-standard">In-seat Snacks</a><a href="{{ url_for('wallet.wallet_page') }}">CineWave Wallet</a></div>
-        <div><h2>Your cinema, connected</h2><p>Made for Visakhapatnam</p><a href="{{ url_for('profile.dashboard') }}">Manage your bookings</a><a href="{{ url_for('profile.profile') }}">Your account</a><span class="cw-footer-demo">DEMO · No real money</span></div>
-      </div>
-      <div class="cw-footer-bottom"><span>© {{ 2026 }} CineWave. Crafted for Visakhapatnam cinephiles.</span><span>Demo tickets are not valid for theatre admission.</span></div>
-    </div>
-  </footer>{% endif %}
-
-
-
+  {% block site_footer %}{% endblock %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

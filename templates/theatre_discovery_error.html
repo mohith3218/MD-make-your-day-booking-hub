@@ -1,3 +1,3 @@
-{% extends "base.html" %}
+{% extends "public_base.html" %}
 {% block title %}Cinema discovery · CineWave{% endblock %}
 {% block content %}<section class="cw-empty" role="alert"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><h1>Let's find another screening.</h1><p>{{ message }}</p><a class="cw-button cw-button-primary" href="{{ url_for('theatre_discovery.index') }}">Explore theatres</a><a class="cw-button cw-button-white" href="{{ url_for('main.home') }}">Browse movies</a></section>{% endblock %}

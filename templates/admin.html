@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block title %}Admin Panel · MD CineWave{% endblock %}
 
 {% block content %}
@@ -25,20 +25,14 @@
   {% endfor %}
 </div>
 
-<div class="flex flex-wrap gap-3">
+<div class="cw-admin-quick-actions" aria-label="Quick actions">
   <a href="{{ url_for('admin.add_movie') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">+ Add Movie</a>
   <a href="{{ url_for('admin.import_movie') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-magnifying-glass mr-1"></i>TMDb Import</a>
   <a href="{{ url_for('admin.add_showtime') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Showtime</a>
   <a href="{{ url_for('admin.add_theater') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Theatre</a>
-  <a href="{{ url_for('admin.screens') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Theatres &amp; Screens</a>
-  <a href="{{ url_for('admin.admin_bookings') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">Bookings</a>
-  <a href="{{ url_for('admin.admin_analytics') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-chart-line mr-1"></i>Analytics</a>
-  <a href="{{ url_for('admin.admin_recharges') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">
-    Recharges{% if pending_recharges %} <span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">{{ pending_recharges }}</span>{% endif %}
-  </a>
 </div>
 
-<section class="glass-card rounded-2xl p-6 space-y-4">
+<section id="theatres" class="glass-card rounded-2xl p-6 space-y-4">
   <div class="flex items-center justify-between gap-3">
     <div>
       <h2 class="text-lg font-bold text-white">Theatres <span class="text-sm text-slate-500">({{ theaters|length }})</span></h2>
@@ -72,7 +66,7 @@
   </div>
 </section>
 
-<section class="glass-card rounded-2xl p-6 space-y-4">
+<section id="movies" class="glass-card rounded-2xl p-6 space-y-4">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 class="text-lg font-bold text-white">Movies <span class="text-sm text-slate-500">({{ movies|length }})</span></h2>
