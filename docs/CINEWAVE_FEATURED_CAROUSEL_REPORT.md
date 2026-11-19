@@ -8,13 +8,13 @@ The homepage selected one film automatically and rendered its portrait poster in
 
 ## Changes
 
-- Replaced the single spotlight with a responsive two-column carousel sourced from active `Movie` records. It displays at most five admin-ranked films.
+- Replaced the single spotlight with a responsive two-column carousel sourced from active `Movie` records. It displays at most five admin-ranked films; before an admin ranks any films, it automatically uses live showings first, then other active and upcoming records.
 - Added optional movie backdrop artwork and an ordered feature rank. TMDb imports save the backdrop from the same movie record; manually added movies can provide a backdrop URL.
 - Admins set ranks from the movie table or while adding/importing a movie. Moving/removing/archiving a film compacts ranks, and the list remains capped at five.
 - The landscape artwork frame uses the matching backdrop with `cover`, the matching poster with `contain`, and a title placeholder when no image is available. The track reserves the tallest slide's dimensions to keep navigation from jumping.
 - Added previous/next buttons, accessible indicators, keyboard navigation, touch swiping, reduced-motion handling, and lazy loading for non-first images. There is no autoplay.
 - Booking actions point to an actual upcoming show with seats remaining. Without one, the action opens the movie page. Trailer actions use only the movie's stored trailer.
-- Added the additive `20261119_01` migration and the SQLite development migration fields. Existing movie records receive no feature rank, so admins choose the first homepage lineup.
+- Added the additive `20261119_01` migration and the SQLite development migration fields. Existing records remain unranked; the live-catalogue fallback populates the hero until admins save an explicit order.
 - Implemented the trailer upload helper already called by admin movie forms; this stores randomly named MP4/WebM files under static media and keeps the form's 50 MB limit accurate.
 
 ## Verification

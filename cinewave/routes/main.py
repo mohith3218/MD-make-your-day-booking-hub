@@ -45,6 +45,22 @@ def home():
     featured_movies = (Movie.query.filter(
         Movie.is_archived.is_(False), Movie.featured_order.isnot(None)
     ).order_by(Movie.featured_order.asc(), Movie.id.asc()).limit(5).all())
+    # Keep the hero populated from the live catalogue until an administrator
+    # publishes an explicit feature order. Prefer real screenings with seats,
+    # then other active releases, and finally upcoming releases.
+    if not featured_movies:
+        fallback_movies = []
+        included_ids = set()
+        for show in scheduled_shows:
+            if show.movie_id not in included_ids:
+                fallback_movies.append(show.movie)
+                included_ids.add(show.movie_id)
+        for movie in (now_showing_releases + now_showing_rereleases
+                      + coming_soon_releases + coming_soon_rereleases):
+            if movie.id not in included_ids:
+                fallback_movies.append(movie)
+                included_ids.add(movie.id)
+        featured_movies = fallback_movies[:5]
     featured_shows_by_movie = {}
     featured_ids = {movie.id for movie in featured_movies}
     for show in scheduled_shows:

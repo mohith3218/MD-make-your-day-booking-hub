@@ -102,15 +102,30 @@ class FeaturedMovieTests(unittest.TestCase):
         self.assertNotIn('/book/', second_slide)
         self.assertIn('data-feature-next', html)
 
-    def test_empty_featured_list_has_a_clean_fallback_without_fabricated_movie(self):
-        self.make_movie('Not Featured Fixture', poster='https://images.test/not-featured.jpg')
+    def test_empty_active_catalogue_has_a_clean_fallback_without_fabricated_movie(self):
+        self.make_movie('Archived Unfeatured Fixture', is_archived=True,
+                        poster='https://images.test/not-featured.jpg')
         A.db.session.commit()
         html = self.viewer_client.get('/').get_data(as_text=True)
         self.assertIn('cw-feature-empty', html)
         self.assertIn('Stories made for the big screen.', html)
         self.assertNotIn('data-feature-slide', html)
-        self.assertNotIn('Not Featured Fixture', html.split('cw-feature-empty', 1)[1].split('</section>', 1)[0])
         self.assertNotIn('Browse screenings', html.split('cw-feature-empty', 1)[1].split('</section>', 1)[0])
+
+    def test_unranked_active_movies_populate_hero_until_admin_orders_them(self):
+        showing = self.make_movie('Fallback Showing Fixture',
+                                  poster='https://images.test/fallback-showing.jpg')
+        upcoming = self.make_movie('Fallback Upcoming Fixture', is_upcoming=True,
+                                   poster='https://images.test/fallback-upcoming.jpg')
+        show = self.add_show(showing, '6:00 PM')
+        self.make_movie('Archived Fallback Fixture', is_archived=True)
+        A.db.session.commit()
+        html = self.viewer_client.get('/').get_data(as_text=True)
+        self.assertIn('Fallback Showing Fixture', html)
+        self.assertIn('Fallback Upcoming Fixture', html)
+        self.assertNotIn('Archived Fallback Fixture', html)
+        first_slide = html.split('data-slide-index="0"', 1)[1].split('</article>', 1)[0]
+        self.assertIn(f'href="/book/{show.id}"', first_slide)
 
     def test_missing_artwork_uses_that_movies_title_placeholder(self):
         movie = self.make_movie('Artwork Missing Fixture', 1)
