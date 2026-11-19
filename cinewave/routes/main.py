@@ -42,11 +42,14 @@ def home():
     for show in scheduled_shows:
         if show.show_date in screening_dates:
             screening_groups.setdefault(show.show_date, {}).setdefault(show.theater, []).append(show)
-    current_movies = now_showing_releases + now_showing_rereleases
-    movies_with_shows = {show.movie_id for show in scheduled_shows}
-    spotlight = next((movie for movie in current_movies if movie.id in movies_with_shows),
-                     current_movies[0] if current_movies else None)
-    spotlight_shows = [show for show in scheduled_shows if spotlight and show.movie_id == spotlight.id]
+    featured_movies = (Movie.query.filter(
+        Movie.is_archived.is_(False), Movie.featured_order.isnot(None)
+    ).order_by(Movie.featured_order.asc(), Movie.id.asc()).limit(5).all())
+    featured_shows_by_movie = {}
+    featured_ids = {movie.id for movie in featured_movies}
+    for show in scheduled_shows:
+        if show.movie_id in featured_ids:
+            featured_shows_by_movie.setdefault(show.movie_id, show)
     active_category = request.args.get('category', 'showing').strip().lower()
     if active_category not in {'showing', 'upcoming'}:
         active_category = 'showing'
@@ -58,24 +61,27 @@ def home():
         coming_soon_releases = [movie for movie in coming_soon_releases if query_lower in movie.title.casefold()]
         coming_soon_rereleases = [movie for movie in coming_soon_rereleases if query_lower in movie.title.casefold()]
     upcoming_ids = [movie.id for movie in coming_soon_releases + coming_soon_rereleases]
+    hype_ids = list(dict.fromkeys(upcoming_ids + [
+        movie.id for movie in featured_movies if movie.is_upcoming
+    ]))
     hype_counts = {movie_id: {'HYPED': 0, 'SUPER_HYPED': 0, 'EXTREME_HYPED': 0}
-                   for movie_id in upcoming_ids}
-    if upcoming_ids:
+                   for movie_id in hype_ids}
+    if hype_ids:
         for movie_id, level, count in db.session.query(
                 MovieHypeVote.movie_id, MovieHypeVote.level, sa_func.count(MovieHypeVote.id)
-        ).filter(MovieHypeVote.movie_id.in_(upcoming_ids)).group_by(
+        ).filter(MovieHypeVote.movie_id.in_(hype_ids)).group_by(
                 MovieHypeVote.movie_id, MovieHypeVote.level):
             if level in hype_counts[movie_id]:
                 hype_counts[movie_id][level] = count
     hype_mine = {vote.movie_id: vote.level for vote in MovieHypeVote.query.filter(
-        MovieHypeVote.user_id == current_user.id, MovieHypeVote.movie_id.in_(upcoming_ids)).all()} if upcoming_ids else {}
+        MovieHypeVote.user_id == current_user.id, MovieHypeVote.movie_id.in_(hype_ids)).all()} if hype_ids else {}
 
     return render_template(
         'index.html',
-        spotlight=spotlight,
+        featured_movies=featured_movies,
         screening_dates=screening_dates,
         screening_groups=screening_groups,
-        spotlight_shows=spotlight_shows,
+        featured_shows_by_movie=featured_shows_by_movie,
         active_category=active_category,
         search_query=search_query,
         hype_counts=hype_counts,

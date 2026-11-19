@@ -70,7 +70,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 class="text-lg font-bold text-white">Movies <span class="text-sm text-slate-500">({{ movies|length }})</span></h2>
-      <p class="text-[11px] text-slate-500 mt-0.5">Update listing status, cast, and trailer sources.</p>
+      <p class="text-[11px] text-slate-500 mt-0.5">Update listing status, feature order, cast, and trailer sources. Choose up to five active films for the homepage.</p>
     </div>
     <form method="get" action="{{ url_for('admin.admin') }}" class="cw-admin-movie-search">
       <label class="sr-only" for="admin-movie-query">Search all movies, including archived</label>
@@ -111,6 +111,18 @@
             </td>
             <td class="p-3">
               <div class="flex min-w-[210px] flex-wrap items-center gap-1.5">
+                {% if m.is_archived %}<span class="basis-full text-[10px] text-slate-500">Archived movies are not featured.</span>{% else %}
+                <form method="POST" action="{{ url_for('admin.set_movie_featured_order', movie_id=m.id, q=movie_search, visibility=movie_visibility) }}" class="basis-full flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-2">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <label class="text-[10px] text-slate-400">Homepage feature order
+                    <select name="featured_order" aria-label="Featured order for {{ m.title }}" class="ml-1 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[10px] text-white">
+                      <option value="" {% if not m.featured_order %}selected{% endif %}>Not featured</option>
+                      {% for rank in range(1, 6) %}<option value="{{ rank }}" {% if m.featured_order == rank %}selected{% endif %}>{{ rank }}{% if rank == 1 %}st{% elif rank == 2 %}nd{% elif rank == 3 %}rd{% else %}th{% endif %}</option>{% endfor %}
+                    </select>
+                  </label>
+                  <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-[10px] font-semibold text-amber-200 hover:bg-amber-600 hover:text-white">Save feature</button>
+                </form>
+                {% endif %}
                 <details class="basis-full rounded-xl border border-slate-800 bg-slate-900/50 p-2">
                   <summary class="cursor-pointer list-none text-[11px] font-semibold text-amber-300 hover:text-amber-200">
                     <i class="fa-solid fa-film mr-1"></i>Manage trailer
@@ -121,7 +133,7 @@
                     <label class="block text-[10px] text-slate-400">YouTube trailer link or ID
                       <input type="text" name="youtube_trailer" value="{% if m.youtube_trailer_key %}https://youtu.be/{{ m.youtube_trailer_key }}{% endif %}" placeholder="Paste a YouTube link" aria-label="YouTube trailer for {{ m.title }}" class="mt-1 w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-[10px] text-white">
                     </label>
-                    <label class="block text-[10px] text-slate-400">Or upload MP4/WebM (up to 250 MB)
+                    <label class="block text-[10px] text-slate-400">Or upload MP4/WebM (up to 50 MB)
                       <input type="file" name="trailer_video" accept="video/mp4,video/webm,.mp4,.webm" aria-label="Upload trailer video for {{ m.title }}" class="mt-1 w-full text-[9px] text-slate-400">
                     </label>
                     <p class="text-[10px] text-slate-500">An uploaded video replaces the YouTube trailer.</p>

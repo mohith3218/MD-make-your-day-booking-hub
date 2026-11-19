@@ -9,6 +9,7 @@ APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "").strip()
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
+TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
 SEAT_LOCK_MINUTES = 8
 WELCOME_WALLET_BALANCE = 500
 PARTY_LIFETIME = timedelta(hours=2)

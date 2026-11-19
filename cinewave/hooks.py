@@ -64,6 +64,7 @@ def register_hooks(application):
         protected = {'auth.login', 'auth.register', 'auth.verify_email', 'auth.resend_email_otp',
                      'auth.logout', 'auth.forgot_password', 'auth.reset_password',
                      'wallet.wallet_convert_points', 'admin.import_movie_add',
+                     'admin.set_movie_featured_order',
                      'admin.verify_theater', 'admin.verify_screen', 'admin.archive_movie'}
         if request.method == 'POST' and request.endpoint in protected:
             expected = session.get('_csrf_token', '')

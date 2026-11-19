@@ -44,7 +44,7 @@ from cinewave.routes.booking import book, vr_seat_preview, checkout, split_pay, 
 from cinewave.routes.party import party_create, party_join, party_sync, party_leave, party_close
 from cinewave.routes.wallet import wallet_page, wallet_convert_points, wallet_recharge
 from cinewave.routes.profile import dashboard, profile, edit_profile
-from cinewave.routes.admin import admin, add_movie, update_movie_trailer, import_movie, import_movie_add, toggle_movie_status, fetch_cast, toggle_rerelease, delete_movie, add_theater, seed_vizag, screens, add_screen, edit_layout, edit_auditorium_reference, admin_auditorium_reference_file, add_showtime, admin_recharges, handle_recharge, admin_bookings, admin_analytics, admin_analytics_export
+from cinewave.routes.admin import admin, add_movie, update_movie_trailer, import_movie, import_movie_add, toggle_movie_status, set_movie_featured_order, fetch_cast, toggle_rerelease, delete_movie, add_theater, seed_vizag, screens, add_screen, edit_layout, edit_auditorium_reference, admin_auditorium_reference_file, add_showtime, admin_recharges, handle_recharge, admin_bookings, admin_analytics, admin_analytics_export
 from cinewave.routes.theatre import api_theatres, api_theatre_detail, api_screen_layout, screen_classes, seat_availability, showtime_live_info
 
 if __name__ == '__main__':

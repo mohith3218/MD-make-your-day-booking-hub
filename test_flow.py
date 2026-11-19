@@ -380,7 +380,10 @@ def main():
     home_html = c1.get('/').get_data(as_text=True).lower()
     assert 'cinebot-widget' not in home_html and 'ai booking assistant' not in home_html
     assert 'coastal-spotlight.jpg' not in home_html
-    assert 'cw-art-placeholder' in home_html and 'pushpa 3 - the rampage' in home_html
+    feature_html = home_html.split('data-feature-carousel', 1)[1].split('</section>', 1)[0]
+    assert 'cw-feature-empty' in feature_html
+    empty_feature = feature_html.split('cw-feature-empty', 1)[1]
+    assert 'pushpa 3 - the rampage' not in empty_feature
     print("12. all pages render (admin + user)")
 
     # ---- 14. admin analytics page + CSV export ---------------------------

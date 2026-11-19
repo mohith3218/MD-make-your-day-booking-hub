@@ -1,8 +1,54 @@
 from flask import Blueprint
+from pathlib import Path
 from urllib.parse import urlsplit
 from ._support import *
 
 bp = Blueprint("admin", __name__)
+MAX_FEATURED_MOVIES = 5
+
+
+def save_trailer_upload(upload):
+    """Store an optional MP4/WebM with a random name under the static media path."""
+    if not upload or not upload.filename:
+        return None
+    suffix = Path(upload.filename).suffix.lower()
+    if suffix not in {'.mp4', '.webm'}:
+        raise ValueError('Trailer uploads must be MP4 or WebM files.')
+    filename = secrets.token_hex(16) + suffix
+    relative_path = Path('uploads') / 'trailers' / filename
+    target = Path(app.static_folder) / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    upload.save(target)
+    return relative_path.as_posix()
+
+
+def _apply_featured_order(movie, position):
+    """Insert or remove an active movie, then compact the ordered feature list."""
+    movie.featured_order = None
+    db.session.flush()
+    ordered = (Movie.query.filter(Movie.is_archived.is_(False),
+                                  Movie.featured_order.isnot(None))
+               .order_by(Movie.featured_order.asc(), Movie.id.asc()).all())
+    ordered = [item for item in ordered if item.id != movie.id]
+    if position is not None:
+        ordered.insert(min(position - 1, len(ordered)), movie)
+    for item in ordered[MAX_FEATURED_MOVIES:]:
+        item.featured_order = None
+    for rank, item in enumerate(ordered[:MAX_FEATURED_MOVIES], start=1):
+        item.featured_order = rank
+
+
+def _parse_featured_position(raw_value):
+    value = (raw_value or '').strip()
+    if not value:
+        return None
+    try:
+        position = int(value)
+    except ValueError:
+        abort(400, description='Featured order must be between 1 and 5.')
+    if not 1 <= position <= MAX_FEATURED_MOVIES:
+        abort(400, description='Featured order must be between 1 and 5.')
+    return position
 
 
 @bp.route('/admin')
@@ -43,6 +89,7 @@ def add_movie():
     if guard:
         return guard
     if request.method == 'POST':
+        featured_position = _parse_featured_position(request.form.get('featured_order'))
         try:
             trailer_path = save_trailer_upload(request.files.get('trailer_video'))
         except ValueError as exc:
@@ -69,6 +116,7 @@ def add_movie():
                       description=request.form['description'],
                       duration=int(request.form['duration']),
                       poster=request.form.get('poster', '').strip() or None,
+                      backdrop=request.form.get('backdrop', '').strip() or None,
                       language=request.form.get('language', 'Telugu'),
                       certificate=request.form.get('certificate', 'U/A'),
                       is_upcoming=is_upcoming,
@@ -77,6 +125,9 @@ def add_movie():
                       youtube_trailer_key=trailer_key or None,
                       trailer_video_path=trailer_path)
         db.session.add(movie)
+        db.session.flush()
+        if featured_position is not None:
+            _apply_featured_order(movie, featured_position)
         db.session.commit()
         cat_label = 'Coming Soon' if is_upcoming else 'Now Showing'
         rel_label = ' (Re-Release)' if is_rerelease else ''
@@ -162,6 +213,7 @@ def import_movie_add(tmdb_id):
         if existing:
             flash(f'"{existing.title}" is already stored in CineWave.')
             return redirect(url_for('movies.movie_detail', movie_id=existing.id), code=303)
+        featured_position = _parse_featured_position(request.form.get('featured_order'))
         try:
             trailer_path = save_trailer_upload(request.files.get('trailer_video'))
         except ValueError as exc:
@@ -183,6 +235,7 @@ def import_movie_add(tmdb_id):
         if not isinstance(res, dict) or res.get('id') != tmdb_id or not res.get('title'):
             raise ValueError('TMDb returned invalid movie details.')
         poster_path = res.get('poster_path')
+        backdrop_path = res.get('backdrop_path')
         category = request.form.get('category', 'showing')
         is_upcoming = (category == 'upcoming')
         is_rerelease = (request.form.get('release_type', 'fresh') == 'rerelease')
@@ -199,6 +252,7 @@ def import_movie_add(tmdb_id):
                       description=res.get('overview', 'No overview available.'),
                       duration=res.get('runtime') or 120,
                       poster=f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
+                      backdrop=f"{TMDB_BACKDROP_BASE}{backdrop_path}" if backdrop_path else None,
                       language=(res.get('original_language') or 'te').upper(),
                       is_upcoming=is_upcoming,
                       is_rerelease=is_rerelease,
@@ -207,6 +261,9 @@ def import_movie_add(tmdb_id):
                       youtube_trailer_key=trailer_key or None,
                       trailer_video_path=trailer_path)
         db.session.add(movie)
+        db.session.flush()
+        if featured_position is not None:
+            _apply_featured_order(movie, featured_position)
         db.session.commit()
 
         # Credits are fetched for the exact selected TMDb ID.
@@ -245,6 +302,27 @@ def toggle_movie_status(movie_id):
     return redirect(url_for('admin.admin'))
 
 
+@bp.route('/admin/movie/<int:movie_id>/feature', methods=['POST'])
+@login_required
+def set_movie_featured_order(movie_id):
+    guard = admin_required()
+    if guard:
+        return guard
+    movie = Movie.query.get_or_404(movie_id)
+    if movie.is_archived:
+        abort(400, description='Archived movies cannot be featured.')
+    position = _parse_featured_position(request.form.get('featured_order'))
+    _apply_featured_order(movie, position)
+    db.session.commit()
+    action = f'featured at position {position}' if position else 'removed from featured movies'
+    flash(f'"{movie.title}" was {action}.')
+    visibility = request.args.get('visibility', 'active')
+    if visibility not in {'active', 'archived', 'all'}:
+        visibility = 'active'
+    return redirect(url_for('admin.admin', q=request.args.get('q', ''),
+                            visibility=visibility), code=303)
+
+
 @bp.route('/admin/movie/<int:movie_id>/archive', methods=['POST'])
 @login_required
 def archive_movie(movie_id):
@@ -253,6 +331,8 @@ def archive_movie(movie_id):
         return guard
     movie = Movie.query.get_or_404(movie_id)
     movie.is_archived = not movie.is_archived
+    if movie.is_archived:
+        _apply_featured_order(movie, None)
     db.session.commit()
     action = 'archived' if movie.is_archived else 'restored to the catalogue'
     flash(f'"{movie.title}" was {action}. Its booking and rating history was preserved.')

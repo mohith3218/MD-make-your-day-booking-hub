@@ -107,9 +107,11 @@ class CatalogFeatureTests(unittest.TestCase):
 
     def test_home_uses_each_movies_own_poster(self):
         first = A.Movie(title='Poster Mapping Fixture One', description='Poster test',
-                        duration=110, poster='https://image.tmdb.org/t/p/w500/fixture-one.jpg')
+                        duration=110, poster='https://image.tmdb.org/t/p/w500/fixture-one.jpg',
+                        featured_order=1)
         second = A.Movie(title='Poster Mapping Fixture Two', description='Poster test',
-                         duration=115, poster='https://image.tmdb.org/t/p/w500/fixture-two.jpg')
+                         duration=115, poster='https://image.tmdb.org/t/p/w500/fixture-two.jpg',
+                         featured_order=2)
         A.db.session.add_all([first, second])
         A.db.session.flush()
         A.db.session.add_all([

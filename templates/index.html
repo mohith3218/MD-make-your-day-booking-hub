@@ -2,26 +2,7 @@
 {% block title %}CineWave · A little closer to cinema{% endblock %}
 {% block content %}
 <div class="cw-home">
-  <section class="cw-hero" aria-labelledby="spotlight-title">
-    <div class="cw-container cw-hero-grid">
-      <div class="cw-hero-copy">
-        <div class="cw-badges"><span class="cw-badge cw-badge-solid"><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i> Coastal spotlight</span><span class="cw-badge">The big-screen experience</span><span class="cw-heritage"><i class="fa-solid fa-water" aria-hidden="true"></i> Made for Vizag</span></div>
-        {% if spotlight %}
-        <h1 id="spotlight-title">{{ spotlight.title }}</h1>
-        <p class="cw-credits">{% if spotlight.cast_info.director %}Directed by <strong>{{ spotlight.cast_info.director }}</strong><span>·</span>{% endif %}{{ spotlight.language or 'Cinema' }}{% if spotlight.release_date %}<span>·</span>{{ spotlight.release_date.strftime('%d %b %Y') }}{% endif %}<span>·</span>{{ spotlight.duration }} minutes<span>·</span>{{ spotlight.certificate or 'U/A' }}</p>
-        {% else %}<p class="cw-overline">The coast. The crowd. The cinema.</p><h1 id="spotlight-title">Make your day.<br><em>Make it cinema.</em></h1><p class="cw-credits">Extraordinary stories, right here in Visakhapatnam.</p>{% endif %}
-        <div class="cw-editorial-quote"><p>“From the roar of Jagadamba to the sea breeze on Beach Road. Every great story deserves a screen that does it justice.”</p><div><span>Your city. Your cinema.</span><span><i class="fa-regular fa-circle-check" aria-hidden="true"></i> The CineWave experience</span></div></div>
-        <div class="cw-hero-proof">{% if spotlight %}<div class="cw-rating"><span class="cw-rating-star">★</span><div><strong>{{ '%.1f'|format(spotlight.display_rating) }} <small>/ {{ 5 if spotlight.user_ratings else 10 }}</small></strong><span>{{ spotlight.user_ratings|length }} community ratings</span></div></div>{% endif %}<p><i class="fa-solid fa-masks-theater" aria-hidden="true"></i> Big-screen memories, from <strong>Jagadamba to Beach Road</strong></p></div>
-        <div class="cw-hero-actions">{% if spotlight_shows|length == 1 %}<a class="cw-button cw-button-primary" href="{{ url_for('booking.book', showtime_id=spotlight_shows[0].id) }}"><i class="fa-solid fa-ticket" aria-hidden="true"></i> Book Tickets Now</a>{% elif spotlight_shows %}<details class="cw-book-chooser"><summary class="cw-button cw-button-primary"><i class="fa-solid fa-ticket" aria-hidden="true"></i> Book Tickets Now</summary><div class="cw-book-chooser-menu"><strong>Choose a screening</strong>{% for show in spotlight_shows %}<a href="{{ url_for('booking.book', showtime_id=show.id) }}"><span>{{ show.theater }} · {{ show.screen_label }}</span><small>{{ show.show_date.strftime('%a, %d %b') }} · {{ show.show_time }} · {{ show.seats_left }} seats left</small></a>{% endfor %}</div></details>{% else %}<a class="cw-button cw-button-primary" href="{{ url_for('theatre_discovery.index') }}"><i class="fa-solid fa-ticket" aria-hidden="true"></i> Browse screenings</a>{% endif %}{% if spotlight %}<a class="cw-button cw-button-white" href="{{ url_for('movies.movie_detail', movie_id=spotlight.id) }}"><i class="fa-regular fa-circle-play" aria-hidden="true"></i> Explore the Film</a><span class="cw-runtime">{{ spotlight.duration }} min · {{ spotlight.certificate or 'U/A' }} Rated</span>{% endif %}</div>
-      </div>
-      <figure class="cw-hero-art{% if not spotlight or not spotlight.poster %} cw-art-missing{% endif %}" aria-label="{% if spotlight %}{{ spotlight.title }} poster{% else %}CineWave spotlight{% endif %}">
-        {% if spotlight and spotlight.poster %}<img src="{{ spotlight.poster }}" alt="{{ spotlight.title }} poster" fetchpriority="high" decoding="async" onerror="this.hidden=true;this.parentElement.classList.add('cw-art-missing')">{% endif %}
-        <div class="cw-art-placeholder" aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ spotlight.title if spotlight else 'Stories made for the big screen' }}</span></div>
-        <div class="cw-art-shade" aria-hidden="true"></div>
-        <figcaption class="cw-art-caption"><div><span>{% if spotlight_shows %}Now showing in Visakhapatnam{% else %}Explore the film{% endif %}</span><p>{% if spotlight_shows %}{{ spotlight_shows[0].theater }} · {{ spotlight_shows[0].screen_label }}{% elif spotlight %}{{ spotlight.title }}{% else %}CineWave · Visakhapatnam{% endif %}</p></div>{% if spotlight_shows %}<a class="cw-art-select-show" href="{{ url_for('booking.book', showtime_id=spotlight_shows[0].id) }}">Select Show <span aria-hidden="true">→</span></a>{% else %}<a class="cw-art-select-show" href="{{ url_for('theatre_discovery.index') }}">Explore theatres <span aria-hidden="true">→</span></a>{% endif %}</figcaption>
-      </figure>
-    </div>
-  </section>
+  {% include "partials/featured_movies.html" %}
   <section class="cw-container td-home-entry" aria-labelledby="explore-theatres-title">
     <div><p class="cw-overline">A different way to find your film</p><h2 id="explore-theatres-title">Explore by Theatre</h2><p>Start with your favourite cinema. Discover the films and screenings actually playing there.</p></div>
     <a class="cw-button cw-button-primary" href="{{ url_for('theatre_discovery.index') }}"><i class="fa-solid fa-building" aria-hidden="true"></i> Explore theatres <span aria-hidden="true">→</span></a>
@@ -78,4 +59,5 @@
   filter();
 })();
 </script>
+<script src="{{ url_for('static', filename='js/featured-movies.js') }}" defer></script>
 {% endblock %}

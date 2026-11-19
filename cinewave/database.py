@@ -34,6 +34,7 @@ def auto_migrate():
                  ('created_at', 'DATETIME'), ('bio', "VARCHAR(250) DEFAULT 'Cinema lover & movie enthusiast.'")],
         'movie': [('language', "VARCHAR(50)"), ('certificate', "VARCHAR(10)"),
                   ('rating', 'FLOAT DEFAULT 8.5'),
+                  ('backdrop', 'VARCHAR(500)'), ('featured_order', 'INTEGER'),
                   ('is_upcoming', 'BOOLEAN DEFAULT 0'), ('release_date', 'DATE'),
                   ('is_rerelease', 'BOOLEAN DEFAULT 0'), ('moods_json', "TEXT DEFAULT '[]'"),
                   ('is_archived', 'BOOLEAN NOT NULL DEFAULT 0'),

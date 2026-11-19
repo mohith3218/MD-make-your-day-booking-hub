@@ -17,6 +17,8 @@ class Movie(db.Model):
     description = db.Column(db.Text, nullable=False)
     duration = db.Column(db.Integer, nullable=False)
     poster = db.Column(db.String(500), nullable=True)
+    backdrop = db.Column(db.String(500), nullable=True)
+    featured_order = db.Column(db.Integer, nullable=True)
     language = db.Column(db.String(50), nullable=True, default='Telugu')
     certificate = db.Column(db.String(10), nullable=True, default='U/A')
     rating = db.Column(db.Float, default=8.5)
