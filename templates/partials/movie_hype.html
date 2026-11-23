@@ -1,0 +1,14 @@
+{% macro hype(movie, counts, selected, return_to, csrf_token) %}
+<form method="post" action="{{ url_for('movies.vote_movie_hype', movie_id=movie.id) }}" class="cw-hype-votes" aria-label="Hype votes for {{ movie.title }}" data-hype-form>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="return_to" value="{{ return_to }}">
+  {% for level, label, icon in [('HYPED','Hyped','fa-bolt'), ('SUPER_HYPED','Super Hyped','fa-fire'), ('EXTREME_HYPED','Extreme Hyped','fa-star')] %}
+  <button type="submit" name="level" value="{{ level }}" aria-pressed="{{ 'true' if selected == level else 'false' }}" class="cw-hype-choice">
+    <i class="fa-solid {{ icon }} cw-hype-icon" aria-hidden="true"></i>
+    <span>{{ label }}<span class="cw-selected-mark" aria-hidden="true"> ✓</span></span>
+    <span class="cw-hype-count"><span class="cw-sr-only">Votes </span><span data-vote-count>{{ counts[level] }}</span></span>
+  </button>
+  {% endfor %}
+  <p data-hype-status role="status"></p>
+</form>
+{% endmacro %}

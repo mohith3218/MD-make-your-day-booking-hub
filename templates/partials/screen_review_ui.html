@@ -1,0 +1,27 @@
+{% macro csrf(token) %}
+  <input type="hidden" name="csrf_token" value="{{ token }}">
+{% endmacro %}
+
+{% macro summary(score, label) %}
+  <p class="cw-review-summary">
+    {% if score %}
+      <span><strong><span aria-hidden="true">★</span> {{ '%.1f'|format(score.overall_rating) }}/5</strong> {{ label }}</span>
+      <span>{{ score.count }} review{{ '' if score.count == 1 else 's' }}</span>
+    {% else %}
+      <strong>Not rated yet</strong><span>0 reviews</span>
+    {% endif %}
+  </p>
+{% endmacro %}
+
+{% macro verified_count(score) %}
+  {% set count = score.verified if score else 0 %}
+  <p>{{ count }} verified booking review{{ '' if count == 1 else 's' }}</p>
+{% endmacro %}
+
+{% macro category_scores(score) %}
+  <dl class="cw-review-metrics">
+    {% for field, label in [('sound_rating', 'Sound'), ('ac_rating', 'AC'), ('comfort_rating', 'Seat comfort')] %}
+    <div><dt>{{ label }}</dt><dd>{{ ('%.1f'|format(score[field])) ~ '/5' if score and score[field] is not none else 'Unrated' }}</dd></div>
+    {% endfor %}
+  </dl>
+{% endmacro %}

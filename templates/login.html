@@ -1,6 +1,5 @@
 {% extends "auth_base.html" %}
 {% block title %}Sign in · CineWave{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">{% endblock %}
 {% block content %}
 <section class="cw-auth" aria-labelledby="auth-title">
   <div class="cw-auth-layout">
@@ -27,4 +26,3 @@
   </div>
 </section>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>{% endblock %}

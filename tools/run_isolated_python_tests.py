@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MODULES = (
     'test_authentication',
     'test_theatre_discovery',
+    'test_screen_reviews',
     'test_party',
     'test_demo_payments',
     'test_database_migration',

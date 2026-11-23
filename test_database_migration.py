@@ -1,5 +1,8 @@
 """Migration safety tests. Only temporary SQLite files are ever written."""
 import copy
+from datetime import date
+from importlib import import_module
+from io import StringIO
 import json
 import os
 from pathlib import Path
@@ -15,8 +18,10 @@ from alembic import command
 from alembic.config import Config
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.pool import NullPool
 from sqlalchemy.schema import CreateTable
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -27,6 +32,53 @@ from migrate_sqlite_to_postgres import backup_source, read_snapshot, transfer, M
 
 
 class MigrationTests(unittest.TestCase):
+    def test_screen_review_upgrade_preserves_existing_booking_and_catalog_rows(self):
+        legacy = create_engine('sqlite:///' + (self.folder / 'before-screen-reviews.db').as_posix(),
+                               poolclass=NullPool)
+        self.addCleanup(legacy.dispose)
+        cfg = Config(str(Path(__file__).with_name('alembic.ini')))
+        rows = {
+            'user': dict(id=10, username='review_migration', password_hash='recorded'),
+            'theater': dict(id=11, name='Existing theatre'),
+            'screen': dict(id=12, theater_id=11, name='Existing screen', layout_json='{}'),
+            'movie': dict(id=13, title='Existing film', description='Fixture', duration=110),
+            'showtime': dict(id=14, movie_id=13, screen_id=12, theater='Existing theatre',
+                             show_date=date(2025, 1, 1), show_time='19:30'),
+            'booking': dict(id=15, user_id=10, showtime_id=14, seats='A1', status='PAID', total_amount=120),
+            'payment': dict(id=16, booking_id=15, gateway='historical', status='CAPTURED'),
+            'movie_rating': dict(id=17, user_id=10, movie_id=13, rating=4),
+            'movie_hype_vote': dict(id=18, user_id=10, movie_id=13, level='SUPER_HYPED'),
+        }
+        with legacy.begin() as conn:
+            cfg.attributes['connection'] = conn
+            command.upgrade(cfg, '20261119_01')
+            for name, values in rows.items():
+                conn.execute(db.metadata.tables[name].insert(), values)
+            before = {name: conn.execute(select(db.metadata.tables[name])).mappings().all() for name in rows}
+        with legacy.begin() as conn:
+            cfg.attributes['connection'] = conn
+            command.upgrade(cfg, 'head')
+            after = {name: conn.execute(select(db.metadata.tables[name])).mappings().all() for name in rows}
+            self.assertEqual(before, after)
+            for name in ('screen_review', 'screen_review_report', 'screen_review_moderation'):
+                self.assertEqual(conn.execute(select(db.metadata.tables[name])).all(), [])
+        self.assertTrue(check_database(legacy, db.metadata)['ok'])
+
+    def test_screen_review_migration_emits_additive_postgres_ddl(self):
+        output = StringIO()
+        context = MigrationContext.configure(dialect_name='postgresql',
+                                             opts={'as_sql': True, 'output_buffer': output})
+        with Operations.context(context):
+            import_module('migrations.versions.20261123_01_screen_reviews').upgrade()
+        ddl = output.getvalue()
+        for suffix in ('', '_report', '_moderation'):
+            self.assertIn(f'CREATE TABLE screen_review{suffix} (', ddl)
+        self.assertIn('REFERENCES booking (id)', ddl)
+        self.assertIn('UNIQUE (booking_id)', ddl)
+        self.assertIn('TIMESTAMP WITHOUT TIME ZONE', ddl)
+        for operation in ('DROP ', 'DELETE ', 'UPDATE ', 'ALTER TABLE '):
+            self.assertNotIn(operation, ddl)
+
     def test_legacy_party_and_jagadamba_upgrade(self):
         import vizag_theaters as theaters
         import seat_layout as sl

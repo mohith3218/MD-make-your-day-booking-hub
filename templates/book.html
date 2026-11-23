@@ -12,15 +12,7 @@
     </p>
     <p class="text-xs text-slate-400">{{ showtime.show_date.strftime('%a, %d %b %Y') }} · {{ showtime.show_time }}</p>
 
-    <!-- 🛋️ Theater Comfort Score Badge -->
-    <div class="flex items-center gap-2 mt-2 flex-wrap">
-      <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold flex items-center gap-1.5">
-        <i class="fa-solid fa-couch text-xs"></i> Comfort {{ screen.comfort_score }}/5.0
-      </span>
-      <span class="text-[11px] text-slate-400">
-        {{ screen.comfort_features|join(' · ') }}
-      </span>
-    </div>
+    <a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=screen.theater_id, screen_id=screen.id) }}">Read screen reviews <span aria-hidden="true">→</span></a>
 
     {# Live countdown to show start #}
     {% if showtime.show_datetime %}
@@ -41,19 +33,19 @@
 
     <div class="flex items-center gap-2 flex-wrap justify-end">
       <!-- 🎬 Watch Official Trailer (shows the same view you will get from your chosen seat) -->
-      <button type="button" onclick="openTrailerWithSeatPOV()" class="px-3 py-2 bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 text-amber-300 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-amber-600/10">
+      <button type="button" onclick="openTrailerWithSeatPOV()" class="cw-button cw-button-white">
         <i class="fa-solid fa-circle-play text-sm"></i>
         <span>Trailer · Seat POV</span>
       </button>
 
       <!-- 👓 3D / AR Seat View Preview -->
-      <button type="button" onclick="open3dArModal()" class="px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600 border border-cyan-500/30 text-cyan-300 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-cyan-600/10">
+      <button type="button" onclick="open3dArModal()" class="cw-button cw-button-white">
         <i class="fa-solid fa-vr-cardboard text-sm"></i>
         <span>Seat preview</span>
       </button>
 
       <!-- 🎉 WATCH TOGETHER PARTY BUTTON -->
-      <button type="button" onclick="initOrShowParty()" class="px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-600/20 flex items-center gap-1.5">
+      <button type="button" onclick="initOrShowParty()" class="cw-button cw-button-primary">
         <span>🎉 Party</span>
         <span class="text-[9px] px-1.5 py-0.5 bg-white/20 rounded-full font-mono" id="party-btn-badge">
           {% if party_code %}Code: {{ party_code }}{% else %}Squad{% endif %}
@@ -66,8 +58,8 @@
 <div class="flex flex-wrap items-center gap-2">
   <label for="party-code-input" class="text-xs text-slate-300">Join Watch Together</label>
   <input id="party-code-input" maxlength="6" placeholder="Party code" autocomplete="off" class="w-32 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase text-white">
-  <button type="button" onclick="joinPartyCode()" class="rounded-xl bg-purple-700 px-3 py-2 text-xs font-bold text-white">Join party</button>
-  <span id="party-status" role="status" aria-live="polite" class="text-xs text-purple-300"></span>
+  <button type="button" onclick="joinPartyCode()" class="cw-button cw-button-white">Join party</button>
+  <span id="party-status" role="status" aria-live="polite" class="text-xs text-slate-400"></span>
 </div>
 <!-- 👥 WATCH TOGETHER SQUAD BANNER -->
 <div id="party-squad-banner" class="glass-card rounded-2xl p-4 border border-purple-500/30 bg-purple-950/20 space-y-3 {% if not party_code %}hidden{% endif %}">
@@ -191,20 +183,20 @@
     </div>
     <div>
       <p class="text-xs font-bold text-white flex items-center gap-2">
-        <span id="insp-zone-name">Hover or click a seat to inspect POV, Vibe, Sound & Exit Way</span>
+        <span id="insp-zone-name">Inspect a seat for viewing angles, audio estimates and the nearest exit</span>
       </p>
       <div class="flex items-center gap-2 mt-0.5 flex-wrap">
         <span class="text-[11px] text-indigo-300 font-medium" id="insp-badge">Smart Seat POV Inspector</span>
         <span class="text-[11px] text-slate-500">·</span>
         <span class="text-[11px] text-emerald-400 font-semibold" id="insp-vibe-badge">🎭 Vibe Tag</span>
         <span class="text-[11px] text-slate-500">·</span>
-        <span class="text-[11px] text-purple-400 font-semibold" id="insp-sound-profile">Dolby Atmos Spatial Audio</span>
+        <span class="text-[11px] text-purple-400 font-semibold">Estimates use seat position</span>
         <span class="text-[11px] text-slate-500">·</span>
         <span class="text-[11px] text-emerald-300 font-bold" id="insp-exit-info">🚪 Exit: --</span>
       </div>
     </div>
   </div>
-  <div class="flex items-center gap-5 text-xs text-slate-400 shrink-0">
+  <div class="grid grid-cols-3 gap-3 min-w-0 max-w-full items-center text-xs text-slate-400">
     <div class="text-right">
       <p class="text-[10px] text-slate-500 uppercase tracking-wider">Screen Distance</p>
       <p class="font-bold text-white text-sm" id="insp-dist">--</p>
@@ -214,7 +206,7 @@
       <p class="font-bold text-white text-sm" id="insp-angle">--</p>
     </div>
     <div class="text-right pl-2 border-l border-slate-800">
-      <p class="text-[10px] text-purple-400 uppercase tracking-wider font-bold">Sound Quality</p>
+      <p class="text-[10px] text-purple-400 uppercase tracking-wider font-bold">Audio Estimate</p>
       <p class="font-black text-purple-300 text-sm" id="insp-sound-score">--</p>
     </div>
   </div>
@@ -226,7 +218,7 @@
     <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
     <div class="min-w-0">
       <p class="font-extrabold text-white" id="pov-badge-title">Row C Seat 8 — Prime center</p>
-      <p class="text-[10px] text-slate-400" id="pov-badge-detail">12.5m · 38° FOV · 96% Dolby Atmos</p>
+      <p class="text-[10px] text-slate-400" id="pov-badge-detail"></p>
     </div>
   </div>
   <!-- Quick Inline Arrow & Exit Controls -->
@@ -292,7 +284,7 @@
       <p class="text-xs font-black text-white" id="ar-info-angle">--</p>
     </div>
     <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
-      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Dolby Atmos</p>
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Audio Estimate</p>
       <p class="text-xs font-black text-sky-400" id="ar-info-sound">--</p>
     </div>
     <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-emerald-500/30">
@@ -308,7 +300,7 @@
   {% endfor %}
   <input type="hidden" name="selected_seats" id="selected_seats_input">
 
-  <div id="seating-viewport" class="glass-card rounded-2xl p-4 sm:p-6 rowscroll transition-all duration-700">
+  <div id="seating-viewport" class="glass-card rounded-2xl p-4 sm:p-6 transition-all duration-700" role="region" aria-label="2D seat map" tabindex="0">
     <div id="seating-grid-container" class="min-w-max mx-auto space-y-1 transition-all duration-700 origin-bottom">
       <!-- Top Rear Exit Indicators on 2D Seat Map -->
       <div class="flex items-center justify-between px-2 pb-2 text-[10px] font-bold text-emerald-400">
@@ -351,10 +343,8 @@
                         data-pov-rows-ahead="{{ cell.pov.rows_ahead if cell.pov else '8' }}"
                         data-pov-row-index="{{ cell.pov.row_index if cell.pov else '0' }}"
                         data-pov-side-angle="{{ cell.pov.side_angle_deg if cell.pov else '0' }}"
-                        data-sound-score="{{ cell.pov.sound_score if cell.pov else '85' }}%"
+                        data-sound-score="{{ (cell.pov.sound_score ~ '%') if cell.pov else '' }}"
                         data-sound-exp="{{ cell.pov.sound_exp if cell.pov else 'Balanced Surround' }}"
-                        data-sound-badge="{{ cell.pov.sound_badge if cell.pov else '🔊 85% Spatial Audio' }}"
-                        data-sound-profile="{{ cell.pov.sound_profile if cell.pov else 'Dolby Atmos Spatial Audio' }}"
                         data-vibe-code="{{ cell.pov.vibe_code if cell.pov else 'FAMILY' }}"
                         data-vibe-badge="{{ cell.pov.vibe_badge if cell.pov else '👨‍👩‍👧 Family Zone' }}"
                         data-vibe-desc="{{ cell.pov.vibe_desc if cell.pov else '' }}"
@@ -471,8 +461,7 @@
     document.getElementById('insp-vibe-badge').textContent = elem.dataset.vibeBadge || '🎭 Standard Vibe';
     document.getElementById('insp-angle').textContent = elem.dataset.povAngle || '15°';
     document.getElementById('insp-dist').textContent = elem.dataset.povDist || '50%';
-    document.getElementById('insp-sound-score').textContent = elem.dataset.soundScore || '85%';
-    document.getElementById('insp-sound-profile').textContent = (elem.dataset.soundBadge || '🔊 Dolby Atmos') + ' · ' + (elem.dataset.soundProfile || 'Spatial Audio');
+    document.getElementById('insp-sound-score').textContent = elem.dataset.soundScore || '—';
     const exitEl = document.getElementById('insp-exit-info');
     if (exitEl) exitEl.textContent = `🚪 ${exitInfo.label}`;
 
@@ -1251,12 +1240,12 @@
     const seatNumber = elem.dataset.seatNumber || elem.dataset.seat.replace(/^\D+/, '');
     const distStr = elem.dataset.povDist || '50%';
     const angleStr = elem.dataset.povAngle || '16°';
-    const soundBadge = elem.dataset.soundBadge || '🔊 85% Spatial Audio';
+    const audioEstimate = elem.dataset.soundScore || '—';
     const exitInfo = computeExitInfo(elem);
 
     document.getElementById('ar-preview-subtitle').textContent = `Row ${rowLabel} · Seat ${seatNumber} (${elem.dataset.class || 'Standard'}) · 🚪 ${exitInfo.label}`;
     document.getElementById('pov-badge-title').textContent = `Row ${rowLabel} · Seat ${seatNumber} (${elem.dataset.class || 'Standard'})`;
-    document.getElementById('pov-badge-detail').textContent = `${distStr} distance · ${angleStr} neck tilt · ${soundBadge} · 🚪 ${exitInfo.label}`;
+    document.getElementById('pov-badge-detail').textContent = `${distStr} distance · ${angleStr} neck tilt · Audio estimate ${audioEstimate} · 🚪 ${exitInfo.label}`;
     document.getElementById('seat-pov-badge').classList.remove('hidden');
 
     const infoStrip = document.getElementById('ar-info-strip');
@@ -1266,7 +1255,7 @@
       document.getElementById('ar-info-dist').textContent = distStr;
       document.getElementById('ar-info-angle').textContent = `${angleStr} tilt`;
       const sndEl = document.getElementById('ar-info-sound');
-      if (sndEl) sndEl.textContent = soundBadge.replace(/^[^\w]+/, '');
+      if (sndEl) sndEl.textContent = audioEstimate;
       const extEl = document.getElementById('ar-info-exit');
       if (extEl) extEl.textContent = `${exitInfo.distMeters}m (${exitInfo.isLeft ? 'Left' : 'Right'})`;
     }

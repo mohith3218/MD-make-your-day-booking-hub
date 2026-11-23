@@ -1,11 +1,31 @@
 {% extends "public_base.html" %}
+{% from "partials/screen_review_ui.html" import summary, category_scores, verified_count %}
 {% block title %}{{ theatre.name }}{% if movie %} · {{ movie.title }}{% endif %} · CineWave{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/theatre-discovery.css') }}">{% endblock %}
 {% block content %}
 <div class="td-page">
   <nav class="td-breadcrumb" aria-label="Breadcrumb"><a href="{{ url_for('theatre_discovery.index') }}">Explore by Theatre</a><span aria-hidden="true">/</span>{% if movie %}<a href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id) }}">{{ theatre.name }}</a><span aria-hidden="true">/</span><span>{{ movie.title }}</span>{% else %}<span aria-current="page">{{ theatre.name }}</span>{% endif %}</nav>
   <header class="td-theatre-header"><div><p class="cw-overline">{{ theatre.city or 'Your cinema destination' }}</p><h1>{{ theatre.name }}</h1><p class="td-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>{{ theatre.location or 'Location not provided' }}</p>{% if theatre.address %}<p class="td-header-address">{{ theatre.address }}</p>{% endif %}</div><div class="td-screen-count"><strong>{{ theatre.screens|length }}</strong><span>auditorium{{ '' if theatre.screens|length == 1 else 's' }} to explore</span></div></header>
-  <details class="td-screen-directory"><summary>View available screens <span aria-hidden="true">＋</span></summary><div class="td-screen-chips">{% for screen in theatre.screens %}<span>{{ screen.name }}{% if screen.screen_type %} · {{ screen.screen_type }}{% endif %}</span>{% else %}<p>No screens have been configured for this theatre.</p>{% endfor %}</div></details>
+  <section id="theatre-screens" class="cw-review-list cw-theatre-screens" aria-labelledby="theatre-screens-title">
+    <div class="cw-review-header">
+      <h2 id="theatre-screens-title">Screens &amp; customer ratings</h2>
+      {{ summary(theatre_score, 'theatre rating') }}
+      {% if theatre_score %}<p>This theatre rating combines all published screen reviews, with each review counted once.</p>{% endif %}
+      <a class="cw-review-link" href="#td-show-heading">Jump to showtimes <span aria-hidden="true">↓</span></a>
+    </div>
+    <div class="cw-screen-grid">
+      {% for screen in theatre.screens|sort(attribute='name') %}
+        {% set score = screen_scores.get(screen.id) %}
+        <article class="cw-review-panel cw-screen-card">
+          <header><h3>{{ screen.name }}</h3>{% if screen.screen_type %}<p>{{ screen.screen_type }}</p>{% endif %}</header>
+          {{ summary(score, 'overall screen rating') }}
+          {{ category_scores(score) }}
+          {{ verified_count(score) }}
+          <a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=theatre.id, screen_id=screen.id) }}">View screen reviews <span aria-hidden="true">→</span><span class="cw-sr-only"> for {{ screen.name }}</span></a>
+        </article>
+      {% else %}<p>No screens have been configured for this theatre.</p>{% endfor %}
+    </div>
+  </section>
 
   <section aria-labelledby="td-show-heading"><div class="td-results-heading"><div><p class="cw-overline">{% if movie %}Your film. Your favourite cinema.{% else %}On the big screen{% endif %}</p><h2 id="td-show-heading">{% if movie %}{{ movie.title }} · Showtimes{% else %}Movies playing here{% endif %}</h2></div><span class="td-timezone">All show times: IST</span></div>
   {% if dates %}<nav class="cw-dates td-dates" aria-label="Choose a screening date">{% for day in dates %}<a class="cw-date {% if day == selected_date %}is-active{% endif %}" href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id, movie_id=movie.id if movie else none, date=day.isoformat(), language=filters.language, format=filters.format, screen=filters.screen, time=filters.time) }}" {% if day == selected_date %}aria-current="date"{% endif %}><small>{{ day.strftime('%a') }}</small><strong>{{ day.strftime('%d %b') }}</strong></a>{% endfor %}</nav>{% endif %}

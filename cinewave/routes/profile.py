@@ -1,5 +1,7 @@
 from flask import Blueprint
+from sqlalchemy.orm import joinedload
 from ._support import *
+from ..services.screen_reviews import review_invitation
 
 bp = Blueprint("profile", __name__)
 
@@ -9,8 +11,12 @@ bp = Blueprint("profile", __name__)
 def dashboard():
     purge_expired_holds()
     bookings = (Booking.query.filter_by(user_id=current_user.id)
+                .options(joinedload(Booking.screen_review), joinedload(Booking.payment),
+                         joinedload(Booking.showtime).joinedload(Showtime.movie),
+                         joinedload(Booking.showtime).joinedload(Showtime.screen))
                 .order_by(Booking.booked_at.desc()).all())
-    return render_template('dashboard.html', bookings=bookings)
+    review_states = {booking.id: review_invitation(booking, current_user.id) for booking in bookings}
+    return render_template('dashboard.html', bookings=bookings, review_states=review_states)
 
 
 @bp.route('/profile')

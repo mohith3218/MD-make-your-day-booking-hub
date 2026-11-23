@@ -470,12 +470,13 @@ def main():
     assert r.status_code == 200 and r.get_json()['has_spoiler'] is True
     print("19. Spoiler Shield OK - explicit and NLP keyword triggers detected")
 
-    # ---- 20. Theater & Screen Comfort Scores ---------------------------
+    # ---- 20. Screen reviews with no customer ratings -------------------
     with A.app.app_context():
         sc = A.Screen.query.filter(A.Screen.name.like('%Screen 1%')).first()
-        assert sc.comfort_score >= 4.5
-        assert len(sc.comfort_features) >= 2
-    print(f"20. Comfort Score OK - {sc.full_name} scored {sc.comfort_score}/5.0 with {len(sc.comfort_features)} features")
+        screen_review_path = f'/theatres/{sc.theater_id}/screens/{sc.id}/reviews'
+    r = c1.get(screen_review_path)
+    assert r.status_code == 200 and b'Not rated yet' in r.data
+    print("20. Screen reviews OK - unrated screens show an empty state")
 
     # Demo authorization, replay protection and split shares use the real routes.
     assert c1.post(f'/pay/simulate/{ref2}', data={'outcome': 'success'}).status_code == 403

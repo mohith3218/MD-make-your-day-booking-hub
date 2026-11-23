@@ -150,7 +150,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(vote.level, 'EXTREME_HYPED')
         self.assertEqual(A.MovieHypeVote.query.filter_by(movie_id=movie.id).count(), 1)
         page = self.client.get('/?category=upcoming')
-        self.assertIn(b'Extreme Hyped <span>1</span>', page.data)
+        self.assertRegex(page.text, r'(?s)value="EXTREME_HYPED" aria-pressed="true"[^>]*>.*?data-vote-count>1</span>')
 
     def test_unsafe_login_redirect_falls_back_to_home(self):
         user = self.add_user()

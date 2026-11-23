@@ -90,6 +90,26 @@
     </div>
   </div>
 
+  {% if screen_review_state %}
+    <section class="cw-review-panel cw-ticket-invitation" aria-labelledby="ticket-screen-review">
+      {% if screen_review_state == 'invite' %}
+        <h2 id="ticket-screen-review">How was your movie experience?</h2>
+        <p>Help other movie lovers choose the right screen.</p>
+      {% else %}
+        <h2 id="ticket-screen-review">Your screen review</h2>
+      {% endif %}
+      <div class="cw-review-actions">
+        <a class="cw-button cw-button-primary" href="{{ url_for('screen_reviews.edit', reference=booking.reference) }}">{{ 'Edit screen review' if screen_review_state == 'edit' else 'Review This Screen' }}</a>
+        {% if screen_review_state == 'invite' %}
+          <form method="post" action="{{ url_for('screen_reviews.dismiss', reference=booking.reference) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="cw-review-text-button" type="submit">Dismiss invitation</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
   <!-- Rate this Film Card -->
   <div class="glass-card rounded-2xl p-5 border border-amber-400/20 bg-[#171825]/90 text-center space-y-3">
     {% set user_score = movie.get_user_rating(current_user) if current_user.is_authenticated else None %}

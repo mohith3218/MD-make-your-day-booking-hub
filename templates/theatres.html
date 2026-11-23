@@ -1,4 +1,5 @@
 {% extends "public_base.html" %}
+{% from "partials/screen_review_ui.html" import summary as rating_summary %}
 {% block title %}Explore by Theatre · CineWave{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/theatre-discovery.css') }}">{% endblock %}
 {% block content %}
@@ -21,13 +22,17 @@
   <div class="td-venue-grid">
     {% for theatre in theatres %}
     <article class="td-venue-card">
-      <div class="td-venue-art" aria-hidden="true"><i class="fa-solid fa-clapperboard"></i><div class="td-art-seats">{% for seat in range(18) %}<span></span>{% endfor %}</div><span>{{ theatre.screens|length }} screen{{ '' if theatre.screens|length == 1 else 's' }}</span></div>
+      <div class="td-venue-art"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i><div class="td-art-seats" aria-hidden="true">{% for seat in range(18) %}<span></span>{% endfor %}</div><span>{{ theatre.screens|length }} screen{{ '' if theatre.screens|length == 1 else 's' }}</span></div>
       <div class="td-venue-content"><p class="cw-overline">{{ theatre.city or 'Cinema directory' }}</p><h3><a href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id) }}">{{ theatre.name }}</a></h3>
         <p class="td-location"><i class="fa-solid fa-location-dot" aria-hidden="true"></i>{{ theatre.location or 'Location not provided' }}</p>
         {% if theatre.address %}<p class="td-address">{{ theatre.address }}</p>{% endif %}
         <div class="td-screen-chips">{% for screen in theatre.screens[:3] %}<span>{{ screen.name }}{% if screen.screen_type %} · {{ screen.screen_type }}{% endif %}</span>{% endfor %}{% if theatre.screens|length > 3 %}<span>+{{ theatre.screens|length - 3 }} more</span>{% endif %}</div>
         <p class="td-schedule-count">{% if summary[theatre.id].shows %}{{ summary[theatre.id].movies|length }} film{{ '' if summary[theatre.id].movies|length == 1 else 's' }} · {{ summary[theatre.id].shows }} upcoming screening{{ '' if summary[theatre.id].shows == 1 else 's' }}{% else %}New screenings will appear when scheduled{% endif %}</p>
-        <a class="td-explore-link" href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id) }}">Explore Movies <span aria-hidden="true">→</span><span class="cw-sr-only"> at {{ theatre.name }}</span></a>
+        {{ rating_summary(review_scores.get(theatre.id), 'theatre rating') }}
+        <div class="cw-review-actions">
+          <a class="td-explore-link" href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id, _anchor='theatre-screens') }}">Explore Screens <span aria-hidden="true">→</span><span class="cw-sr-only"> at {{ theatre.name }}</span></a>
+          <a class="cw-review-link" href="{{ url_for('theatre_discovery.detail', theatre_id=theatre.id, _anchor='td-show-heading') }}">Explore Movies<span class="cw-sr-only"> at {{ theatre.name }}</span></a>
+        </div>
       </div>
     </article>
     {% else %}

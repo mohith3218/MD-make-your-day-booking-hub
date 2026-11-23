@@ -1,4 +1,6 @@
 from flask import Blueprint
+from sqlalchemy.dialects.postgresql import insert as postgres_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ._support import *
 
 bp = Blueprint("movies", __name__)
@@ -98,15 +100,20 @@ def vote_movie_hype(movie_id):
     level = request.form.get('level', '').strip().upper()
     if level not in {'HYPED', 'SUPER_HYPED', 'EXTREME_HYPED'}:
         abort(400, description='Choose a valid hype level.')
-    vote = MovieHypeVote.query.filter_by(user_id=current_user.id, movie_id=movie.id).first()
-    if vote:
-        vote.level = level
-        vote.updated_at = datetime.utcnow()
-    else:
-        vote = MovieHypeVote(user_id=current_user.id, movie_id=movie.id, level=level)
-        db.session.add(vote)
+    insert = postgres_insert if db.engine.dialect.name == 'postgresql' else sqlite_insert
+    vote = insert(MovieHypeVote).values(user_id=current_user.id, movie_id=movie.id, level=level)
+    db.session.execute(vote.on_conflict_do_update(
+        index_elements=[MovieHypeVote.user_id, MovieHypeVote.movie_id],
+        set_={'level': vote.excluded.level, 'updated_at': datetime.utcnow()},
+        where=MovieHypeVote.level != vote.excluded.level,
+    ))
+    counts = MovieHypeVote.counts_for(movie.id)
     db.session.commit()
+    if request.accept_mimetypes.best == 'application/json':
+        return jsonify(selected=level, counts=counts)
     flash(f'Your hype for {movie.title} is now {level.replace("_", " ").title()}.')
+    if request.form.get('return_to') == 'movie':
+        return redirect(url_for('.movie_detail', movie_id=movie.id) + '#movie-hype', code=303)
     return redirect(url_for('main.home', category='upcoming') + '#movies', code=303)
 
 
@@ -127,8 +134,10 @@ def movie_detail(movie_id):
     for s in shows:
         grouped.setdefault(s.show_date, {}).setdefault(s.theater, []).append(s)
 
-    return render_template('movie.html', movie=movie, showtimes=shows,
-                           grouped=grouped)
+    hype_counts = MovieHypeVote.counts_for(movie.id) if movie.is_upcoming and not movie.is_archived else {}
+    vote = MovieHypeVote.query.filter_by(user_id=current_user.id, movie_id=movie.id).first() if hype_counts else None
+    return render_template('movie.html', movie=movie, showtimes=shows, grouped=grouped,
+                           movie_hype_counts=hype_counts, movie_hype_mine=vote.level if vote else None)
 
 
 @bp.route('/api/movies/by-mood/<mood_code>')

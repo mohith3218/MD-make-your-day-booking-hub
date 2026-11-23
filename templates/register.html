@@ -1,6 +1,5 @@
 {% extends "auth_base.html" %}
 {% block title %}Create your account · CineWave{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">{% endblock %}
 {% block content %}
 <section class="cw-auth" aria-labelledby="auth-title">
   <div class="cw-auth-layout">
@@ -16,7 +15,7 @@
       <header class="cw-auth-heading"><p class="cw-overline">Join the CineWave community</p><h1 id="auth-title">Create your account</h1><p>Your next movie day is a few details away.</p></header>
       <form method="POST" action="{{ url_for('auth.register') }}" class="cw-auth-form" data-auth-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div class="cw-auth-field"><label for="register-username">Username</label><input id="register-username" type="text" name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_.-]+" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="username-help"><small id="username-help">3–30 characters: letters, numbers, dots, underscores or hyphens.</small></div>
+        <div class="cw-auth-field"><label for="register-username">Username</label><input id="register-username" type="text" name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_.\-]+" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="username-help"><small id="username-help">3–30 characters: letters, numbers, dots, underscores or hyphens.</small></div>
         <div class="cw-auth-field"><label for="register-email">Email address</label><input id="register-email" type="email" name="email" autocomplete="email" maxlength="120" autocapitalize="none" required></div>
         <div class="cw-auth-field"><label for="register-phone">Mobile number <span>(optional)</span></label><input id="register-phone" type="tel" name="phone" inputmode="numeric" autocomplete="tel-national" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit number" aria-describedby="phone-help"><small id="phone-help">Use 10 digits, or leave this field blank.</small></div>
         <div class="cw-auth-field"><label for="register-password">Password</label><div class="cw-auth-password"><input id="register-password" type="password" name="password" minlength="6" maxlength="256" autocomplete="new-password" required aria-describedby="password-help"><button type="button" class="cw-password-toggle" data-password-toggle aria-controls="register-password" aria-pressed="false">Show</button></div><small id="password-help">Use 6–256 characters. Avoid reusing a password from another site.</small></div>
@@ -27,4 +26,3 @@
   </div>
 </section>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>{% endblock %}

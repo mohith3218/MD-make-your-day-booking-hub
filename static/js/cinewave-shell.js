@@ -59,8 +59,10 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') closeNavigation();
     });
+    const desktopNavigation = window.matchMedia(menu?.classList.contains('cw-admin-nav')
+      ? '(min-width: 1101px)' : '(min-width: 901px)');
     window.addEventListener('resize', () => {
-      if (window.matchMedia('(min-width: 901px)').matches) closeNavigation();
+      if (desktopNavigation.matches) closeNavigation();
     }, { passive: true });
   }
 

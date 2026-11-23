@@ -1,5 +1,6 @@
 from flask import Blueprint
 from ._support import *
+from ..services.screen_reviews import review_invitation
 
 bp = Blueprint("booking", __name__)
 
@@ -780,6 +781,7 @@ def ticket(reference):
     return render_template('ticket.html', booking=booking,
                            showtime=booking.showtime,
                            movie=booking.showtime.movie,
+                           screen_review_state=review_invitation(booking, current_user.id),
                            payment=booking.payment)
 
 

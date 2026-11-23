@@ -213,32 +213,6 @@ class Screen(DirectoryVerificationMixin, db.Model):
     layout_json = db.Column(db.Text, nullable=False, default='{}')
 
     @property
-    def comfort_score(self):
-        """Calculates authentic comfort index rating out of 5."""
-        name_lower = (self.name + ' ' + (self.theater.name if self.theater else '')).lower()
-        if 'insignia' in name_lower or 'vip' in name_lower or 'lounge' in name_lower:
-            return 4.9
-        if 'aaa' in name_lower or 'led' in name_lower or 'varun' in name_lower:
-            return 4.8
-        if 'imax' in name_lower or '70mm' in name_lower:
-            return 4.7
-        return 4.6
-
-    @property
-    def comfort_features(self):
-        """Returns acoustic, visual, and seat ergonomics comfort badges."""
-        name_lower = (self.name + ' ' + (self.theater.name if self.theater else '')).lower()
-        if 'insignia' in name_lower or 'recliner' in name_lower or 'vip' in name_lower:
-            return ['160° Motorized Recliners', 'Dolby Atmos 64-Channel', '4K Barco Laser', 'Dedicated Butler Service']
-        elif 'aaa' in name_lower or 'led' in name_lower:
-            return ['Q-Luxon 70ft Active LED', 'Dolby Atmos Sound', 'Premium Ergonomic Prime Seats', '42-inch Extra Legroom']
-        elif 'varun' in name_lower:
-            return ['RGB Laser 4K Projection', 'Dolby Atmos Sound', 'Sea Breeze Ambient Lounge', 'Luxury Prime Cushions']
-        elif '70mm' in name_lower:
-            return ['Giant 70MM Curved Screen', 'Acoustic Sound Array', 'Classic Balcony Experience']
-        return ['Dolby 7.1 Surround', 'Plush Pushback Seating', 'Climate Controlled 21°C']
-
-    @property
     def layout(self):
         try:
             layout = json.loads(self.layout_json or '{}')

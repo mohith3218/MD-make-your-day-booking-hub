@@ -1,4 +1,5 @@
 {% extends "public_base.html" %}
+{% from "partials/movie_hype.html" import hype %}
 {% block title %}{{ movie.title }} · MD CineWave{% endblock %}
 
 {% block content %}
@@ -94,6 +95,14 @@
 </section>
 {% endif %}
 
+{% if movie_hype_counts %}
+<section class="cw-review-panel cw-movie-hype-panel" id="movie-hype" aria-labelledby="movie-hype-title">
+  <h2 id="movie-hype-title">How hyped are you?</h2>
+  <p>Your reaction stays selected until you pick another.</p>
+  {{ hype(movie, movie_hype_counts, movie_hype_mine, 'movie', csrf_token) }}
+</section>
+{% endif %}
+
 <section class="space-y-5">
   <h2 class="text-xl font-bold text-white">Showtimes in Visakhapatnam</h2>
 
@@ -107,14 +116,7 @@
             <div>
               <p class="text-sm font-bold text-white break-words">{{ theater_name }}</p>
               {% if shows[0].screen %}
-                <div class="flex items-center gap-2 mt-0.5">
-                  <span class="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
-                    <i class="fa-solid fa-couch text-[9px]"></i> Comfort {{ shows[0].screen.comfort_score }}/5.0
-                  </span>
-                  <span class="text-[10px] text-slate-400 hidden sm:inline">
-                    {{ shows[0].screen.comfort_features|slice(2)|join(' · ') }}
-                  </span>
-                </div>
+                <a class="cw-review-link" href="{{ url_for('theatre_discovery.detail', theatre_id=shows[0].screen.theater_id, _anchor='theatre-screens') }}">Explore screens and reviews</a>
               {% endif %}
             </div>
             {% if shows[0].screen %}
@@ -183,7 +185,7 @@
       <h2 class="text-xl font-black text-white flex items-center gap-2">
         <span>Audience Reviews</span>
         <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20 font-mono">
-          ★ {{ '%.1f'|format(movie.display_rating) }} / 5.0
+          {% if movie.user_ratings %}★ {{ '%.1f'|format(movie.display_rating) }} / 5.0{% else %}Not rated yet{% endif %}
         </span>
       </h2>
       <p class="text-xs text-slate-400 mt-0.5">{{ movie.user_ratings|length }} member ratings & reviews</p>
@@ -301,6 +303,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% if movie_hype_counts %}<script src="{{ url_for('static', filename='js/movie-hype.js') }}" defer></script>{% endif %}
 <script>
   // ---- Countdown timers ----
   document.querySelectorAll('[id^="countdown-"]').forEach(el => {

@@ -47,6 +47,9 @@ def validate_booking_context(show):
 
 def create_theatre_blueprint(db, models, price_map):
     """Reuse existing models without another engine, schema or booking system."""
+    from cinewave.services.screen_reviews import combined_theatre_score, review_summaries
+    from cinewave.models import ScreenReview
+
     bp = Blueprint('theatre_discovery', __name__)
     Theater, Screen, Showtime = models.Theater, models.Screen, models.Showtime
     Movie, BookedSeat, SeatHold = models.Movie, models.BookedSeat, models.SeatHold
@@ -128,7 +131,8 @@ def create_theatre_blueprint(db, models, price_map):
             summary[show.screen.theater_id]['shows'] += 1
             summary[show.screen.theater_id]['movies'].add(show.movie_id)
         return render_template('theatres.html', theatres=theatres, filters=filters,
-                               summary=summary)
+                               summary=summary, review_scores=review_summaries(
+                                   ScreenReview.theater_id, [theatre.id for theatre in theatres]))
 
     @bp.route('/theatres/<int:theatre_id>', defaults={'movie_id': None})
     @bp.route('/theatres/<int:theatre_id>/movies/<int:movie_id>')
@@ -175,10 +179,12 @@ def create_theatre_blueprint(db, models, price_map):
         for group in groups.values():
             prices = [card['price'] for card in group['shows'] if card['price'] is not None]
             group['starting_price'] = min(prices) if prices else None
+        screen_scores = review_summaries(ScreenReview.screen_id, [screen.id for screen in theatre.screens])
         return render_template('theatre_detail.html', theatre=theatre, movie=movie,
                                movie_groups=list(groups.values()), dates=dates,
                                filters=filters, selected_date=selected_date,
-                               languages=languages, formats=formats, times=times)
+                               languages=languages, formats=formats, times=times,
+                               theatre_score=combined_theatre_score(screen_scores), screen_scores=screen_scores)
 
     @bp.route('/theatres/<int:theatre_id>/shows/<int:showtime_id>/book')
     def select_show(theatre_id, showtime_id):

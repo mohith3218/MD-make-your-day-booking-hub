@@ -31,6 +31,9 @@
           </div>
           {% if b.status == 'PAID' %}
             <a href="{{ url_for('booking.ticket', reference=b.reference) }}" class="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">View ticket</a>
+            {% if review_states[b.id] in ('invite', 'edit') %}
+              <a class="cw-review-link" href="{{ url_for('screen_reviews.edit', reference=b.reference) }}">{{ 'Edit screen review' if review_states[b.id] == 'edit' else 'Review This Screen' }}</a>
+            {% endif %}
           {% elif b.status == 'PENDING' and b.seconds_left > 0 %}
             <a href="{{ url_for('booking.checkout', reference=b.reference) }}" class="inline-block px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">
               Pay now · {{ b.seconds_left // 60 }}m left

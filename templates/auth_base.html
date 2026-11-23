@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+  <script src="{{ url_for('static', filename='js/auth.js') }}" defer></script>
+{% endblock %}
 {% block body_class %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300 cw-auth-shell{% endblock %}
 {% block site_header %}
-  <header class="cw-auth-brandbar"><a href="{{ url_for('main.home') }}" class="cw-brand" aria-label="CineWave home"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a></header>
+  <header class="cw-auth-brandbar">
+    <a href="{{ url_for('main.home') }}" class="cw-brand" aria-label="CineWave home"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
+    {% include "partials/theme_menu.html" %}
+  </header>
 {% endblock %}
 {% block main_wrap_class %}cw-main-wrap max-w-7xl mx-auto px-5 sm:px-6 py-8 space-y-6{% endblock %}

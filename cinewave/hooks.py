@@ -45,7 +45,9 @@ def register_hooks(application):
                   'auth.resend_email_otp', 'auth.forgot_password', 'auth.reset_password'}
         if request.endpoint is None or request.endpoint in public or current_user.is_authenticated:
             return None
-        if request.path.startswith('/api/') or request.is_json:
+        if request.path.startswith('/api/') or request.is_json or (
+                request.endpoint == 'movies.vote_movie_hype' and
+                request.accept_mimetypes.best == 'application/json'):
             return jsonify({'error': 'authentication_required', 'message': 'Sign in to continue.'}), 401
         next_url = safe_local_redirect(request.full_path.rstrip('?'))
         return redirect(url_for('auth.login', next=next_url) if next_url else url_for('auth.login'))
@@ -65,7 +67,9 @@ def register_hooks(application):
                      'auth.logout', 'auth.forgot_password', 'auth.reset_password',
                      'wallet.wallet_convert_points', 'admin.import_movie_add',
                      'admin.set_movie_featured_order',
-                     'admin.verify_theater', 'admin.verify_screen', 'admin.archive_movie'}
+                     'admin.verify_theater', 'admin.verify_screen', 'admin.archive_movie',
+                     'movies.vote_movie_hype', 'screen_reviews.edit', 'screen_reviews.dismiss',
+                     'screen_reviews.withdraw', 'screen_reviews.report', 'screen_reviews.moderate'}
         if request.method == 'POST' and request.endpoint in protected:
             expected = session.get('_csrf_token', '')
             supplied = request.form.get('csrf_token', '')
