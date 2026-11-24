@@ -1,5 +1,5 @@
 {% extends "public_base.html" %}
-{% from "partials/screen_review_ui.html" import csrf, summary, category_scores, verified_count %}
+{% from "partials/screen_review_ui.html" import summary, category_scores, verified_count, booking_label, distribution_chart, review_filters, report_form %}
 {% block title %}{{ screen.name }} Reviews · {{ screen.theater.name }} · CineWave{% endblock %}
 {% block content %}
 <div class="cw-review-page">
@@ -12,54 +12,37 @@
       {{ verified_count(score) }}
       {{ category_scores(score) }}
     </div>
-    <div class="cw-rating-distribution">
-      <h2>Rating distribution</h2>
-      <ol>
-      {% for rating, count in distribution.items() %}
-        <li><span>{{ rating }} ★</span><meter min="0" max="{{ score.count if score else 1 }}" value="{{ count }}" aria-label="{{ rating }}-star reviews"></meter><span>{{ count }}</span></li>
-      {% endfor %}
-      </ol>
-    </div>
+    {{ distribution_chart(distribution, score) }}
   </section>
   <section aria-labelledby="customer-reviews-title" class="cw-review-list">
     <h2 id="customer-reviews-title">Customer reviews</h2>
-    <form method="get" class="cw-review-filters">
-      <label>Sort reviews<select name="sort">
-        {% for value, label in [('recent', 'Most recent'), ('highest', 'Highest rated'), ('lowest', 'Lowest rated')] %}
-        <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select></label>
-      <label class="cw-review-checkbox"><input type="checkbox" name="verified" value="1" {% if verified_only %}checked{% endif %}> Verified bookings only</label>
-      <button class="cw-button cw-button-primary" type="submit">Apply filters</button>
-    </form>
+    {% if current_user.is_authenticated %}
+      <p>Watched a movie here? Review your screen from <a class="cw-review-link" href="{{ url_for('profile.dashboard') }}">My bookings</a> after the screening ends.</p>
+    {% else %}
+      <p>Watched a movie here? <a class="cw-review-link" href="{{ url_for('auth.login', next=request.full_path.rstrip('?')) }}">Sign in</a> and review your screen after your completed booking.</p>
+    {% endif %}
+    {{ review_filters(filters) }}
     {% for review in page.items %}
     <article class="cw-review-panel cw-review-card">
       <header><div><h3>{{ review.user.username }}</h3><time datetime="{{ review.created_at.isoformat() }}Z">{{ review.created_at.strftime('%d %b %Y') }}</time></div>
         <strong><span aria-hidden="true">★</span> {{ review.overall_rating }}/5</strong>
       </header>
-      {% if review.verified %}<p class="cw-review-badge"><span aria-hidden="true">✓</span> Verified Booking</p>{% endif %}
+      <p class="cw-review-badge">{{ booking_label(review) }}</p>
       {{ category_scores(review) }}
       {% if review.review_text %}<p class="cw-review-copy">{{ review.review_text }}</p>{% endif %}
       {% if review.id in reported %}
         <p class="cw-review-note">You reported this review.</p>
-      {% elif review.user_id != current_user.id %}
-        <details class="cw-review-report">
-          <summary>Report review</summary>
-          <form method="post" action="{{ url_for('screen_reviews.report', review_id=review.id) }}">
-            {{ csrf(csrf_token) }}
-            <label>Why are you reporting this review?<textarea name="reason" rows="2" maxlength="300" required></textarea></label>
-            <button class="cw-review-text-button" type="submit">Send report</button>
-          </form>
-        </details>
+      {% elif current_user.is_authenticated and review.user_id != current_user.id %}
+        {{ report_form(url_for('screen_reviews.report', review_id=review.id), csrf_token) }}
       {% endif %}
     </article>
-    {% else %}<p class="cw-review-panel">{{ 'No verified reviews match this filter.' if verified_only else 'No customer reviews have been published for this screen yet.' }}</p>
+    {% else %}<p class="cw-review-panel">{{ 'No screen reviews match these filters.' if score else 'No customer reviews have been published for this screen yet.' }}</p>
     {% endfor %}
     {% if page.pages > 1 %}
     <nav class="cw-review-actions" aria-label="Review pages">
-      {% if page.has_prev %}<a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=screen.theater_id, screen_id=screen.id, sort=sort, verified=1 if verified_only else None, page=page.prev_num) }}">Previous</a>{% endif %}
+      {% if page.has_prev %}<a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=screen.theater_id, screen_id=screen.id, page=page.prev_num, **filters) }}">Previous</a>{% endif %}
       <span>Page {{ page.page }} of {{ page.pages }}</span>
-      {% if page.has_next %}<a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=screen.theater_id, screen_id=screen.id, sort=sort, verified=1 if verified_only else None, page=page.next_num) }}">Next</a>{% endif %}
+      {% if page.has_next %}<a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=screen.theater_id, screen_id=screen.id, page=page.next_num, **filters) }}">Next</a>{% endif %}
     </nav>
     {% endif %}
   </section>

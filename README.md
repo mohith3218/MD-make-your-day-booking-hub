@@ -18,7 +18,18 @@ listens on http://127.0.0.1:5000. Recreate virtual environments when moving the
 project between machines.
 
 On a fresh local database, set `ADMIN_PASSWORD` before first startup to create the admin account. Passwords are never printed and existing credentials are preserved. Set `SECRET_KEY` to a long random value to keep sessions valid across restarts. For an HTTPS deployment, also set `SESSION_COOKIE_SECURE=1`. Flask debug mode is off by default; set `FLASK_DEBUG=1` only for local development.
-Your old `vizag_movies.db` keeps working — `auto_migrate()` adds the new columns on startup.
+For a database already managed by Alembic, back it up and apply the versioned
+schema changes before starting the updated app:
+
+```powershell
+.venv\Scripts\python.exe -m alembic current
+.venv\Scripts\python.exe -m alembic upgrade head
+.venv\Scripts\python.exe database_health.py
+```
+
+If `alembic current` is empty for an existing SQLite database, compare its
+schema to the corresponding historical revision before stamping it. The app's
+development database normally lives at `instance/vizag_movies.db`.
 Keep the original database and its backups. For Supabase PostgreSQL configuration, versioned schema migrations and safe data transfer, see [the Supabase setup guide](docs/SUPABASE_SETUP.md) and [migration verification report](docs/SUPABASE_DATABASE_MIGRATION_REPORT.md).
 
 ### Movie catalogue synchronization

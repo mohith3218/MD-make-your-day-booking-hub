@@ -16,7 +16,12 @@
 {% macro verified_count(score) %}
   {% set count = score.verified if score else 0 %}
   <p>{{ count }} verified booking review{{ '' if count == 1 else 's' }}</p>
+  {% if score and score.demo %}<p>{{ score.demo }} demo booking review{{ '' if score.demo == 1 else 's' }}</p>{% endif %}
 {% endmacro %}
+
+{% macro booking_label(review) -%}
+  {{ 'Demo Booking Review' if review.is_demo else 'Verified Booking' if review.verified else 'Unverified' }}
+{%- endmacro %}
 
 {% macro category_scores(score) %}
   <dl class="cw-review-metrics">
@@ -24,4 +29,71 @@
     <div><dt>{{ label }}</dt><dd>{{ ('%.1f'|format(score[field])) ~ '/5' if score and score[field] is not none else 'Unrated' }}</dd></div>
     {% endfor %}
   </dl>
+{% endmacro %}
+
+{% macro distribution_chart(distribution, score) %}
+  <div class="cw-rating-distribution">
+    <h2>Rating distribution</h2>
+    <ol>
+    {% for rating, count in distribution.items() %}
+      <li><span>{{ rating }} ★</span><meter min="0" max="{{ score.count if score else 1 }}" value="{{ count }}" aria-label="{{ rating }}-star reviews"></meter><span>{{ count }}</span></li>
+    {% endfor %}
+    </ol>
+  </div>
+{% endmacro %}
+
+{% macro review_filters(filters, movie=false) %}
+  <form method="get" class="cw-review-filters">
+    <label>Sort reviews<select name="sort">
+      {% for value, label in [('recent', 'Newest'), ('oldest', 'Oldest'), ('highest', 'Highest rated'), ('lowest', 'Lowest rated')] %}
+      <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select></label>
+    <label>Rating<select name="rating">
+      <option value="">All ratings</option>
+      {% for stars in range(5, 0, -1) %}<option value="{{ stars }}" {% if filters.rating == stars %}selected{% endif %}>{{ stars }} star{{ '' if stars == 1 else 's' }}</option>{% endfor %}
+    </select></label>
+    <label>Booking type<select name="source">
+      <option value="">All bookings</option>
+      <option value="verified" {% if filters.source == 'verified' %}selected{% endif %}>Verified Booking</option>
+      <option value="demo" {% if filters.source == 'demo' %}selected{% endif %}>Demo Booking Review</option>
+    </select></label>
+    {% if movie %}
+      <label>Spoilers<select name="spoiler">
+        <option value="">All reviews</option>
+        <option value="no" {% if filters.spoiler == 'no' %}selected{% endif %}>Spoiler-free</option>
+        <option value="yes" {% if filters.spoiler == 'yes' %}selected{% endif %}>Contains spoilers</option>
+      </select></label>
+    {% endif %}
+    <button class="cw-button cw-button-primary" type="submit">Apply filters</button>
+  </form>
+{% endmacro %}
+
+{% macro report_form(action, token) %}
+  <details class="cw-review-report">
+    <summary>Report review</summary>
+    <form method="post" action="{{ action }}">
+      {{ csrf(token) }}
+      <label>Why are you reporting this review?<textarea name="reason" rows="2" maxlength="300" required></textarea></label>
+      <button class="cw-review-text-button" type="submit">Send report</button>
+    </form>
+  </details>
+{% endmacro %}
+
+{% macro stars(field, question, value, error, required) %}
+  <fieldset class="cw-review-question" {% if error %}aria-describedby="error-{{ field }}"{% endif %}>
+    <legend>{{ question }} <small>{{ 'Required' if required else 'Optional' }}</small></legend>
+    <div class="cw-stars">
+      {% for number in range(1, 6) %}
+      <label>
+        <input type="radio" name="{{ field }}" value="{{ number }}" {% if value == number %}checked{% endif %} {% if required %}required{% endif %}>
+        <span><span aria-hidden="true">★</span> {{ number }}<span class="cw-sr-only"> out of 5 stars</span><span class="cw-selected-mark" aria-hidden="true">✓</span></span>
+      </label>
+      {% endfor %}
+      {% if not required %}
+      <label class="cw-star-skip"><input type="radio" name="{{ field }}" value="" {% if value is none %}checked{% endif %}><span>Skip</span></label>
+      {% endif %}
+    </div>
+    {% if error %}<p id="error-{{ field }}" class="cw-review-error">{{ error }}</p>{% endif %}
+  </fieldset>
 {% endmacro %}

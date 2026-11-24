@@ -52,7 +52,7 @@ transfer scripts or an automatic migration as a build step.
 Existing IDs, users, movies, theatres, layouts, bookings, wallet values and payment
 history stay intact. Apply the additive changes once from the service root with
 `alembic upgrade head`, then run `python database_health.py`; the expected head is
-`20261125_01`. Apply migrations as an operator step after reviewing the backup,
+`20261125_02`. Apply migrations as an operator step after reviewing the backup,
 never as a build command. Do not run a baseline over populated tables.
 
 Only a fresh local development database may be created using `python app.py` and

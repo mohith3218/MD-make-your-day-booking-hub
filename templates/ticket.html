@@ -100,6 +100,7 @@
       {% endif %}
       <div class="cw-review-actions">
         <a class="cw-button cw-button-primary" href="{{ url_for('screen_reviews.edit', reference=booking.reference) }}">{{ 'Edit Screen Review' if screen_review_state == 'edit' else 'Review This Screen' }}</a>
+        <a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=showtime.screen.theater_id, screen_id=showtime.screen_id) }}">Read Screen Reviews</a>
         {% if screen_review_state == 'invite' %}
           <form method="post" action="{{ url_for('screen_reviews.dismiss', reference=booking.reference) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

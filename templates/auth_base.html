@@ -8,6 +8,7 @@
 {% block site_header %}
   <header class="cw-auth-brandbar">
     <a href="{{ url_for('main.home') }}" class="cw-brand" aria-label="CineWave home"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
+    <a class="cw-review-link" href="{{ url_for('theatre_discovery.index') }}">Theatres</a>
     {% include "partials/theme_menu.html" %}
   </header>
 {% endblock %}

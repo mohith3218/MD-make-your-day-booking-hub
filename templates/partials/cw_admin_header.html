@@ -9,6 +9,7 @@
       <a href="{{ url_for('admin.add_showtime') }}" {% if request.endpoint == 'admin.add_showtime' %}aria-current="page"{% endif %}>Showtimes</a>
       <a href="{{ url_for('admin.admin_bookings') }}" {% if request.endpoint == 'admin.admin_bookings' %}aria-current="page"{% endif %}>Bookings</a>
       <a href="{{ url_for('screen_reviews.moderation') }}" {% if request.endpoint == 'screen_reviews.moderation' %}aria-current="page"{% endif %}>Screen reviews</a>
+      <a href="{{ url_for('movie_reviews.moderation') }}" {% if request.endpoint == 'movie_reviews.moderation' %}aria-current="page"{% endif %}>Movie reviews</a>
       <a href="{{ url_for('admin.admin_analytics') }}" {% if request.endpoint in ('admin.admin_analytics', 'admin.admin_analytics_export') %}aria-current="page"{% endif %}>Analytics</a>
       <a href="{{ url_for('admin.admin_recharges') }}" {% if request.endpoint == 'admin.admin_recharges' %}aria-current="page"{% endif %}>Recharges</a>
     </nav>

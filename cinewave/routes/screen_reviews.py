@@ -40,6 +40,8 @@ def edit(reference):
     values['review_text'] = (review.review_text or '') if review else ''
     errors = {}
     if request.method == 'POST':
+        if review and request.form.get('intent') == 'create':
+            abort(409, description='This ticket already has a screen review. Reopen the form to edit it.')
         for field, _ in QUESTIONS:
             submitted = request.form.getlist(field)
             raw = submitted[0] if submitted else ''
@@ -108,7 +110,7 @@ def withdraw(reference):
 def detail(theatre_id, screen_id):
     screen = Screen.query.filter_by(id=screen_id, theater_id=theatre_id).first_or_404()
     query, filters = filtered_reviews(
-        public_reviews().filter_by(screen_id=screen.id), ScreenReview, ScreenReview.overall_rating)
+        public_reviews().filter(ScreenReview.screen_id == screen.id), ScreenReview, ScreenReview.overall_rating)
     page = query.options(joinedload(ScreenReview.user)).paginate(per_page=10)
     score = review_summaries(ScreenReview.screen_id, [screen.id]).get(screen.id)
     return render_template('screen_reviews.html', screen=screen, score=score, page=page, filters=filters,
@@ -119,7 +121,7 @@ def detail(theatre_id, screen_id):
 @bp.post('/screen-reviews/<int:review_id>/report')
 @login_required
 def report(review_id):
-    review = public_reviews().filter_by(id=review_id).first_or_404()
+    review = public_reviews().filter(ScreenReview.id == review_id).first_or_404()
     report_review(ScreenReviewReport, review)
     return redirect(url_for('.detail', theatre_id=review.theater_id, screen_id=review.screen_id), code=303)
 

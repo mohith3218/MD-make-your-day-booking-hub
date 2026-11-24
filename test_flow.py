@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
+from unittest.mock import patch
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -461,16 +462,28 @@ def main():
         assert A.BookedSeat.query.filter_by(booking_id=b_after.id).count() == 0
     print(f"16. Self-service Cancellation & Refund OK - ₹{expected_refund:.2f} credited to wallet, seats freed")
 
-    # ---- 19. Spoiler Shield & Keyword Auto-Detection ------------------
+    # ---- 19. Movie review eligibility and spoiler reveal --------------
     with A.app.app_context():
-        m_id = A.Movie.query.first().id
-    # Test review with explicit spoiler flag
-    r = c1.post(f'/api/movie/{m_id}/rate', json={'rating': 5, 'review': 'Awesome film!', 'has_spoiler': True})
-    assert r.status_code == 200 and r.get_json()['has_spoiler'] is True
-    # Test review with auto-detected spoiler keyword 'climax twist'
-    r = c1.post(f'/api/movie/{m_id}/rate', json={'rating': 4.5, 'review': 'The climax twist where the hero dies was shocking'})
-    assert r.status_code == 200 and r.get_json()['has_spoiler'] is True
-    print("19. Spoiler Shield OK - explicit and NLP keyword triggers detected")
+        paid_booking = A.Booking.query.filter_by(reference=ref2).one()
+        show = paid_booking.showtime
+        m_id = show.movie_id
+        completed_at = show.show_datetime + timedelta(minutes=show.movie.duration + 1)
+    with c2.session_transaction() as session:
+        csrf = session['_csrf_token']
+    review_url = f'/movies/{m_id}/reviews'
+    spoiler = 'The final scene revealed who sent the letter.'
+    assert c2.get(review_url).status_code == 403
+    with patch('cinewave.models.catalog.cinema_now', return_value=completed_at), \
+            patch('cinewave.services.movie_reviews.cinema_now', return_value=completed_at):
+        assert c1.get(review_url).status_code == 403
+        r = c2.post(f'/api/movie/{m_id}/rate', headers={'X-CSRF-Token': csrf},
+                    json={'rating': 5, 'review': spoiler, 'has_spoiler': True})
+        assert r.status_code == 200 and r.get_json()['has_spoiler'] is True
+        with A.app.app_context():
+            review_id = A.MovieRating.query.filter_by(movie_id=m_id).one().id
+        assert spoiler not in c2.get(review_url).text
+        assert spoiler in c2.get(review_url + f'?reveal={review_id}').text
+    print("19. Movie review eligibility and spoiler reveal OK")
 
     # ---- 20. Screen reviews with no customer ratings -------------------
     with A.app.app_context():

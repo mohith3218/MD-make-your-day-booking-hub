@@ -12,7 +12,7 @@
     <nav id="cw-main-nav" class="cw-nav" aria-label="Main navigation">
       <a href="{{ url_for('main.home') }}#movies" {% if request.endpoint == 'main.home' %}aria-current="page"{% endif %}>Movies</a>
       <a href="{{ url_for('movies.cine_match') }}" {% if request.endpoint == 'movies.cine_match' %}aria-current="page"{% endif %}>CineWatch</a>
-      <a href="{{ url_for('theatre_discovery.index') }}" {% if request.blueprint == 'theatre_discovery' %}aria-current="page"{% endif %}>Theatres</a>
+      <a href="{{ url_for('theatre_discovery.index') }}" {% if request.blueprint in ('theatre_discovery', 'screen_reviews') %}aria-current="page"{% endif %}>Theatres</a>
       <a href="{{ url_for('main.home') }}#coastal-standard">Offers</a>
       <a href="{{ url_for('profile.dashboard') }}">SquadPay</a>
     </nav>

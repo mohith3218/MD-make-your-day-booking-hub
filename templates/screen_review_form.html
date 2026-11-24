@@ -17,6 +17,7 @@
     {% endif %}
     <form class="cw-review-form" method="post">
       {{ csrf(csrf_token) }}
+      <input type="hidden" name="intent" value="{{ 'edit' if review else 'create' }}">
       {% for field, question in questions %}
       {{ stars(field, question, values[field], errors.get(field), field == 'overall_rating') }}
       {% endfor %}

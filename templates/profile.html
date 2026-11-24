@@ -190,23 +190,23 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for b in recent_bookings %}
-          {% set user_movie_score = b.showtime.movie.get_user_rating(current_user) %}
           <div class="glass-card rounded-2xl p-4 border border-white/[.07] bg-slate-900/50 flex items-center justify-between gap-3">
             <div class="space-y-1 min-w-0">
               <h4 class="text-sm font-bold text-white truncate">{{ b.showtime.movie.title }}</h4>
               <p class="text-[11px] text-slate-400">{{ b.showtime.theater }}</p>
-              <div class="flex items-center gap-2 pt-0.5">
-                <span class="text-[10px] text-slate-400 font-medium">Seats: {{ b.seats }}</span>
-                {% if user_movie_score %}
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-400 font-bold border border-amber-400/20">
-                    ★ {{ '%.1f'|format(user_movie_score) }}
-                  </span>
-                {% else %}
-                  <a href="{{ url_for('movies.movie_detail', movie_id=b.showtime.movie.id) }}" class="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition">
-                    <i class="fa-regular fa-star"></i> Rate
-                  </a>
+              <p class="text-[10px] text-slate-400 font-medium">Seats: {{ b.seats }}</p>
+              {% if review_states[b.id] or b.id in movie_review_states %}
+              <div class="cw-review-actions">
+                {% if review_states[b.id] in ('invite', 'edit') %}
+                  <a class="cw-review-link" href="{{ url_for('screen_reviews.edit', reference=b.reference) }}">{{ 'Edit Screen Review' if review_states[b.id] == 'edit' else 'Review This Screen' }}</a>
+                {% endif %}
+                {% if b.id in movie_review_states %}
+                  {% with booking=b, movie_review_state=movie_review_states[b.id] %}
+                    {% include "partials/movie_review_actions.html" %}
+                  {% endwith %}
                 {% endif %}
               </div>
+              {% endif %}
             </div>
             <a href="{{ url_for('booking.ticket', reference=b.reference) }}" class="shrink-0 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition">
               Ticket

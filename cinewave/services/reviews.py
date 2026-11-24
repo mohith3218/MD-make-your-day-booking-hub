@@ -13,8 +13,11 @@ def completed_booking_source(booking, user_id):
         return None
     if show.status != 'ended':
         return None
-    payment = booking.payment
-    if not payment or payment.status != 'CAPTURED' or not (payment.gateway or '').strip():
+    # Checkout can retain an earlier CREATED or FAILED payment when the method changes.
+    if len(booking.captured_payments) != 1:
+        return None
+    payment = booking.captured_payments[0]
+    if not (payment.gateway or '').strip():
         return None
     if payment.is_demo:
         return 'demo' if booking.paid_at else None
@@ -54,7 +57,7 @@ def filtered_reviews(query, model, rating, *, spoilers=False):
         filters['rating'] = None
     filters['source'] = request.args.get('source') or ('verified' if request.args.get('verified') == '1' else '')
     if filters['source'] == 'verified':
-        query = query.filter(model.verified.is_(True))
+        query = query.filter(model.verified.is_(True), model.is_demo.is_(False))
     elif filters['source'] == 'demo':
         query = query.filter(model.is_demo.is_(True))
     else:

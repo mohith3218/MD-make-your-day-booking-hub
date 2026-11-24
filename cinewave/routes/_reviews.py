@@ -46,7 +46,7 @@ def moderation_context(model, query, report_model, event_model, *options):
         'reported': model.id.in_(db.select(report_model.review_id).where(report_model.resolved_at.is_(None))),
         'hidden': db.and_(model.hidden.is_(True), model.withdrawn_at.is_(None)),
         'withdrawn': model.withdrawn_at.is_not(None),
-        'verified': model.verified.is_(True),
+        'verified': db.and_(model.verified.is_(True), model.is_demo.is_(False)),
         'demo': model.is_demo.is_(True),
         'unverified': db.and_(model.verified.is_(False), model.is_demo.is_(False)),
     }

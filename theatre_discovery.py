@@ -101,7 +101,7 @@ def create_theatre_blueprint(db, models):
             summary[show.screen.theater_id]['movies'].add(show.movie_id)
         return render_template('theatres.html', theatres=theatres, filters=filters,
                                summary=summary, review_scores=review_summaries(
-                                   ScreenReview.theater_id, [theatre.id for theatre in theatres]))
+                                   Screen.theater_id, [theatre.id for theatre in theatres]))
 
     @bp.route('/theatres/<int:theatre_id>', defaults={'movie_id': None})
     @bp.route('/theatres/<int:theatre_id>/movies/<int:movie_id>')

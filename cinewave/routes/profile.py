@@ -1,5 +1,5 @@
 from flask import Blueprint
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from ._support import *
 from ..services.screen_reviews import review_invitation
 from ..services.movie_reviews import movie_review_states
@@ -13,6 +13,7 @@ def dashboard():
     purge_expired_holds()
     bookings = (Booking.query.filter_by(user_id=current_user.id)
                 .options(joinedload(Booking.screen_review), joinedload(Booking.payment),
+                         selectinload(Booking.captured_payments),
                          joinedload(Booking.showtime).joinedload(Showtime.movie),
                          joinedload(Booking.showtime).joinedload(Showtime.screen).joinedload(Screen.theater))
                 .order_by(Booking.booked_at.desc()).all())
@@ -39,7 +40,9 @@ def profile():
         film_dna=film_dna,
         watchlist_movies=watchlist_movies,
         recent_bookings=recent_bookings,
-        hype_stickers=hype_stickers
+        hype_stickers=hype_stickers,
+        review_states={booking.id: review_invitation(booking, current_user.id) for booking in recent_bookings},
+        movie_review_states=movie_review_states(recent_bookings, current_user.id),
     )
 
 

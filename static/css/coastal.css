@@ -1211,7 +1211,7 @@ body#app-body :is(.cw-review-link, .cw-review-text-button) {
 .cw-review-summary strong { color:var(--cw-primary-dark); font-size:18px; font-weight:800; }
 .cw-review-summary>span { color:var(--cw-muted); font-size:14px; }
 .cw-review-list { display:grid; gap:16px; }
-.cw-theatre-screens { margin-block:20px 30px; }
+.cw-theatre-screens { margin-block:20px 30px; scroll-margin-top:96px; }
 .cw-screen-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap:16px; }
 .cw-screen-card h3,.cw-review-card h3 { font-size:25px; line-height:1.15; }
 .cw-screen-card header>p,.cw-review-card header time,.cw-review-card header p { color:var(--cw-muted); font-size:13px; }
@@ -1233,11 +1233,17 @@ body#app-body :is(.cw-review-link, .cw-review-text-button) {
 .cw-review-card>header { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
 .cw-review-card>header>strong { color:var(--cw-primary-dark); font-size:19px; flex:none; }
 .cw-review-card h2 { font-size:24px; }
-.cw-review-copy { white-space:pre-wrap; }
+.cw-review-copy { white-space:pre-wrap; overflow-wrap:anywhere; }
+.cw-review-card[id] { scroll-margin-top:96px; }
+.cw-review-movie-heading { display:flex; align-items:flex-start; gap:16px; }
+.cw-review-movie-heading h1 { overflow-wrap:anywhere; }
+.cw-review-poster { width:clamp(64px, 11vw, 96px); height:auto; aspect-ratio:2/3; object-fit:cover; border-radius:10px; }
 .cw-review-badge { width:fit-content; padding:3px 9px; border:1px solid var(--cw-field-border); border-radius:8px; color:var(--cw-success); font-size:13px; font-weight:750; }
 .cw-review-withdraw summary,.cw-review-report summary,.cw-review-card details summary { width:fit-content; color:var(--cw-primary-dark); cursor:pointer; padding-block:8px; }
 .cw-review-report label,.cw-review-comment { display:grid; gap:6px; font-weight:700; }
-.cw-review-report textarea,.cw-review-comment textarea { width:100%; padding:10px; border-radius:9px; font-size:16px; font-weight:400; resize:vertical; }
+.cw-review-report textarea,.cw-review-comment textarea,.cw-review-comment input { width:100%; padding:10px; border-radius:9px; font-size:16px; font-weight:400; }
+.cw-review-report textarea,.cw-review-comment textarea { resize:vertical; }
+.cw-review-spoiler-toggle { display:flex; align-items:center; gap:8px; min-height:44px; }
 .cw-review-withdraw { margin-top:18px; border-top:1px solid var(--cw-line); }
 .cw-review-form { display:grid; gap:16px; margin-top:18px; }
 .cw-review-question { min-width:0; padding:8px 0 14px; border-bottom:1px solid var(--cw-line); }

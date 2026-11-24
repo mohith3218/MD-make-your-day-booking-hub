@@ -19,7 +19,7 @@ from alembic.config import Config
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import MetaData, Table, create_engine, select, text
+from sqlalchemy import MetaData, Table, create_engine, inspect, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.pool import NullPool
 from sqlalchemy.schema import CreateTable
@@ -86,6 +86,53 @@ class MigrationTests(unittest.TestCase):
         self.assertIn('TIMESTAMP WITHOUT TIME ZONE', ddl)
         for operation in ('DROP ', 'DELETE ', 'UPDATE ', 'ALTER TABLE '):
             self.assertNotIn(operation, ddl)
+
+    def test_booking_reviews_preserve_legacy_ratings_and_correct_old_booking_labels(self):
+        engine = create_engine('sqlite://')
+        self.addCleanup(engine.dispose)
+        cfg = Config(str(Path(__file__).with_name('alembic.ini')))
+        with engine.begin() as conn:
+            cfg.attributes['connection'] = conn
+            command.upgrade(cfg, '20261125_01')
+            conn.execute(text(
+                'INSERT INTO "user" (id, username, password_hash, email_verified, email_otp_attempts, alternative_id) '
+                "VALUES (1, 'legacy-reviewer', 'fixture', false, 0, 'legacy-reviewer')"))
+            conn.execute(text("INSERT INTO theater (id, name) VALUES (1, 'Legacy theatre')"))
+            conn.execute(text("INSERT INTO screen (id, theater_id, name, layout_json) VALUES (1, 1, 'Hall', '{}')"))
+            conn.execute(text(
+                "INSERT INTO movie (id, title, description, duration) VALUES (1, 'Legacy movie', 'Synopsis', 90)"))
+            conn.execute(text(
+                "INSERT INTO showtime (id, movie_id, screen_id, theater, show_date, show_time) "
+                "VALUES (1, 1, 1, 'Legacy theatre', '2026-01-01', '15:00')"))
+            for id_ in range(1, 5):
+                conn.execute(text(
+                    "INSERT INTO booking (id, reference, user_id, showtime_id, seats, total_amount, status, paid_at) "
+                    "VALUES (:id, :reference, 1, 1, 'A1', 100, 'PAID', '2026-01-01 09:00:00')"),
+                    {'id': id_, 'reference': f'LEGACY-{id_}'})
+                conn.execute(text(
+                    "INSERT INTO screen_review (id, booking_id, user_id, theater_id, screen_id, overall_rating, "
+                    "verified, review_text, created_at, updated_at) "
+                    "VALUES (:id, :id, 1, 1, 1, 4, true, 'A legacy screen review', '2026-01-02', '2026-01-02')"),
+                    {'id': id_})
+            conn.execute(text("INSERT INTO payment (booking_id, gateway, status) VALUES "
+                              "(1, 'razorpay', 'CAPTURED'), (2, 'mock', 'CAPTURED'), (4, 'razorpay', 'REFUNDED')"))
+            conn.execute(text("INSERT INTO movie_rating (id, movie_id, user_id, rating, review, has_spoiler) "
+                              "VALUES (1, 1, 1, 4.5, 'Legacy movie text', true)"))
+        with engine.begin() as conn:
+            cfg.attributes['connection'] = conn
+            command.upgrade(cfg, 'head')
+            self.assertEqual(conn.execute(text(
+                'SELECT verified, is_demo, review_text FROM screen_review ORDER BY id')).all(),
+                [(1, 0, 'A legacy screen review'), (0, 1, 'A legacy screen review'),
+                 (0, 0, 'A legacy screen review'), (0, 0, 'A legacy screen review')])
+            self.assertEqual(conn.execute(text(
+                'SELECT id, rating, review, has_spoiler, booking_id FROM movie_rating')).one(),
+                (1, 4.5, 'Legacy movie text', 1, None))
+            schema = inspect(conn)
+            self.assertIn('fk_movie_rating_booking', {key['name'] for key in schema.get_foreign_keys('movie_rating')})
+            self.assertIn('_user_movie_rating_uc', {key['name'] for key in schema.get_unique_constraints('movie_rating')})
+            self.assertFalse(conn.exec_driver_sql('PRAGMA foreign_key_check').all())
+        self.assertTrue(check_database(engine, db.metadata)['ok'])
 
     def test_tmdb_upgrade_preserves_duplicate_legacy_records(self):
         cfg = Config(str(Path(__file__).with_name('alembic.ini')))

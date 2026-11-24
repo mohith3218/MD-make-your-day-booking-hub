@@ -117,25 +117,12 @@ def auto_migrate():
 
 
 def seed_sample_movies():
-    """Seeds popular Vizag blockbusters with showtimes and reviews if not present."""
-    admin = User.query.filter_by(username='admin').first()
+    """Seed popular Vizag blockbusters and showtimes for local development."""
     inox_screen = Screen.query.filter(Screen.name.contains('1')).first()
     jag_theater = Theater.query.filter(Theater.name.contains('Jagadamba')).first()
     jag_screen = jag_theater.screens[0] if (jag_theater and jag_theater.screens) else inox_screen
     cine_theater = Theater.query.filter(Theater.name.contains('Cinepolis')).first()
     cine_screen = cine_theater.screens[0] if (cine_theater and cine_theater.screens) else inox_screen
-
-    u1 = User.query.filter_by(username='rahul_vizag').first()
-    if not u1:
-        u1 = User(username='rahul_vizag', email='rahul@vizag.com')
-        u1.set_password('pass123')
-        db.session.add(u1)
-    u2 = User.query.filter_by(username='ananya_k').first()
-    if not u2:
-        u2 = User(username='ananya_k', email='ananya@vizag.com')
-        u2.set_password('pass123')
-        db.session.add(u2)
-    db.session.commit()
 
     samples = [
         {
@@ -155,11 +142,7 @@ def seed_sample_movies():
                 {'name': 'Fahadh Faasil', 'role': 'SP Bhanwar Singh'}
             ]),
             'screen': inox_screen,
-            'times': ['10:30 AM', '02:00 PM', '06:15 PM', '09:45 PM'],
-            'reviews': [
-                {'user': u1, 'rating': 5.0, 'review': 'Peak mass cinema! The Jathara sequence is pure goosebumps. Allu Arjun national award worthy performance.', 'has_spoiler': False},
-                {'user': u2, 'rating': 4.5, 'review': 'Shekhawat revenge plan in the climax sets up Pushpa 3 Rampage perfectly! Watch out for the truck chase scene.', 'has_spoiler': True}
-            ]
+            'times': ['10:30 AM', '02:00 PM', '06:15 PM', '09:45 PM']
         },
         {
             'title': 'Devara: Part 1',
@@ -178,11 +161,7 @@ def seed_sample_movies():
                 {'name': 'Saif Ali Khan', 'role': 'Bhaira'}
             ]),
             'screen': jag_screen,
-            'times': ['02:15 PM', '06:45 PM', '10:15 PM'],
-            'reviews': [
-                {'user': u1, 'rating': 5.0, 'review': 'Mind-blowing interval block and Anirudh BGM shook Jagadamba 70MM!', 'has_spoiler': False},
-                {'user': u2, 'rating': 4.5, 'review': 'Major plot twist at the climax when Bhaira discovers who actually survived the sea fight! Do not leave before post-credits.', 'has_spoiler': True}
-            ]
+            'times': ['02:15 PM', '06:45 PM', '10:15 PM']
         },
         {
             'title': 'Kalki 2898 AD',
@@ -201,11 +180,7 @@ def seed_sample_movies():
                 {'name': 'Kamal Haasan', 'role': 'Supreme Yaskin'}
             ]),
             'screen': inox_screen,
-            'times': ['11:00 AM', '03:30 PM', '07:30 PM'],
-            'reviews': [
-                {'user': u1, 'rating': 5.0, 'review': 'World-class visuals! Amitabh Bachchan as Ashwatthama steals the whole show.', 'has_spoiler': False},
-                {'user': u2, 'rating': 5.0, 'review': 'The Karna reveal in the climax battle was absolute goosebumps! Prabhas transformation is insane.', 'has_spoiler': True}
-            ]
+            'times': ['11:00 AM', '03:30 PM', '07:30 PM']
         },
         {
             'title': 'Game Changer',
@@ -224,10 +199,7 @@ def seed_sample_movies():
                 {'name': 'SJ Suryah', 'role': 'Minister'}
             ]),
             'screen': cine_screen,
-            'times': ['01:30 PM', '06:00 PM', '09:45 PM'],
-            'reviews': [
-                {'user': u1, 'rating': 4.5, 'review': 'Shankar style grandeur and Ram Charan in top form. Thaman songs are energetic.', 'has_spoiler': False}
-            ]
+            'times': ['01:30 PM', '06:00 PM', '09:45 PM']
         }
     ]
 
@@ -264,18 +236,6 @@ def seed_sample_movies():
                         show_time=t
                     )
                     db.session.add(st)
-
-        # Add sample ratings if none exist
-        if not movie.user_ratings:
-            for r in m_data['reviews']:
-                mr = MovieRating(
-                    user_id=r['user'].id,
-                    movie_id=movie.id,
-                    rating=r['rating'],
-                    review=r['review'],
-                    has_spoiler=r['has_spoiler']
-                )
-                db.session.add(mr)
 
     db.session.commit()
 

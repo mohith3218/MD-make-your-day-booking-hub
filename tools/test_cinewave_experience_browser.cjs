@@ -104,6 +104,7 @@ async function verify(browser, info) {
         form: '/booking/' + info.references[1] + '/screen-review', admin: '/admin/screen-reviews',
         ticket: '/ticket/' + info.references[1], seats: '/book/' + info.show,
         checkout: '/checkout/QA-CHECKOUT',
+        'movie-reviews': '/movies/' + info.reviewMovie + '/reviews',
         'imported-movie': '/movie/' + info.importedMovie,
         'admin-movies': '/admin?source=tmdb&schedule=unscheduled#movies',
     };
@@ -138,6 +139,17 @@ async function verify(browser, info) {
     };
 
     await setViewport(390);
+    await go(fixture.login, '#login-username');
+    const clickLink = (url) => evaluate(`document.querySelector(${JSON.stringify('a[href=' + JSON.stringify(url) + ']')}).click()`);
+    await clickLink(fixture.theatres);
+    await until(() => evaluate("!!document.querySelector('.td-venue-card')"), 'Guest theatre listing did not open.');
+    assert(await evaluate("document.querySelector('.td-explore-link').textContent.includes('Be the first to review')"));
+    await clickLink(fixture.theatre + '#theatre-screens');
+    await until(() => evaluate("!!document.querySelector('#theatre-screens')"), 'Guest theatre detail did not open.');
+    await clickLink(fixture.reviews);
+    await until(() => evaluate("!!document.querySelector('.cw-review-overview')"), 'Guest screen reviews did not open.');
+    assert(await evaluate("document.body.textContent.includes('Watched a movie here?')"));
+    console.log('Guest navigation verified from sign-in through theatres, screens, and reviews.');
     await go(fixture.login, '#login-username');
     await browser.call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
     await setTheme('system');
@@ -247,6 +259,66 @@ async function verify(browser, info) {
     await go(fixture.seats, '#seating-viewport');
     console.log('Review submission, keyboard control, empty screens and admin view verified.');
 
+    await go(fixture['movie-reviews'], '#movie-reviews-title');
+    assert(await evaluate("document.body.textContent.includes('Movie reviews become available after you complete your booked screening.')"));
+    await go(fixture.theatre, '#theatre-screens');
+    await clickLink(fixture.theatre + '/shows/' + info.demoShow + '/book');
+    await until(() => evaluate("!!document.querySelector('#booking-form')"), 'Demo screening seat map did not open.');
+    await evaluate("document.querySelector('.seat-btn[data-seat=A1]').click()");
+    await until(() => evaluate("!document.querySelector('#confirm-btn').disabled"), 'Seat selection did not enable checkout.');
+    await evaluate("document.querySelector('#confirm-btn').click()");
+    await until(() => evaluate("!!document.querySelector('#confirm-payment')"), 'Demo checkout did not open.');
+    await evaluate("document.querySelector('#confirm-payment').click()");
+    await until(() => evaluate("!!document.querySelector('[name=outcome][value=success]')"), 'Demo payment did not open.');
+    await evaluate("document.querySelector('[name=outcome][value=success]').click()");
+    await until(() => evaluate("location.pathname.startsWith('/ticket/') && document.body?.textContent.includes('DEMO TICKET')"),
+        'Confirmed demo ticket did not open.');
+    const demoTicket = await evaluate('location.pathname');
+    assert.equal(await evaluate("document.querySelector('.cw-ticket-invitation')"), null);
+    assert.equal(await evaluate(`fetch(${JSON.stringify(fixture['movie-reviews'])}).then(response => response.status)`), 403);
+    assert.equal(await evaluate("fetch('/__qa__/end-demo-screening', {method:'POST'}).then(response => response.status)"), 204);
+    await go(demoTicket, '#ticket-movie-review');
+    const demoReference = demoTicket.split('/').pop();
+    fixture['movie-form'] = '/booking/' + demoReference + '/movie-review';
+    assert(await evaluate("document.body.textContent.includes('How was your movie experience?')"));
+    await clickLink(cast(demoReference));
+    await until(() => evaluate("!!document.querySelector('.cw-review-form')"), 'Screen review form did not open.');
+    await evaluate(`document.querySelector('[name="overall_rating"][value="3"]').click();
+                  document.querySelector('[name="sound_rating"][value="4"]').click();
+                  document.querySelector('[name=review_text]').value = 'Demo screening: balanced sound.';
+                  document.querySelector('.cw-review-form').requestSubmit()`);
+    await until(() => evaluate("document.body?.textContent.includes('Edit Screen Review')"), 'Demo screen review did not publish.');
+    await clickLink(fixture.reviews);
+    await until(() => evaluate("document.body?.textContent.includes('Demo screening: balanced sound.')"),
+        'The screen review was not visible after publication.');
+    await go(demoTicket, '#ticket-movie-review');
+    await clickLink(fixture['movie-form']);
+    await until(() => evaluate("!!document.querySelector('.cw-review-form [name=review]')"), 'Movie review form did not open.');
+    await evaluate(`document.querySelector('[name="rating"][value="5"]').click();
+                  document.querySelector('[name=title]').value = 'A twist at the bay';
+                  document.querySelector('[name=review]').value = 'The boat returned at dawn.';
+                  document.querySelector('[name=has_spoiler]').click();
+                  document.querySelector('.cw-review-form').requestSubmit()`);
+    await until(() => evaluate("!!document.querySelector('.cw-review-card')"), 'Demo movie review did not publish.');
+    assert(await evaluate("document.querySelector('.cw-review-card').textContent.includes('Demo Booking Review')"));
+    assert.equal(await evaluate("document.querySelector('.cw-review-card').textContent.includes('The boat returned at dawn.')"), false);
+    await evaluate("document.querySelector('.cw-review-card a[href*=reveal]').click()");
+    await until(() => evaluate("document.querySelector('.cw-review-card')?.textContent.includes('The boat returned at dawn.')"),
+        'Spoiler reveal did not display the review body.');
+    await go(demoTicket, '#ticket-movie-review');
+    assert(await evaluate("document.body.textContent.includes('Edit Movie Review')"));
+    await clickLink(fixture['movie-reviews']);
+    await until(() => evaluate("!!document.querySelector('.cw-review-movie-heading')"), 'Read Movie Reviews did not open.');
+    await clickLink(fixture.theatres);
+    await until(() => evaluate("!!document.querySelector('.td-venue-card')"), 'Return to theatres failed.');
+    assert(await evaluate("document.querySelector('.td-explore-link').textContent.includes('Read Reviews')"));
+    await clickLink(fixture.theatre + '#theatre-screens');
+    await until(() => evaluate("!!document.querySelector('#theatre-screens')"), 'Return to theatre detail failed.');
+    await clickLink(fixture.reviews);
+    await until(() => evaluate("document.body?.textContent.includes('Demo screening: balanced sound.')"),
+        'Published demo screen review was not visible from the theatre directory.');
+    console.log('Real browser verified seat selection, demo payment, post-show eligibility, both review forms, spoiler reveal and theatre rediscovery.');
+
     // Use fixed seeds and freshly rendered pages for all screenshot captures.
     const pages = {
         login: '#login-username', register: '#register-email', home: '.cw-featured-hero',
@@ -255,6 +327,7 @@ async function verify(browser, info) {
         'cine-match': '.cm-form',
         theatres: '.td-venue-card', theatre: '#theatre-screens', reviews: '.cw-review-card',
         form: '.cw-review-form', admin: '.cw-review-card', ticket: '.cw-ticket-invitation',
+        'movie-form': '.cw-review-form', 'movie-reviews': '.cw-review-card',
         seats: '#seating-viewport', checkout: '.cw-order',
     };
     const widths = [360, 390, 430, 768, 1024, 1366, 1920];

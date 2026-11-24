@@ -40,6 +40,9 @@ class Booking(db.Model):
     showtime = db.relationship('Showtime', backref=db.backref('bookings', lazy=True))
     payment = db.relationship('Payment', backref='booking', uselist=False,
                               cascade='all, delete-orphan')
+    captured_payments = db.relationship(
+        'Payment', primaryjoin="and_(Booking.id == Payment.booking_id, Payment.status == 'CAPTURED')",
+        viewonly=True)
 
     __table_args__ = (db.Index('ix_booking_user_status_booked', 'user_id', 'status', 'booked_at'),
                       db.Index('ix_booking_showtime_status', 'showtime_id', 'status'))

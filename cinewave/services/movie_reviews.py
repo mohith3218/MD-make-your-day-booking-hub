@@ -1,4 +1,4 @@
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from ..models import Booking, MovieRating, Showtime
 from ..time import cinema_now
@@ -14,7 +14,8 @@ def eligible_booking(movie_id, user_id):
                 .filter(Booking.user_id == user_id, Booking.status == 'PAID',
                         Showtime.movie_id == movie_id, Showtime.show_date <= cinema_now().date(),
                         Showtime.is_cancelled.is_(False))
-                .options(joinedload(Booking.showtime).joinedload(Showtime.movie), joinedload(Booking.payment))
+                .options(joinedload(Booking.showtime).joinedload(Showtime.movie),
+                         selectinload(Booking.captured_payments))
                 .order_by(Booking.id.desc()))
     return next((booking for booking in bookings if completed_booking_source(booking, user_id)), None)
 

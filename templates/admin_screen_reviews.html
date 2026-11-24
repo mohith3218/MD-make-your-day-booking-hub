@@ -1,30 +1,37 @@
 {% extends "admin_base.html" %}
-{% from "partials/screen_review_ui.html" import csrf, category_scores %}
-{% block title %}Moderate screen reviews · CineWave{% endblock %}
+{% from "partials/screen_review_ui.html" import csrf, category_scores, booking_label %}
+{% set endpoint = review_type ~ '_reviews.' %}
+{% block title %}Moderate {{ review_type }} reviews · CineWave{% endblock %}
 {% block content %}
 <section class="cw-review-page cw-review-list">
-  <header class="cw-review-header"><h1>Screen review moderation</h1></header>
+  <header class="cw-review-header"><h1>{{ review_type|capitalize }} review moderation</h1></header>
   <nav class="cw-review-actions cw-moderation-filters" aria-label="Review status">
-    {% for value, label, count in [('all', 'All', counts.total), ('visible', 'Visible', counts.visible), ('reported', 'Reported', counts.reported), ('hidden', 'Hidden', counts.hidden), ('withdrawn', 'Withdrawn', counts.withdrawn), ('verified', 'Verified', counts.verified), ('unverified', 'Unverified', counts.unverified)] %}
-      <a class="cw-review-link" href="{{ url_for('screen_reviews.moderation', view=value) }}" {% if view == value %}aria-current="page"{% endif %}>{{ label }} ({{ count }})</a>
+    {% for value, label, count in [('all', 'All', counts.total), ('visible', 'Visible', counts.visible), ('reported', 'Reported', counts.reported), ('hidden', 'Hidden', counts.hidden), ('withdrawn', 'Withdrawn', counts.withdrawn), ('verified', 'Verified', counts.verified), ('demo', 'Demo', counts.demo), ('unverified', 'Unverified', counts.unverified)] %}
+      <a class="cw-review-link" href="{{ url_for(endpoint ~ 'moderation', view=value) }}" {% if view == value %}aria-current="page"{% endif %}>{{ label }} ({{ count }})</a>
     {% endfor %}
   </nav>
   {% for review in page.items %}
   <article class="cw-review-panel cw-review-card">
     <header>
-      <div><h2>{{ review.theater.name }} · {{ review.screen.name }}</h2><p>{{ review.user.username }} · {{ review.created_at.strftime('%d %b %Y') }}</p></div>
-      <strong><span aria-hidden="true">★</span> {{ review.overall_rating }}/5</strong>
+      <div><h2>{{ review.movie.title if review_type == 'movie' else review.theater.name ~ ' · ' ~ review.screen.name }}</h2><p>{{ review.user.username }} · {{ review.created_at.strftime('%d %b %Y') }}</p></div>
+      <strong><span aria-hidden="true">★</span> {{ review.rating|int if review_type == 'movie' else review.overall_rating }}/5</strong>
     </header>
-    <p class="cw-review-badge">{{ 'Verified Booking' if review.verified else 'Unverified' }} · {{ 'Withdrawn' if review.withdrawn_at else 'Hidden' if review.hidden else 'Visible' }}</p>
-    {{ category_scores(review) }}
-    {% if review.review_text %}<p class="cw-review-copy">{{ review.review_text }}</p>{% endif %}
+    <p class="cw-review-badge">{{ booking_label(review) }} · {{ 'Withdrawn' if review.withdrawn_at else 'Hidden' if review.hidden else 'Visible' }}</p>
+    {% if review_type == 'movie' %}
+      {% if review.title %}<p><strong>{{ review.title }}</strong></p>{% endif %}
+      {% if review.has_spoiler %}<p class="cw-review-note">Contains spoilers</p>{% endif %}
+      <p class="cw-review-copy">{{ review.review }}</p>
+    {% else %}
+      {{ category_scores(review) }}
+      {% if review.review_text %}<p class="cw-review-copy">{{ review.review_text }}</p>{% endif %}
+    {% endif %}
     {% if reports[review.id] %}<details><summary>{{ reports[review.id]|length }} open report(s)</summary><ul>
       {% for report in reports[review.id] %}<li class="cw-review-copy">{{ report.reason }}</li>{% endfor %}
     </ul></details>{% endif %}
     {% if history[review.id] %}<details><summary>Moderation history</summary><ul>
       {% for event in history[review.id] %}<li>{{ event.action|capitalize }} · {{ event.admin.username }} · {{ event.created_at.strftime('%d %b %Y, %H:%M') }} UTC</li>{% endfor %}
     </ul></details>{% endif %}
-    <form method="post" class="cw-review-actions" action="{{ url_for('screen_reviews.moderate', review_id=review.id) }}">
+    <form method="post" class="cw-review-actions" action="{{ url_for(endpoint ~ 'moderate', review_id=review.id) }}">
       {{ csrf(csrf_token) }}
       {% if not review.withdrawn_at %}<button class="cw-button cw-button-primary" name="action" value="{{ 'restore' if review.hidden else 'hide' }}">{{ 'Restore review' if review.hidden else 'Hide review' }}</button>{% endif %}
       {% if reports[review.id] %}<button class="cw-review-text-button" name="action" value="resolve">Resolve reports</button>{% endif %}
@@ -32,9 +39,9 @@
   </article>
   {% else %}<p class="cw-review-panel">No reviews match this view.</p>{% endfor %}
   {% if page.pages > 1 %}<nav class="cw-review-actions" aria-label="Moderation pages">
-    {% if page.has_prev %}<a class="cw-review-link" href="{{ url_for('screen_reviews.moderation', view=view, page=page.prev_num) }}">Previous</a>{% endif %}
+    {% if page.has_prev %}<a class="cw-review-link" href="{{ url_for(endpoint ~ 'moderation', view=view, page=page.prev_num) }}">Previous</a>{% endif %}
     <span>Page {{ page.page }} of {{ page.pages }}</span>
-    {% if page.has_next %}<a class="cw-review-link" href="{{ url_for('screen_reviews.moderation', view=view, page=page.next_num) }}">Next</a>{% endif %}
+    {% if page.has_next %}<a class="cw-review-link" href="{{ url_for(endpoint ~ 'moderation', view=view, page=page.next_num) }}">Next</a>{% endif %}
   </nav>{% endif %}
 </section>
 {% endblock %}

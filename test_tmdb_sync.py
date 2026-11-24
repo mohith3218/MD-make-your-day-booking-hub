@@ -109,7 +109,7 @@ class MovieSyncTests(unittest.TestCase):
         show = Showtime(movie=movie, theater='Original venue', show_date=today, show_time='10:00',
                         price_overrides_json='{"STD":230}')
         booking = Booking(user=customer, showtime=show, seats='A1', status='PAID', total_amount=230)
-        review = MovieRating(movie=movie, user=customer, rating=4, review='A customer review')
+        review = MovieRating(movie=movie, user=customer, booking=booking, rating=4, review='A customer review')
         db.session.add_all([booking, review])
         self.age_movie(movie)
 
@@ -286,9 +286,11 @@ class MovieSyncTests(unittest.TestCase):
         admin_client, customer_client = self.logged_in(admin), self.logged_in(customer)
         movie_url = f'/movie/{movie.id}'
         review_url = f'/api/movie/{movie.id}/rate'
+        reviews_page = f'/movies/{movie.id}/reviews'
+        csrf_header = {'X-CSRF-Token': 'form-token'}
 
         self.assertIn('No screenings scheduled yet.', customer_client.get(movie_url).get_data(as_text=True))
-        self.assertEqual(customer_client.post(review_url, json={'rating': 5}).status_code, 403)
+        self.assertEqual(customer_client.post(review_url, json={'rating': 5}, headers=csrf_header).status_code, 403)
         for client in (self.app.test_client(), customer_client):
             self.assertEqual(client.post('/admin/movies/sync', data={'csrf_token': 'form-token'}).status_code, 302)
         self.assertIsNone(db.session.get(MovieSyncState, 1).requested_at)
@@ -318,19 +320,26 @@ class MovieSyncTests(unittest.TestCase):
             self.assertIn('/ticket/', paid.headers['Location'])
             self.assertEqual(customer_client.get(paid.headers['Location']).status_code, 200)
         self.assertEqual(booking.status, 'PAID')
+        self.assertEqual(customer_client.get(reviews_page).status_code, 403)
 
         show.is_cancelled = True
         db.session.commit()
         self.assertNotIn(f'/book/{show.id}', customer_client.get(movie_url).get_data(as_text=True))
         self.assertEqual(customer_client.get(f'/book/{show.id}').status_code, 302)
         show.is_cancelled = False
-        show.show_date = cinema_now().date() - timedelta(days=1)
-        db.session.add(Booking(user=customer, showtime=show, seats='A2', status='PAID', total_amount=140))
         db.session.commit()
-        self.assertEqual(customer_client.get(f'/book/{show.id}').status_code, 302)
-        self.assertEqual(customer_client.post(review_url, json={'rating': 4, 'review': 'Eligible review'}).status_code, 200)
-        self.assertIn('Eligible review', customer_client.get(movie_url).get_data(as_text=True))
-        self.assertNotIn('Eligible review', admin_client.get(movie_url).get_data(as_text=True))
+        completed = show.show_datetime + timedelta(minutes=movie.duration + 1)
+        with patch('cinewave.models.catalog.cinema_now', return_value=completed), \
+                patch('cinewave.services.movie_reviews.cinema_now', return_value=completed):
+            self.assertEqual(customer_client.get(f'/book/{show.id}').status_code, 302)
+            response = customer_client.post(review_url, json={'rating': 4, 'review': 'Eligible review'},
+                                            headers=csrf_header)
+            self.assertEqual(response.status_code, 200)
+            body = customer_client.get(reviews_page).get_data(as_text=True)
+            self.assertIn('Eligible review', body)
+            self.assertIn('Demo Booking Review</p>', body)
+            self.assertEqual(admin_client.get(reviews_page).status_code, 403)
+            self.assertNotIn('Eligible review', admin_client.get(movie_url).get_data(as_text=True))
 
 
 if __name__ == '__main__':

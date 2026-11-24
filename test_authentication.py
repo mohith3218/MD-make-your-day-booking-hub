@@ -208,7 +208,8 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(api.json['error'], 'authentication_required')
         login_page = self.client.get('/login')
         self.assertNotIn(b'CineMatch', login_page.data)
-        self.assertNotIn(b'Theatres', login_page.data)
+        self.assertIn(b'href="/theatres">Theatres</a>', login_page.data)
+        self.assertEqual(self.client.get('/theatres').status_code, 200)
 
     def test_password_reset_is_digest_backed_single_use_and_invalidates_sessions(self):
         user = self.add_user()

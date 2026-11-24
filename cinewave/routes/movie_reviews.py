@@ -121,6 +121,8 @@ def edit(reference):
     values = {field: getattr(review, field, None) for field in fields}
     errors = {}
     if request.method == 'POST':
+        if review and request.form.get('intent') == 'create':
+            abort(409, description='You already reviewed this movie. Reopen the form to edit it.')
         values, errors = review_values(request.form)
         if not errors:
             saved = save_review(booking, source, existing, values)

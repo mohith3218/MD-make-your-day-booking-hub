@@ -1,7 +1,7 @@
 from flask import session
 from sqlalchemy import case, func
 
-from ..models import ScreenReview
+from ..models import Screen, ScreenReview
 from .reviews import completed_booking_source, published_reviews, rating_distribution
 
 QUESTIONS = (
@@ -25,17 +25,24 @@ def eligible_screen(booking, user_id):
 
 
 def review_invitation(booking, user_id):
-    if not eligible_screen(booking, user_id):
+    screen = eligible_screen(booking, user_id)
+    if screen is None:
         return None
-    if booking.screen_review:
-        return 'edit' if booking.screen_review.withdrawn_at is None else None
+    review = booking.screen_review
+    if review:
+        if review.withdrawn_at is None and (review.user_id, review.screen_id, review.theater_id) == (
+                user_id, screen.id, screen.theater_id):
+            return 'edit'
+        return None
     if booking.screen_review_dismissed_at or booking.id in session.get('dismissed_screen_reviews', []):
         return None
     return 'invite'
 
 
 def public_reviews():
-    return published_reviews(ScreenReview)
+    return (published_reviews(ScreenReview)
+            .join(Screen, Screen.id == ScreenReview.screen_id)
+            .filter(Screen.theater_id == ScreenReview.theater_id))
 
 
 def review_summaries(group, ids):
@@ -44,7 +51,7 @@ def review_summaries(group, ids):
         return {}
     selected = (
         group, func.count(ScreenReview.id).label('count'),
-        func.sum(case((ScreenReview.verified.is_(True), 1), else_=0)).label('verified'),
+        func.sum(case((ScreenReview.verified.is_(True) & ScreenReview.is_demo.is_(False), 1), else_=0)).label('verified'),
         func.sum(case((ScreenReview.is_demo.is_(True), 1), else_=0)).label('demo'),
         func.sum(ScreenReview.overall_rating).label('overall_total'),
         *(func.avg(getattr(ScreenReview, field)).label(field) for field, _ in QUESTIONS),
@@ -62,4 +69,5 @@ def combined_theatre_score(screen_scores):
 
 
 def review_distribution(screen_id):
-    return rating_distribution(public_reviews().filter_by(screen_id=screen_id), ScreenReview.overall_rating)
+    return rating_distribution(public_reviews().filter(ScreenReview.screen_id == screen_id),
+                               ScreenReview.overall_rating)

@@ -1,0 +1,64 @@
+{% extends "public_base.html" %}
+{% from "partials/screen_review_ui.html" import summary, distribution_chart, booking_label, review_filters, report_form %}
+{% block title %}{{ movie.title }} Movie Reviews · CineWave{% endblock %}
+{% block content %}
+<div class="cw-review-page">
+  <a class="cw-review-link" href="{{ url_for('movies.movie_detail', movie_id=movie.id) if not movie.is_archived else url_for('profile.dashboard') }}">← {{ 'Movie details' if not movie.is_archived else 'My bookings' }}</a>
+  <section class="cw-review-panel cw-review-overview" aria-labelledby="movie-reviews-title">
+    <div class="cw-review-header cw-review-movie-heading">
+      {% if movie.poster %}<img class="cw-review-poster" src="{{ movie.poster }}" alt="" width="96" height="144">{% endif %}
+      <div>
+        <p class="cw-overline">Movie Reviews</p>
+        <h1 id="movie-reviews-title">{{ movie.title }}</h1>
+        {% if access_message %}<p>{{ access_message }}</p>{% else %}{{ summary(score, 'overall movie rating') }}{% endif %}
+        {% if access_message and not current_user.is_authenticated %}
+          <a class="cw-review-link" href="{{ url_for('auth.login', next=request.path) }}">Sign in</a>
+        {% elif not access_message and review_state != 'withdrawn' %}
+          <a class="cw-review-link" href="{{ url_for('movie_reviews.edit', reference=booking.reference) }}">{{ 'Edit Movie Review' if review_state == 'edit' else 'Review This Movie' }}</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if not access_message %}{{ distribution_chart(distribution, score) }}{% endif %}
+  </section>
+  {% if not access_message %}
+  <section aria-labelledby="movie-customer-reviews" class="cw-review-list">
+    <h2 id="movie-customer-reviews">Customer reviews</h2>
+    {{ review_filters(filters, movie=true) }}
+    {% for review in page.items %}
+    <article class="cw-review-panel cw-review-card" id="review-{{ review.id }}">
+      <header>
+        <div><h3>{{ review.user.username }}</h3><time datetime="{{ review.created_at.isoformat() }}Z">{{ review.created_at.strftime('%d %b %Y') }}</time></div>
+        <strong><span aria-hidden="true">★</span> {{ review.rating|int }}/5</strong>
+      </header>
+      <p class="cw-review-badge">{{ booking_label(review) }}</p>
+      {% if review.has_spoiler %}
+        <p class="cw-review-note">Contains spoilers</p>
+        {% if reveal == review.id %}
+          <a class="cw-review-link" href="{{ url_for('movie_reviews.detail', movie_id=movie.id, page=page.page, _anchor='review-' ~ review.id, **filters) }}">Hide spoilers</a>
+        {% else %}
+          <a class="cw-review-link" href="{{ url_for('movie_reviews.detail', movie_id=movie.id, page=page.page, reveal=review.id, _anchor='review-' ~ review.id, **filters) }}">Reveal spoilers<span class="cw-sr-only"> in {{ review.user.username }}’s review</span></a>
+        {% endif %}
+      {% endif %}
+      {% if not review.has_spoiler or reveal == review.id %}
+        {% if review.title %}<p><strong>{{ review.title }}</strong></p>{% endif %}
+        <p class="cw-review-copy">{{ review.review }}</p>
+      {% endif %}
+      {% if review.id in reported %}
+        <p class="cw-review-note">You reported this review.</p>
+      {% elif review.user_id != current_user.id %}
+        {{ report_form(url_for('movie_reviews.report', review_id=review.id), csrf_token) }}
+      {% endif %}
+    </article>
+    {% else %}<p class="cw-review-panel">{{ 'No movie reviews match these filters.' if score else 'No customer reviews have been published for this movie yet.' }}</p>
+    {% endfor %}
+    {% if page.pages > 1 %}
+    <nav class="cw-review-actions" aria-label="Review pages">
+      {% if page.has_prev %}<a class="cw-review-link" href="{{ url_for('movie_reviews.detail', movie_id=movie.id, page=page.prev_num, **filters) }}">Previous</a>{% endif %}
+      <span>Page {{ page.page }} of {{ page.pages }}</span>
+      {% if page.has_next %}<a class="cw-review-link" href="{{ url_for('movie_reviews.detail', movie_id=movie.id, page=page.next_num, **filters) }}">Next</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

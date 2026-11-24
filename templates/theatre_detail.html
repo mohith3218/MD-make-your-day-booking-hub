@@ -21,7 +21,7 @@
           {{ summary(score, 'overall screen rating') }}
           {{ category_scores(score) }}
           {{ verified_count(score) }}
-          <a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=theatre.id, screen_id=screen.id) }}">View screen reviews <span aria-hidden="true">→</span><span class="cw-sr-only"> for {{ screen.name }}</span></a>
+          <a class="cw-button cw-button-white cw-button-small" href="{{ url_for('screen_reviews.detail', theatre_id=theatre.id, screen_id=screen.id) }}">View Screen Reviews <span aria-hidden="true">→</span><span class="cw-sr-only"> for {{ screen.name }}</span></a>
         </article>
       {% else %}<p>No screens have been configured for this theatre.</p>{% endfor %}
     </div>

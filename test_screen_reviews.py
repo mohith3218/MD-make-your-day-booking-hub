@@ -1,5 +1,5 @@
 """Screen review and hype regressions, using an isolated in-memory SQLite app."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 from os import environ
 import unittest
 from unittest.mock import patch
@@ -9,8 +9,9 @@ from werkzeug.datastructures import MultiDict
 
 from cinewave.extensions import db
 from cinewave.factory import create_app
-from cinewave.models import (Booking, Movie, MovieHypeVote, MovieRating, Payment, Screen, ScreenReview,
-                             ScreenReviewModeration, ScreenReviewReport, Showtime, Theater, User)
+from cinewave.models import (Booking, Movie, MovieHypeVote, MovieRating, MovieReviewModeration,
+                             MovieReviewReport, Payment, Screen, ScreenReview, ScreenReviewModeration,
+                             ScreenReviewReport, Showtime, Theater, User)
 from cinewave.time import cinema_now
 
 
@@ -64,8 +65,11 @@ class CineWaveExperienceTests(unittest.TestCase):
         return show
 
     @staticmethod
-    def book(user, show, status='PAID'):
+    def book(user, show, status='PAID', gateway='razorpay', payment_status='CAPTURED'):
         booking = Booking(user=user, showtime=show, seats='A1', status=status, total_amount=150)
+        if status == 'PAID' and gateway:
+            booking.paid_at = datetime.utcnow()
+            booking.payment = Payment(gateway=gateway, status=payment_status)
         db.session.add(booking)
         return booking
 
@@ -88,15 +92,23 @@ class CineWaveExperienceTests(unittest.TestCase):
         canceled = self.book(self.viewer, self.ended, 'CANCELLED')
         ongoing = self.book(self.viewer, self.in_progress)
         future = self.book(self.viewer, self.future)
-        demo = self.book(self.viewer, self.ended)
-        demo.payment = Payment(gateway='mock', status='CAPTURED')
-        refunded = self.book(self.viewer, self.ended)
-        refunded.payment = Payment(gateway='historical', status='REFUNDED')
+        demo = self.book(self.viewer, self.ended, gateway='mock')
+        demo.paid_at = None
+        refunded = self.book(self.viewer, self.ended, payment_status='REFUNDED')
+        unpaid_capture = self.book(self.viewer, self.ended, payment_status='CREATED')
+        missing_payment = self.book(self.viewer, self.ended, gateway=None)
+        cancelled_show = self.show(cinema_now() - timedelta(days=1))
+        cancelled_show.is_cancelled = True
+        cancelled_screening = self.book(self.viewer, cancelled_show)
+        wrong_theatre = self.show(cinema_now() - timedelta(days=1))
+        wrong_theatre.theater = self.other_theater.name
+        mismatched = self.book(self.viewer, wrong_theatre)
         no_screen = self.show(cinema_now() - timedelta(days=1))
         no_screen.screen = None
         legacy = self.book(self.viewer, no_screen)
         db.session.commit()
-        for booking in (pending, canceled, ongoing, future, demo, refunded, legacy):
+        for booking in (pending, canceled, ongoing, future, demo, refunded, unpaid_capture,
+                        missing_payment, cancelled_screening, mismatched, legacy):
             with self.subTest(status=booking.status, ref=booking.reference):
                 self.assertNotIn('Review This Screen', self.client.get(f'/ticket/{booking.reference}').text)
                 self.assertEqual(self.client.get(self.edit_url(booking)).status_code, 403)
@@ -107,7 +119,7 @@ class CineWaveExperienceTests(unittest.TestCase):
         self.assertEqual(self.client.get(self.edit_url()).status_code, 200)
         self.assertEqual(self.client.post(self.edit_url() + '/dismiss').status_code, 400)
         self.assertEqual(self.post(self.client, self.edit_url() + '/dismiss').status_code, 303)
-        self.assertNotIn('How was your movie experience?', self.client.get(ticket).text)
+        self.assertNotIn('How was your movie experience?', self.client_for(self.viewer).get(ticket).text)
         self.assertNotIn('Review This Screen', self.client.get('/dashboard').text)
         self.assertEqual(self.client.get(self.edit_url()).status_code, 200)
 
@@ -142,12 +154,14 @@ class CineWaveExperienceTests(unittest.TestCase):
         self.assertNotIn(markup, rendered)
 
     def test_edit_updates_same_review_and_withdrawal_removes_it_from_public_view(self):
-        self.assertEqual(self.submit(overall_rating=2, sound_rating=3).status_code, 303)
+        self.assertEqual(self.submit(intent='create', overall_rating=2, sound_rating=3).status_code, 303)
+        self.assertEqual(self.submit(intent='create', overall_rating=5).status_code, 409)
         original = ScreenReview.query.one()
         ticket = self.client.get(f'/ticket/{self.booking.reference}').text
-        self.assertIn('Edit screen review', ticket)
+        self.assertIn('Edit Screen Review', ticket)
+        self.assertIn(f'href="{self.detail_url()}">Read Screen Reviews', ticket)
         self.assertNotIn('How was your movie experience?', ticket)
-        self.assertEqual(self.submit(overall_rating=5, sound_rating='').status_code, 303)
+        self.assertEqual(self.submit(intent='edit', overall_rating=5, sound_rating='').status_code, 303)
         review = ScreenReview.query.one()
         self.assertEqual(original.id, review.id)
         self.assertEqual(review.overall_rating, 5)
@@ -178,7 +192,7 @@ class CineWaveExperienceTests(unittest.TestCase):
         db.session.commit()
         listing = self.client.get('/theatres').text
         self.assertIn('Not rated yet', listing)
-        self.assertIn('Explore Screens', listing)
+        self.assertIn('Be the first to review', listing)
         self.assertIn('Main Road', listing)
 
         low = self.book(self.second, self.ended)
@@ -200,6 +214,7 @@ class CineWaveExperienceTests(unittest.TestCase):
         self.assertIn('4 reviews', theatre)
         self.assertIn('3 verified booking reviews', theatre)
         self.assertIn('3.0/5</strong> theatre rating', self.client.get('/theatres').text)
+        self.assertIn('Read Reviews', self.app.test_client().get('/theatres').text)
         details = self.client.get(self.detail_url() + '?sort=lowest').text
         self.assertLess(details.index('Low score'), details.index('Clear sound'))
         self.assertIn('Verified Booking', details)
@@ -243,6 +258,161 @@ class CineWaveExperienceTests(unittest.TestCase):
         self.assertIn('Edited', reporter.get(self.detail_url() + '?verified=1').text)
         self.assertEqual([row.action for row in ScreenReviewModeration.query.order_by(ScreenReviewModeration.id)],
                          ['hide', 'restore'])
+
+    def test_guests_can_find_and_read_screen_reviews_and_demo_is_never_verified(self):
+        guest = self.app.test_client()
+        self.assertIn('href="/theatres"', guest.get('/login').text)
+        listing = guest.get('/theatres')
+        self.assertEqual(listing.status_code, 200)
+        self.assertIn(f'/theatres/{self.theater.id}#theatre-screens', listing.text)
+        self.assertIn('Be the first to review', listing.text)
+        detail = guest.get(f'/theatres/{self.theater.id}')
+        self.assertEqual(detail.status_code, 200)
+        for screen in (self.screen, self.other_screen):
+            self.assertIn(f'href="{self.detail_url(screen)}">View Screen Reviews', detail.text)
+        empty = guest.get(self.detail_url())
+        self.assertEqual(empty.status_code, 200)
+        self.assertIn('Watched a movie here?', empty.text)
+        self.assertEqual(guest.post(self.edit_url(), data={'overall_rating': 5}).status_code, 302)
+        demo = self.book(self.viewer, self.ended, gateway='mock')
+        db.session.flush()
+        db.session.add(Payment(booking_id=demo.id, gateway='wallet', status='FAILED'))
+        db.session.commit()
+        self.assertIn('Review This Screen', self.client.get(f'/ticket/{demo.reference}').text)
+        self.assertEqual(self.submit(demo, overall_rating=4, review_text='Demo sound check').status_code, 303)
+        review = ScreenReview.query.one()
+        self.assertTrue(review.is_demo)
+        self.assertFalse(review.verified)
+        listing = guest.get(self.detail_url() + '?source=demo&rating=4')
+        self.assertIn('Demo Booking Review</p>', listing.text)
+        self.assertNotIn('Verified Booking</p>', listing.text)
+        self.assertIn('0 verified booking reviews', listing.text)
+        self.assertIn('1 demo booking review', listing.text)
+        self.assertIn('Demo sound check', listing.text)
+        self.assertNotIn(demo.reference, listing.text)
+        self.assertNotIn('Report review', listing.text)
+        self.assertNotIn('Demo sound check', guest.get(self.detail_url() + '?verified=1').text)
+        self.assertNotIn('Demo sound check', guest.get(self.detail_url() + '?rating=5').text)
+        report_path = f'/screen-reviews/{review.id}/report'
+        self.assertEqual(guest.post(report_path, data={'reason': 'Guest report'}).status_code, 302)
+
+    def test_movie_reviews_require_owned_paid_screenings_and_are_independent(self):
+        url = f'/movies/{self.movie.id}/reviews'
+        edit_url = f'/booking/{self.booking.reference}/movie-review'
+        guest = self.app.test_client()
+        other = self.client_for(self.second)
+        message = 'Movie reviews become available after you complete your booked screening.'
+        for client in (guest, other):
+            response = client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertIn(message, response.text)
+        self.assertEqual(self.post(guest, edit_url, rating=4, review='Guest').status_code, 302)
+        self.assertEqual(self.post(other, edit_url, rating=4, review='Wrong owner').status_code, 404)
+        for show, status, proof in ((self.in_progress, 'PAID', 'CAPTURED'), (self.future, 'PAID', 'CAPTURED'),
+                                    (self.ended, 'PAID', 'REFUNDED'), (self.ended, 'CANCELLED', 'CAPTURED'),
+                                    (self.ended, 'PENDING', 'CAPTURED')):
+            booking = self.book(self.second, show, status, payment_status=proof)
+            db.session.commit()
+            self.assertEqual(other.get(url).status_code, 403)
+            path = f'/booking/{booking.reference}/movie-review'
+            self.assertEqual(self.post(other, path, rating=5, review='Too early').status_code, 403)
+        self.assertEqual(self.client.get(f'/movies/{self.upcoming.id}/reviews').status_code, 403)
+        self.assertEqual(self.client.post(edit_url, data={'rating': 4, 'review': 'No token'}).status_code, 400)
+        self.assertEqual(self.post(self.client, edit_url, rating=4, review='  ').status_code, 422)
+        self.assertEqual(self.post(self.client, edit_url, rating=4, review='Wrong movie',
+                                   movie_id=self.upcoming.id).status_code, 404)
+        ticket = f'/ticket/{self.booking.reference}'
+        for body in (self.client.get(ticket).text, self.client.get('/dashboard').text,
+                     self.client.get('/profile').text):
+            for action in ('Review This Screen', 'Review This Movie', 'Read Movie Reviews'):
+                self.assertIn(action, body)
+        legacy = MovieRating(user=self.viewer, movie=self.movie, rating=4.5, review='Legacy unbacked text')
+        db.session.add(legacy)
+        db.session.commit()
+        self.assertNotIn('Legacy unbacked text', self.client.get(url).text)
+        self.assertNotIn('Legacy unbacked text', self.client.get(edit_url).text)
+        self.assertEqual(self.post(self.client, edit_url, rating=4, title='My review',
+                                   review='Hidden plot detail', has_spoiler=1).status_code, 303)
+        self.assertEqual(MovieRating.query.one().id, legacy.id)
+        self.assertTrue(legacy.verified)
+        self.assertEqual(legacy.booking_id, self.booking.id)
+        self.assertIn('Edit Movie Review', self.client.get(ticket).text)
+        self.assertIn('Review This Screen', self.client.get(ticket).text)
+        self.assertEqual(self.submit(overall_rating=2, review_text='Screen experience').status_code, 303)
+        self.assertIn('Edit Screen Review', self.client.get(ticket).text)
+        self.assertIn('Edit Movie Review', self.client.get(ticket).text)
+        self.assertIn('2.0/5', guest.get(self.detail_url()).text)
+        self.assertNotIn('Hidden plot detail', self.client.get(url).text)
+        self.assertNotIn('My review', self.client.get(url).text)
+        self.assertEqual(self.client.get(url).headers['Cache-Control'], 'private, no-store')
+        self.assertIn('Hidden plot detail', self.client.get(url + f'?reveal={legacy.id}').text)
+        self.assertNotIn('Hidden plot detail', other.get(url + f'?reveal={legacy.id}').text)
+
+    def test_movie_demo_filter_edit_report_moderate_and_withdraw(self):
+        url = f'/movies/{self.movie.id}/reviews'
+        demo_screen = Screen(theater=self.other_theater, name='Another cinema screen')
+        demo_show = self.show(cinema_now() - timedelta(days=2), demo_screen)
+        demo = self.book(self.second, demo_show, gateway='wallet')
+        other = self.client_for(self.second)
+        admin = self.client_for(self.admin)
+        db.session.commit()
+        demo_url = f'/booking/{demo.reference}/movie-review'
+        real_url = f'/booking/{self.booking.reference}/movie-review'
+        self.assertEqual(self.post(other, demo_url, intent='create', rating=2, review='Demo opinion').status_code, 303)
+        self.assertEqual(self.post(other, demo_url, intent='create', rating=5, review='Duplicate').status_code, 409)
+        self.assertEqual(self.post(self.client, real_url, rating=5, review='Real opinion').status_code, 303)
+        review = MovieRating.query.filter_by(user_id=self.second.id).one()
+        self.assertFalse(review.verified)
+        self.assertTrue(review.is_demo)
+        self.assertIn('3.5/5', self.client.get(url).text)
+        self.assertIn('2 reviews', self.client.get(url).text)
+        self.assertIn('value="1" aria-label="5-star reviews"', other.get(url).text)
+        for order, first, second in (('oldest', 'Demo', 'Real'), ('recent', 'Real', 'Demo'),
+                                     ('highest', 'Real', 'Demo'), ('lowest', 'Demo', 'Real')):
+            body = other.get(url + '?sort=' + order).text
+            self.assertLess(body.index(first + ' opinion'), body.index(second + ' opinion'))
+        filtered = self.client.get(url + '?source=demo&rating=2&spoiler=no').text
+        self.assertIn('Demo Booking Review</p>', filtered)
+        self.assertNotIn('Verified Booking</p>', filtered)
+        self.assertIn('Demo opinion', filtered)
+        self.assertNotIn('Demo opinion', self.client.get(url + '?spoiler=yes').text)
+        self.assertNotIn('Demo opinion', self.client.get(url + '?source=verified').text)
+        self.assertNotIn('Demo opinion', self.client.get(url + '?rating=5').text)
+        report = f'/movie-reviews/{review.id}/report'
+        moderate = f'/admin/movie-reviews/{review.id}/moderate'
+        self.assertEqual(self.post(other, report, reason='Cannot report own review').status_code, 403)
+        self.assertEqual(self.post(admin, report, reason='No booking for this film').status_code, 403)
+        self.assertEqual(self.client.post(report, data={'reason': 'Missing CSRF'}).status_code, 400)
+        for _ in range(2):
+            self.assertEqual(self.post(self.client, report, reason='Please check this review.').status_code, 303)
+        self.assertEqual(MovieReviewReport.query.count(), 1)
+        self.assertEqual(other.get('/admin/movie-reviews').status_code, 403)
+        self.assertEqual(self.post(other, moderate, action='hide').status_code, 403)
+        self.assertEqual(admin.post(moderate, data={'action': 'hide'}).status_code, 400)
+        self.assertIn('Please check this review.', admin.get('/admin/movie-reviews?view=reported').text)
+        self.assertEqual(self.post(admin, moderate, action='hide').status_code, 303)
+        self.assertEqual(MovieReviewModeration.query.one().action, 'hide')
+        self.assertIsNotNone(MovieReviewReport.query.one().resolved_at)
+        self.assertIn('5.0/5', self.client.get(url).text)
+        self.assertNotIn('Demo opinion', self.client.get(url).text)
+        repeat = self.book(self.second, self.ended)
+        db.session.commit()
+        edit = f'/booking/{repeat.reference}/movie-review'
+        self.assertIn('Edit your movie review', other.get(edit).text)
+        self.assertEqual(self.post(other, edit, rating=3, review='Updated opinion').status_code, 303)
+        self.assertEqual(MovieRating.query.filter_by(user_id=self.second.id).count(), 1)
+        self.assertEqual(review.booking_id, demo.id)
+        self.assertNotIn('Updated opinion', self.client.get(url).text)
+        self.assertEqual(self.post(admin, moderate, action='restore').status_code, 303)
+        self.assertIn('Updated opinion', self.client.get(url).text)
+        self.assertEqual(self.post(other, edit + '/withdraw').status_code, 303)
+        self.assertEqual(self.post(other, edit, rating=3, review='Duplicate').status_code, 409)
+        self.assertEqual(self.post(admin, moderate, action='restore').status_code, 409)
+        self.assertNotIn('Updated opinion', self.client.get(url).text)
+        db.session.add(MovieRating(user=self.second, movie=self.movie, booking=repeat, rating=4, review='Duplicate'))
+        with self.assertRaises(IntegrityError):
+            db.session.commit()
+        db.session.rollback()
 
     def test_hype_json_updates_all_counts_and_same_vote_is_idempotent(self):
         url = f'/movies/{self.upcoming.id}/hype'

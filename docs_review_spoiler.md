@@ -1,5 +1,5 @@
-# Review and spoiler notes
+# Movie review spoilers
 
-The rating endpoint now stores the `review` text on the existing `MovieRating.review` column and keeps the standalone `has_spoiler` flag. Auto-detection runs only when the user did not explicitly toggle the Spoiler Shield checkbox.
+An eligible viewer can mark a written movie review as containing spoilers. The movie review page omits the title and text of that review until the reader chooses **Reveal spoilers**. The same completed-booking check applies to the reveal request. **Hide spoilers** returns the review to its collapsed display.
 
-The movie page renders spoiler reviews inside a tappable spoiler shield block, with the review text blurred until the user taps "Tap to reveal". Non-spoiler reviews render normally.
+The feature extends the existing `MovieRating` records. Legacy ratings without a booking link remain in the database and are excluded from the written-review page and its averages. An eligible viewer can publish a new draft in their existing record.
