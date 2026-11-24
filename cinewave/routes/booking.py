@@ -3,6 +3,7 @@ from math import isfinite
 from flask import Blueprint
 from ._support import *
 from ..services.screen_reviews import review_invitation
+from ..services.movie_reviews import movie_review_states
 
 bp = Blueprint("booking", __name__)
 
@@ -787,6 +788,7 @@ def ticket(reference):
                            showtime=booking.showtime,
                            movie=booking.showtime.movie,
                            screen_review_state=review_invitation(booking, current_user.id),
+                           movie_review_state=movie_review_states([booking], current_user.id).get(booking.id),
                            payment=booking.payment)
 
 

@@ -2,7 +2,9 @@ from flask import Blueprint
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ._support import *
-from ..services.screen_reviews import eligible_screen
+from .movie_reviews import own_rating, review_values, save_review
+from ..services.movie_reviews import ACCESS_MESSAGE, eligible_booking
+from ..services.reviews import completed_booking_source
 from ..services.seat import screening_availability
 
 bp = Blueprint("movies", __name__)
@@ -141,19 +143,10 @@ def movie_detail(movie_id):
     hype_counts = MovieHypeVote.counts_for(movie.id) if movie.is_upcoming and not movie.is_archived else {}
     vote = MovieHypeVote.query.filter_by(user_id=current_user.id, movie_id=movie.id).first() if hype_counts else None
     return render_template('movie.html', movie=movie, showtimes=shows, grouped=grouped,
-                           remaining_seats=remaining_seats, can_review=can_review_movie(movie),
+                           remaining_seats=remaining_seats,
+                           review_booking=eligible_booking(movie.id, current_user.id),
+                           movie_review_access_message=ACCESS_MESSAGE,
                            movie_hype_counts=hype_counts, movie_hype_mine=vote.level if vote else None)
-
-
-def can_review_movie(movie):
-    if not current_user.is_authenticated or movie.is_archived:
-        return False
-    if not movie.tmdb_managed:
-        return True
-    bookings = Booking.query.join(Showtime).filter(
-        Booking.user_id == current_user.id, Booking.status == 'PAID', Showtime.movie_id == movie.id,
-        Showtime.show_date <= cinema_now().date()).all()
-    return any(eligible_screen(booking, current_user.id) for booking in bookings)
 
 
 @bp.route('/api/movies/by-mood/<mood_code>')
@@ -218,51 +211,22 @@ def watchlist_page():
 @bp.route('/api/movie/<int:movie_id>/rate', methods=['POST'])
 @login_required
 def rate_movie(movie_id):
-    movie = Movie.query.get_or_404(movie_id)
-    if not can_review_movie(movie):
-        return jsonify({'success': False, 'message': 'Complete an eligible booked screening to review this film.'}), 403
-    data = request.get_json(silent=True) or request.form
-    try:
-        score = float(data.get('rating', 0))
-    except (ValueError, TypeError):
-        return jsonify({'success': False, 'message': 'Invalid rating score'}), 400
-
-    if not 1.0 <= score <= 5.0:
-        return jsonify({'success': False, 'message': 'Rating must be between 1 and 5 stars'}), 400
-
-    review_text = (data.get('review') or '').strip()[:500]
-    has_spoiler = bool(data.get('has_spoiler', False))
-    # Auto-detect plot spoilers if not explicitly flagged
-    if not has_spoiler and review_text:
-        spoiler_triggers = ['die', 'dies', 'died', 'death', 'kill', 'kills', 'killed', 'murder',
-                            'climax', 'twist', 'ending', 'ends with', 'post credit', 'villain is',
-                            'culprit', 'betray', 'killer is']
-        if any(trig in review_text.lower() for trig in spoiler_triggers):
-            has_spoiler = True
-
-    rating_obj = MovieRating.query.filter_by(user_id=current_user.id, movie_id=movie_id).first()
-    is_new = False
-    if rating_obj:
-        rating_obj.rating = score
-        rating_obj.review = review_text
-        rating_obj.has_spoiler = has_spoiler
-        rating_obj.created_at = datetime.utcnow()
-    else:
-        rating_obj = MovieRating(user_id=current_user.id, movie_id=movie_id, rating=score,
-                                 review=review_text, has_spoiler=has_spoiler)
-        db.session.add(rating_obj)
-        is_new = True
-
-    if is_new:
-        current_user.points = (current_user.points or 0) + 5
-
-    db.session.commit()
-
-    return jsonify({
-        'success': True,
-        'message': f"You rated '{movie.title}' {score:.1f} ★" + (" (+5 CinePass Pts)" if is_new else ""),
-        'rating': score,
-        'has_spoiler': has_spoiler,
-        'movie_avg_rating': movie.display_rating,
-        'user_points': current_user.points
-    })
+    movie = db.get_or_404(Movie, movie_id)
+    booking = eligible_booking(movie_id, current_user.id)
+    if not booking:
+        return jsonify(success=False, message=ACCESS_MESSAGE), 403
+    review = own_rating(movie.id)
+    if review and review.withdrawn_at:
+        return jsonify(success=False, message='This movie review was withdrawn.'), 409
+    data = request.get_json(silent=True) if request.is_json else request.form
+    if not hasattr(data, 'get'):
+        return jsonify(success=False, message='Provide a rating and a written review.'), 400
+    values, errors = review_values(data)
+    if errors:
+        return jsonify(success=False, message=next(iter(errors.values())), errors=errors), 400
+    saved = save_review(booking, completed_booking_source(booking, current_user.id), review, values)
+    if saved is None:
+        return jsonify(success=False, message='You already reviewed this movie. Open your review to edit it.'), 409
+    return jsonify(success=True, message='Your movie review was saved.', rating=saved.rating,
+                   has_spoiler=saved.has_spoiler, movie_avg_rating=movie.display_rating,
+                   user_points=current_user.points)

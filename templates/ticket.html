@@ -99,7 +99,7 @@
         <h2 id="ticket-screen-review">Your screen review</h2>
       {% endif %}
       <div class="cw-review-actions">
-        <a class="cw-button cw-button-primary" href="{{ url_for('screen_reviews.edit', reference=booking.reference) }}">{{ 'Edit screen review' if screen_review_state == 'edit' else 'Review This Screen' }}</a>
+        <a class="cw-button cw-button-primary" href="{{ url_for('screen_reviews.edit', reference=booking.reference) }}">{{ 'Edit Screen Review' if screen_review_state == 'edit' else 'Review This Screen' }}</a>
         {% if screen_review_state == 'invite' %}
           <form method="post" action="{{ url_for('screen_reviews.dismiss', reference=booking.reference) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -110,27 +110,14 @@
     </section>
   {% endif %}
 
-  <!-- Rate this Film Card -->
-  <div class="glass-card rounded-2xl p-5 border border-amber-400/20 bg-[#171825]/90 text-center space-y-3">
-    {% set user_score = movie.get_user_rating(current_user) if current_user.is_authenticated else None %}
-    <p class="text-xs font-bold text-white">How was <span class="text-amber-400">{{ movie.title }}</span>?</p>
-    <p class="text-[11px] text-slate-400">Leave your rating to update your personal Film DNA and earn +5 CinePass Points!</p>
-    
-    <div class="flex items-center justify-center gap-2 pt-1">
-      {% for star in range(1, 6) %}
-        <button type="button" onclick="submitTicketRating({{ movie.id }}, {{ star }})"
-                onmouseenter="hoverTicketStars({{ star }})"
-                onmouseleave="resetTicketStars({{ user_score or 0 }})"
-                class="ticket-star-{{ star }} text-2xl transition duration-150 {% if user_score and user_score >= star %}text-amber-400{% else %}text-slate-600 hover:text-amber-400{% endif %}"
-                title="Rate {{ star }} star{% if star > 1 %}s{% endif %}">
-          <i class="fa-solid fa-star"></i>
-        </button>
-      {% endfor %}
+  {% if movie_review_state %}
+  <section class="cw-review-panel cw-ticket-invitation" aria-labelledby="ticket-movie-review">
+    <h2 id="ticket-movie-review">Movie reviews</h2>
+    <div class="cw-review-actions">
+      {% include "partials/movie_review_actions.html" %}
     </div>
-    <p id="ticket-rating-feedback" class="text-xs font-bold text-amber-400">
-      {% if user_score %}Your rating: {{ '%.1f'|format(user_score) }} ★{% endif %}
-    </p>
-  </div>
+  </section>
+  {% endif %}
 
   <div class="flex flex-wrap gap-3 justify-center">
     {% set wa_text = "🎟️ MD CineWave E-Ticket\n" ~ movie.title ~ "\n📍 " ~ showtime.theater ~ "\n📅 " ~ showtime.show_date.strftime('%a, %d %b %Y') ~ " at " ~ showtime.show_time ~ "\n💺 Seats: " ~ booking.seats ~ "\n🆔 Ref: " ~ booking.reference %}
@@ -156,47 +143,4 @@
     <a href="{{ url_for('main.home') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">Book another</a>
   </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-  let ticketUserScore = {{ (movie.get_user_rating(current_user) or 0) if current_user.is_authenticated else 0 }};
-
-  function hoverTicketStars(score) {
-    for (let i = 1; i <= 5; i++) {
-      const btn = document.querySelector(`.ticket-star-${i}`);
-      if (!btn) continue;
-      if (i <= score) {
-        btn.classList.add('text-amber-400');
-        btn.classList.remove('text-slate-600');
-      } else {
-        btn.classList.remove('text-amber-400');
-        btn.classList.add('text-slate-600');
-      }
-    }
-  }
-
-  function resetTicketStars(score) {
-    hoverTicketStars(score || ticketUserScore);
-  }
-
-  async function submitTicketRating(movieId, score) {
-    try {
-      const res = await fetch(`/api/movie/${movieId}/rate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rating: score })
-      });
-      const data = await res.json();
-      if (data.success) {
-        ticketUserScore = score;
-        hoverTicketStars(score);
-        const fb = document.getElementById('ticket-rating-feedback');
-        if (fb) fb.textContent = `You rated: ${score.toFixed(1)} ★ (+5 CinePass Pts earned!)`;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-</script>
 {% endblock %}

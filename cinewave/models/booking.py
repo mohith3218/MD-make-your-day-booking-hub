@@ -30,6 +30,7 @@ class Booking(db.Model):
     lock_token = db.Column(db.String(40), nullable=True)
     booked_at = db.Column(db.DateTime, default=datetime.utcnow)
     paid_at = db.Column(db.DateTime, nullable=True)
+    screen_review_dismissed_at = db.Column(db.DateTime)
     ticket_email_sent_at = db.Column(db.DateTime, nullable=True)
     ticket_email_error = db.Column(db.String(300), nullable=True)
     expires_at = db.Column(db.DateTime,

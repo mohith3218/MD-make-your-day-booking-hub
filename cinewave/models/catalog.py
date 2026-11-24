@@ -67,7 +67,7 @@ class Movie(db.Model):
 
     @property
     def display_rating(self):
-        ratings = [r.rating for r in self.user_ratings]
+        ratings = [r.rating for r in self.user_ratings if r.is_published]
         if ratings:
             return round(sum(ratings) / len(ratings), 1)
         return None
@@ -136,11 +136,30 @@ class MovieRating(db.Model):
     review = db.Column(db.String(500), nullable=True)
     has_spoiler = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    booking_id = db.Column(db.Integer, db.ForeignKey('booking.id', name='fk_movie_rating_booking'))
+    title = db.Column(db.String(120))
+    verified = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    is_demo = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    withdrawn_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime)
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'movie_id', name='_user_movie_rating_uc'),)
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'movie_id', name='_user_movie_rating_uc'),
+        db.Index('ix_movie_rating_visibility', 'movie_id', 'hidden', 'withdrawn_at'),
+        db.CheckConstraint(
+            'booking_id IS NULL OR (rating BETWEEN 1 AND 5 AND rating = CAST(rating AS INTEGER)'
+            ' AND review IS NOT NULL AND length(trim(review)) > 0)',
+            name='ck_movie_rating_booked_review'),
+    )
 
     user = db.relationship('User', backref=db.backref('movie_ratings', lazy=True, cascade='all, delete-orphan'))
     movie = db.relationship('Movie', backref=db.backref('user_ratings', lazy=True, cascade='all, delete-orphan'))
+    booking = db.relationship('Booking')
+
+    @property
+    def is_published(self):
+        return self.booking_id is not None and not self.hidden and self.withdrawn_at is None
 
 
 class MovieHypeVote(db.Model):

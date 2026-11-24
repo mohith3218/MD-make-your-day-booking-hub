@@ -1,0 +1,4 @@
+{% if movie_review_state in ('invite', 'edit') %}
+  <a class="cw-review-link" href="{{ url_for('movie_reviews.edit', reference=booking.reference) }}">{{ 'Edit Movie Review' if movie_review_state == 'edit' else 'Review This Movie' }}</a>
+{% endif %}
+<a class="cw-review-link" href="{{ url_for('movie_reviews.detail', movie_id=booking.showtime.movie_id) }}">Read Movie Reviews</a>

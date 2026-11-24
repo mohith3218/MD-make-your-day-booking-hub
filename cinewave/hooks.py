@@ -42,7 +42,9 @@ def register_hooks(application):
     def require_sign_in_for_application_routes():
         g.pop('_login_user', None)
         public = {'static', 'auth.login', 'auth.register', 'auth.verify_email',
-                  'auth.resend_email_otp', 'auth.forgot_password', 'auth.reset_password'}
+                  'auth.resend_email_otp', 'auth.forgot_password', 'auth.reset_password',
+                  'theatre_discovery.index', 'theatre_discovery.detail', 'screen_reviews.detail',
+                  'movie_reviews.detail'}
         if request.endpoint is None or request.endpoint in public or current_user.is_authenticated:
             return None
         if request.path.startswith('/api/') or request.is_json or (
@@ -71,10 +73,14 @@ def register_hooks(application):
                      'admin.add_showtime', 'admin.add_movie', 'admin.toggle_rerelease', 'admin.delete_movie',
                      'admin.verify_theater', 'admin.verify_screen', 'admin.archive_movie',
                      'movies.vote_movie_hype', 'screen_reviews.edit', 'screen_reviews.dismiss',
-                     'screen_reviews.withdraw', 'screen_reviews.report', 'screen_reviews.moderate'}
+                     'screen_reviews.withdraw', 'screen_reviews.report', 'screen_reviews.moderate',
+                     'movie_reviews.edit', 'movie_reviews.withdraw', 'movie_reviews.report',
+                     'movie_reviews.moderate', 'movies.rate_movie'}
         if request.method == 'POST' and request.endpoint in protected:
             expected = session.get('_csrf_token', '')
             supplied = request.form.get('csrf_token', '')
+            if request.endpoint == 'movies.rate_movie' and request.is_json:
+                supplied = request.headers.get('X-CSRF-Token', '')
             if not expected or not supplied or not hmac.compare_digest(expected, supplied):
                 abort(400, description='Your form session expired. Reload the page and try again.')
 

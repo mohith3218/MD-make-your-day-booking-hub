@@ -17,6 +17,7 @@ class ScreenReview(db.Model):
     comfort_rating = db.Column(db.Integer)
     review_text = db.Column(db.String(1000))
     verified = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    is_demo = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     withdrawn_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -55,6 +56,30 @@ class ScreenReviewReport(db.Model):
 class ScreenReviewModeration(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     review_id = db.Column(db.Integer, db.ForeignKey('screen_review.id'), nullable=False, index=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    action = db.Column(db.String(20), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    admin = db.relationship('User')
+
+
+class MovieReviewReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    review_id = db.Column(db.Integer, db.ForeignKey('movie_rating.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    reason = db.Column(db.String(300), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime)
+
+    __table_args__ = (
+        db.UniqueConstraint('review_id', 'user_id', name='uq_movie_review_report_user'),
+        db.Index('ix_movie_review_report_pending', 'resolved_at', 'review_id'),
+    )
+
+
+class MovieReviewModeration(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    review_id = db.Column(db.Integer, db.ForeignKey('movie_rating.id'), nullable=False, index=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     action = db.Column(db.String(20), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

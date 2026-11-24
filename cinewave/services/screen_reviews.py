@@ -1,8 +1,8 @@
 from flask import session
 from sqlalchemy import case, func
 
-from ..extensions import db
 from ..models import ScreenReview
+from .reviews import completed_booking_source, published_reviews, rating_distribution
 
 QUESTIONS = (
     ('sound_rating', 'How was the sound quality?'),
@@ -13,17 +13,15 @@ QUESTIONS = (
 
 
 def eligible_screen(booking, user_id):
-    if booking.user_id != user_id or booking.status != 'PAID':
+    if not completed_booking_source(booking, user_id):
         return None
     show = booking.showtime
-    if not show or not show.screen or not show.movie or not show.movie.duration or show.movie.duration < 1:
+    screen = show.screen
+    if not screen or not screen.theater:
         return None
-    if show.status != 'ended':
+    if (show.theater or '').strip().casefold() != screen.theater.name.strip().casefold():
         return None
-    payment = booking.payment
-    if payment and (payment.is_demo or payment.status != 'CAPTURED'):
-        return None
-    return show.screen
+    return screen
 
 
 def review_invitation(booking, user_id):
@@ -31,13 +29,13 @@ def review_invitation(booking, user_id):
         return None
     if booking.screen_review:
         return 'edit' if booking.screen_review.withdrawn_at is None else None
-    if booking.id in session.get('dismissed_screen_reviews', []):
-        return 'dismissed'
+    if booking.screen_review_dismissed_at or booking.id in session.get('dismissed_screen_reviews', []):
+        return None
     return 'invite'
 
 
 def public_reviews():
-    return ScreenReview.query.filter(ScreenReview.hidden.is_(False), ScreenReview.withdrawn_at.is_(None))
+    return published_reviews(ScreenReview)
 
 
 def review_summaries(group, ids):
@@ -47,6 +45,7 @@ def review_summaries(group, ids):
     selected = (
         group, func.count(ScreenReview.id).label('count'),
         func.sum(case((ScreenReview.verified.is_(True), 1), else_=0)).label('verified'),
+        func.sum(case((ScreenReview.is_demo.is_(True), 1), else_=0)).label('demo'),
         func.sum(ScreenReview.overall_rating).label('overall_total'),
         *(func.avg(getattr(ScreenReview, field)).label(field) for field, _ in QUESTIONS),
     )
@@ -63,6 +62,4 @@ def combined_theatre_score(screen_scores):
 
 
 def review_distribution(screen_id):
-    counts = dict(public_reviews().with_entities(ScreenReview.overall_rating, func.count(ScreenReview.id))
-                  .filter(ScreenReview.screen_id == screen_id).group_by(ScreenReview.overall_rating))
-    return {rating: counts.get(rating, 0) for rating in range(5, 0, -1)}
+    return rating_distribution(public_reviews().filter_by(screen_id=screen_id), ScreenReview.overall_rating)
