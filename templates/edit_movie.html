@@ -1,0 +1,32 @@
+{% extends "admin_base.html" %}
+{% block title %}Edit Movie · CineWave Admin{% endblock %}
+{% block content %}
+<section class="max-w-xl mx-auto glass-card rounded-3xl p-6 sm:p-8 space-y-5">
+  <h1 class="text-xl font-bold text-white">Edit Movie</h1>
+  <form method="post" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% for name, label, limit, full in [
+      ('title', 'Title', 200, true), ('language', 'Language', 50, false),
+      ('certificate', 'Age certification', 10, false), ('poster', 'Poster URL', 500, true),
+      ('backdrop', 'Backdrop URL', 500, true)] %}
+      <label class="block text-xs text-slate-300 {% if full %}sm:col-span-2{% endif %}">{{ label }}
+        <input class="cw-form-control w-full" name="{{ name }}" maxlength="{{ limit }}"
+               value="{{ movie|attr(name) or '' }}" {% if name == 'title' %}required{% endif %}>
+      </label>
+    {% endfor %}
+    <label class="block text-xs text-slate-300 sm:col-span-2">Description
+      <textarea class="cw-form-control w-full" name="description" rows="5" required>{{ movie.description }}</textarea>
+    </label>
+    <label class="block text-xs text-slate-300">Runtime in minutes
+      <input class="cw-form-control w-full" name="duration" type="number" min="1" max="9999" value="{{ movie.duration or '' }}">
+    </label>
+    <label class="block text-xs text-slate-300">Release date
+      <input class="cw-form-control w-full" name="release_date" type="date" value="{{ movie.release_date or '' }}">
+    </label>
+    <div class="flex flex-wrap gap-3 sm:col-span-2">
+      <button class="cw-button cw-button-primary" type="submit">Save details</button>
+      <a class="cw-button cw-button-white" href="{{ url_for('admin.admin', _anchor='movies') }}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

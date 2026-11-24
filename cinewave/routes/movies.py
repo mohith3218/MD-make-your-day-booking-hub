@@ -2,6 +2,8 @@ from flask import Blueprint
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ._support import *
+from ..services.screen_reviews import eligible_screen
+from ..services.seat import screening_availability
 
 bp = Blueprint("movies", __name__)
 
@@ -82,8 +84,9 @@ def cine_match():
                 why.append('Already in your watchlist')
             candidates.append((score, movie, why))
 
-        candidates.sort(key=lambda item: (-item[0], -(item[1].rating or 0), item[1].title.casefold()))
-        results = [{'movie': movie, 'why': why or ['A well-rated pick from the CineWave catalog']}
+        candidates.sort(key=lambda item: (-item[0], -(item[1].tmdb_rating or item[1].rating or 0),
+                                          item[1].title.casefold()))
+        results = [{'movie': movie, 'why': why or ['From the CineWave catalogue']}
                    for _, movie, why in candidates[:3]]
 
     return render_template('cine_match.html', results=results, mood=mood, language=language,
@@ -126,8 +129,9 @@ def movie_detail(movie_id):
     all_shows = (Showtime.query.filter_by(movie_id=movie_id)
                  .order_by(Showtime.show_date, Showtime.id).all())
 
-    # Only keep shows that have NOT ended yet (upcoming + live)
-    shows = [s for s in all_shows if s.status != 'ended']
+    shows = [s for s in all_shows if s.screen and s.status in {'upcoming', 'live'}]
+    remaining_seats = {show_id: card['remaining'] for show_id, card in
+                       screening_availability([s for s in shows if s.accepts_bookings]).items()}
 
     # group by date -> theatre so it reads like a real booking page
     grouped = {}
@@ -137,7 +141,19 @@ def movie_detail(movie_id):
     hype_counts = MovieHypeVote.counts_for(movie.id) if movie.is_upcoming and not movie.is_archived else {}
     vote = MovieHypeVote.query.filter_by(user_id=current_user.id, movie_id=movie.id).first() if hype_counts else None
     return render_template('movie.html', movie=movie, showtimes=shows, grouped=grouped,
+                           remaining_seats=remaining_seats, can_review=can_review_movie(movie),
                            movie_hype_counts=hype_counts, movie_hype_mine=vote.level if vote else None)
+
+
+def can_review_movie(movie):
+    if not current_user.is_authenticated or movie.is_archived:
+        return False
+    if not movie.tmdb_managed:
+        return True
+    bookings = Booking.query.join(Showtime).filter(
+        Booking.user_id == current_user.id, Booking.status == 'PAID', Showtime.movie_id == movie.id,
+        Showtime.show_date <= cinema_now().date()).all()
+    return any(eligible_screen(booking, current_user.id) for booking in bookings)
 
 
 @bp.route('/api/movies/by-mood/<mood_code>')
@@ -168,6 +184,8 @@ def movies_by_mood(mood_code):
 @login_required
 def toggle_watchlist(movie_id):
     movie = Movie.query.get_or_404(movie_id)
+    if movie.is_archived:
+        abort(404)
     item = Watchlist.query.filter_by(user_id=current_user.id, movie_id=movie_id).first()
     if item:
         db.session.delete(item)
@@ -201,13 +219,15 @@ def watchlist_page():
 @login_required
 def rate_movie(movie_id):
     movie = Movie.query.get_or_404(movie_id)
+    if not can_review_movie(movie):
+        return jsonify({'success': False, 'message': 'Complete an eligible booked screening to review this film.'}), 403
     data = request.get_json(silent=True) or request.form
     try:
         score = float(data.get('rating', 0))
     except (ValueError, TypeError):
         return jsonify({'success': False, 'message': 'Invalid rating score'}), 400
 
-    if score < 1.0 or score > 5.0:
+    if not 1.0 <= score <= 5.0:
         return jsonify({'success': False, 'message': 'Rating must be between 1 and 5 stars'}), 400
 
     review_text = (data.get('review') or '').strip()[:500]

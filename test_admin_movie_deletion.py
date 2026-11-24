@@ -66,10 +66,12 @@ class AdminMovieDeletionTests(unittest.TestCase):
         with client.session_transaction() as state:
             state['_user_id'] = user.alternative_id
             state['_fresh'] = True
+            state['_csrf_token'] = 'deletion-fixture-token'
         return client
 
     def delete(self):
-        return self.client.post(f'/admin/delete_movie/{self.movie_id}', follow_redirects=True)
+        return self.client.post(f'/admin/delete_movie/{self.movie_id}',
+                                data={'csrf_token': 'deletion-fixture-token'}, follow_redirects=True)
 
     def assert_preserved(self):
         self.assertIsNotNone(A.db.session.get(A.Movie, self.movie_id))
@@ -191,13 +193,16 @@ class AdminMovieDeletionTests(unittest.TestCase):
         self.assertEqual(A.PartyMember.query.count(), 0)
 
     def test_non_admin_and_get_cannot_delete(self):
-        response = self.client_for(self.viewer).post(f'/admin/delete_movie/{self.movie_id}')
+        response = self.client_for(self.viewer).post(f'/admin/delete_movie/{self.movie_id}',
+                                                     data={'csrf_token': 'deletion-fixture-token'})
         self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.client.post(f'/admin/delete_movie/{self.movie_id}').status_code, 400)
         self.assertEqual(self.client.get(f'/admin/delete_movie/{self.movie_id}').status_code, 405)
         self.assert_preserved()
 
     def test_empty_movie_can_be_deleted(self):
-        response = self.client.post(f'/admin/delete_movie/{self.other_id}')
+        response = self.client.post(f'/admin/delete_movie/{self.other_id}',
+                                    data={'csrf_token': 'deletion-fixture-token'})
         self.assertEqual(response.status_code, 302)
         self.assertIsNone(A.db.session.get(A.Movie, self.other_id))
         self.assert_preserved()
@@ -208,7 +213,8 @@ class AdminMovieDeletionTests(unittest.TestCase):
         A.db.session.add(room)
         A.db.session.commit()
         with patch.object(A.db.session, 'commit', side_effect=IntegrityError('fixture', {}, Exception('fixture'))):
-            response = self.client.post(f'/admin/delete_movie/{self.movie_id}')
+            response = self.client.post(f'/admin/delete_movie/{self.movie_id}',
+                                        data={'csrf_token': 'deletion-fixture-token'})
         self.assertEqual(response.status_code, 302)
         self.assert_preserved()
         self.assertEqual(A.PartySession.query.count(), 1)

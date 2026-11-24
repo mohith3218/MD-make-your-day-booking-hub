@@ -1,7 +1,15 @@
 from flask import Blueprint
 from pathlib import Path
 from urllib.parse import urlsplit
+from sqlalchemy.orm import joinedload
 from ._support import *
+from ..services.movie_sync import (
+    STATE_ID, apply_metadata, create_movie, credentials_configured, matching_local_movie,
+    request_movie_sync, sync_status, utc_now,
+)
+from ..services.movies import (
+    TMDBClient, TMDBError, image_url, minimum_metadata, movie_metadata, parse_release_date,
+)
 
 bp = Blueprint("admin", __name__)
 MAX_FEATURED_MOVIES = 5
@@ -61,25 +69,105 @@ def admin():
     if visibility not in {'active', 'archived', 'all'}:
         visibility = 'active'
     movie_search = request.args.get('q', '').strip()[:100]
+    language = request.args.get('language', '').strip()[:50]
+    released_from = parse_release_date(request.args.get('released_from'))
+    released_to = parse_release_date(request.args.get('released_to'))
+    schedule = request.args.get('schedule', '')
+    source = request.args.get('source', '')
     movie_query = Movie.query
     if visibility == 'active':
         movie_query = movie_query.filter_by(is_archived=False)
     elif visibility == 'archived':
         movie_query = movie_query.filter_by(is_archived=True)
     if movie_search:
-        movie_query = movie_query.filter(Movie.title.contains(movie_search, autoescape=True))
-    movies = movie_query.order_by(Movie.is_archived, Movie.title).all()
-    showtimes = Showtime.query.order_by(Showtime.show_date.desc()).all()
+        movie_query = movie_query.filter(Movie.title.icontains(movie_search, autoescape=True))
+    if language:
+        movie_query = movie_query.filter(Movie.language == language)
+    if released_from:
+        movie_query = movie_query.filter(Movie.release_date >= released_from)
+    if released_to:
+        movie_query = movie_query.filter(Movie.release_date <= released_to)
+    if source == 'tmdb':
+        movie_query = movie_query.filter(Movie.tmdb_id.is_not(None))
+    if source == 'manual':
+        movie_query = movie_query.filter(Movie.tmdb_id.is_(None))
+    showtimes = Showtime.query.options(joinedload(Showtime.screen)).order_by(Showtime.show_date.desc()).all()
+    scheduled_ids = {show.movie_id for show in showtimes if show.screen and show.status == 'upcoming'}
+    if schedule == 'scheduled':
+        movie_query = movie_query.filter(Movie.id.in_(scheduled_ids))
+    if schedule == 'unscheduled':
+        movie_query = movie_query.filter(Movie.id.not_in(scheduled_ids))
+    movie_page = movie_query.order_by(Movie.is_archived, Movie.title, Movie.id).paginate(
+        page=request.args.get('page', 1, type=int), per_page=25, error_out=False)
+    languages = [row[0] for row in db.session.query(Movie.language).filter(Movie.language.is_not(None))
+                 .distinct().order_by(Movie.language)]
+    filters = {'q': movie_search, 'visibility': visibility, 'language': language,
+               'released_from': released_from, 'released_to': released_to,
+               'schedule': schedule, 'source': source}
+    state = db.session.get(MovieSyncState, STATE_ID)
     theaters = Theater.query.all()
     screens = Screen.query.all()
     pending_recharges = RechargeRequest.query.filter_by(status='PENDING').count()
     revenue = db.session.query(db.func.sum(Booking.total_amount)) \
                         .filter(Booking.status == 'PAID').scalar() or 0
-    return render_template('admin.html', movies=movies, showtimes=showtimes,
+    return render_template('admin.html', movies=movie_page.items, showtimes=showtimes,
                            theaters=theaters, screens=screens,
                            movie_search=movie_search, movie_visibility=visibility,
+                           movie_page=movie_page, movie_filters=filters, movie_languages=languages,
+                           scheduled_ids=scheduled_ids, sync_state=state, sync_status=sync_status(state),
+                           sync_configured=credentials_configured(),
                            pending_recharges=pending_recharges, revenue=revenue,
                            paid_count=Booking.query.filter_by(status='PAID').count())
+
+
+@bp.post('/admin/movies/sync')
+@login_required
+def queue_movie_sync():
+    guard = admin_required()
+    if guard:
+        return guard
+    if not credentials_configured():
+        abort(400, description='Configure TMDB credentials first.')
+    request_movie_sync()
+    flash('TMDB synchronization queued for the next worker check-in.')
+    return redirect(url_for('admin.admin', _anchor='movie-sync'), code=303)
+
+
+@bp.route('/admin/movie/<int:movie_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_movie(movie_id):
+    guard = admin_required()
+    if guard:
+        return guard
+    query = Movie.query.filter_by(id=movie_id)
+    movie = (query.with_for_update() if request.method == 'POST' else query).first_or_404()
+    if request.method == 'POST':
+        fields = {
+            'title': request.form.get('title', '').strip(),
+            'description': request.form.get('description', '').strip(),
+            **{key: request.form.get(key, '').strip() or None
+               for key in ('language', 'certificate', 'poster', 'backdrop')},
+        }
+        runtime = request.form.get('duration', '').strip()
+        release = request.form.get('release_date', '').strip()
+        fields['release_date'] = parse_release_date(release)
+        if (not fields['title'] or not fields['description']
+                or any(len(fields[key] or '') > limit for key, limit in (
+                    ('title', 200), ('language', 50), ('certificate', 10), ('poster', 500), ('backdrop', 500)))
+                or (runtime and not re.fullmatch(r'[1-9][0-9]{0,3}', runtime))
+                or (release and not fields['release_date'])):
+            flash('Enter a title, description, and valid movie information.')
+            return render_template('edit_movie.html', movie=movie), 400
+        fields['duration'] = int(runtime) if runtime else 0
+        changed = [name for name, value in fields.items() if value != getattr(movie, name)]
+        for name in changed:
+            setattr(movie, name, fields[name])
+        if changed:
+            movie.lock_tmdb_fields(*changed)
+            db.session.commit()
+        flash('Movie details saved.')
+        return redirect(url_for('admin.admin', _anchor='movies'), code=303)
+    return render_template('edit_movie.html', movie=movie)
 
 
 @bp.route('/admin/add_movie', methods=['GET', 'POST'])
@@ -142,7 +230,7 @@ def update_movie_trailer(movie_id):
     guard = admin_required()
     if guard:
         return guard
-    movie = Movie.query.get_or_404(movie_id)
+    movie = Movie.query.filter_by(id=movie_id).with_for_update().first_or_404()
     try:
         trailer_path = save_trailer_upload(request.files.get('trailer_video'))
     except ValueError as exc:
@@ -153,6 +241,7 @@ def update_movie_trailer(movie_id):
     if trailer_path:
         movie.trailer_video_path = trailer_path
         movie.youtube_trailer_key = None
+        movie.lock_tmdb_fields('youtube_trailer_key')
         db.session.commit()
         flash(f"Uploaded trailer saved for '{movie.title}'.")
     elif trailer_input and trailer_key is None:
@@ -160,6 +249,7 @@ def update_movie_trailer(movie_id):
     elif trailer_input:
         movie.youtube_trailer_key = trailer_key or None
         movie.trailer_video_path = None
+        movie.lock_tmdb_fields('youtube_trailer_key')
         db.session.commit()
         flash(f"YouTube trailer saved for '{movie.title}'.")
     return redirect(url_for('admin.admin'))
@@ -173,32 +263,25 @@ def import_movie():
         return guard
     results, query = [], request.args.get('query', '').strip()[:120]
     if query:
-        if not TMDB_API_KEY:
-            flash('TMDb search is unavailable because TMDB_API_KEY is not configured.')
-        else:
-            try:
-                response = requests.get(f"{TMDB_BASE_URL}/search/movie",
-                    params={'api_key': TMDB_API_KEY, 'query': query}, timeout=(3.05, 8))
-                response.raise_for_status()
-                payload = response.json()
-                if not isinstance(payload, dict) or not isinstance(payload.get('results'), list):
-                    raise ValueError('TMDb returned an invalid search response.')
-                for item in payload['results'][:8]:
-                    if not isinstance(item, dict) or not item.get('id') or not item.get('title'):
-                        continue
-                    poster_path = item.get('poster_path')
-                    release_date = item.get('release_date', '') or ''
-                    try:
-                        release = date.fromisoformat(release_date[:10]) if release_date else None
-                    except ValueError:
-                        release = None
-                    results.append({'tmdb_id': item['id'], 'title': item['title'],
-                        'overview': item.get('overview', ''),
-                        'poster_url': f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
-                        'release_date': release_date, 'year': release_date[:4] if release_date else '',
-                        'suggested_category': 'upcoming' if release and release > date.today() else 'showing'})
-            except (requests.RequestException, ValueError, TypeError):
-                flash('TMDb could not complete the search. Check the credentials or try again shortly.')
+        try:
+            with TMDBClient(attempts=1) as client:
+                items = client.search(query).get('results')
+            if not isinstance(items, list):
+                raise TMDBError('TMDB returned invalid search results.')
+            for item in items[:8]:
+                if (not isinstance(item, dict) or type(item.get('id')) is not int
+                        or item['id'] <= 0 or not item.get('title') or item.get('adult')):
+                    continue
+                release = parse_release_date(item.get('release_date'))
+                results.append({
+                    'tmdb_id': item['id'], 'title': item['title'], 'overview': item.get('overview'),
+                    'poster_url': image_url(item.get('poster_path')),
+                    'release_date': release.isoformat() if release else '',
+                    'year': release.year if release else '',
+                    'suggested_category': 'upcoming' if release and release > cinema_now().date() else 'showing',
+                })
+        except TMDBError as failure:
+            flash(str(failure))
     return render_template('import_movie.html', results=results, query=query)
 
 
@@ -208,84 +291,66 @@ def import_movie_add(tmdb_id):
     guard = admin_required()
     if guard:
         return guard
+    search_url = url_for('admin.import_movie', query=request.form.get('query', ''))
+    if not 0 < tmdb_id <= 2_147_483_647:
+        abort(400)
     try:
         existing = Movie.query.filter_by(tmdb_id=tmdb_id).first()
         if existing:
-            flash(f'"{existing.title}" is already stored in CineWave.')
+            flash(f'“{existing.title}” is already stored in CineWave.')
             return redirect(url_for('movies.movie_detail', movie_id=existing.id), code=303)
         featured_position = _parse_featured_position(request.form.get('featured_order'))
-        try:
-            trailer_path = save_trailer_upload(request.files.get('trailer_video'))
-        except ValueError as exc:
-            flash(str(exc))
-            return redirect(url_for('admin.admin'))
-        trailer_key = ('' if trailer_path else
-                       parse_youtube_video_key(request.form.get('youtube_trailer')))
-        raw_trailer = request.form.get('youtube_trailer', '').strip()
-        if raw_trailer and trailer_key is None and not trailer_path:
+        with TMDBClient(attempts=1) as client:
+            detail = client.details(tmdb_id)
+            fields = movie_metadata(detail, client.region)
+        if detail.get('adult') or not minimum_metadata(fields):
+            flash('TMDB records need a title, description, and poster before import.')
+            return redirect(search_url, code=303)
+        trailer_input = request.form.get('youtube_trailer', '').strip()
+        trailer_upload = request.files.get('trailer_video')
+        trailer_key = parse_youtube_video_key(trailer_input)
+        if trailer_input and trailer_key is None and not (trailer_upload and trailer_upload.filename):
             flash('Enter a valid YouTube video link or 11-character video ID.')
-            return redirect(url_for('admin.import_movie', query=request.form.get('query', '')), code=303)
-        if not TMDB_API_KEY:
-            flash('TMDb import is unavailable because TMDB_API_KEY is not configured.')
-            return redirect(url_for('admin.import_movie'), code=303)
-        detail_response = requests.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}",
-                           params={'api_key': TMDB_API_KEY}, timeout=(3.05, 8))
-        detail_response.raise_for_status()
-        res = detail_response.json()
-        if not isinstance(res, dict) or res.get('id') != tmdb_id or not res.get('title'):
-            raise ValueError('TMDb returned invalid movie details.')
-        poster_path = res.get('poster_path')
-        backdrop_path = res.get('backdrop_path')
-        category = request.form.get('category', 'showing')
-        is_upcoming = (category == 'upcoming')
-        is_rerelease = (request.form.get('release_type', 'fresh') == 'rerelease')
-
-        rel_date_str = request.form.get('release_date', '').strip() or res.get('release_date', '')
-        rel_date = None
-        if rel_date_str:
-            try:
-                rel_date = datetime.strptime(rel_date_str[:10], '%Y-%m-%d').date()
-            except ValueError:
-                rel_date = None
-
-        movie = Movie(title=res.get('title', 'Untitled'),
-                      description=res.get('overview', 'No overview available.'),
-                      duration=res.get('runtime') or 120,
-                      poster=f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
-                      backdrop=f"{TMDB_BACKDROP_BASE}{backdrop_path}" if backdrop_path else None,
-                      language=(res.get('original_language') or 'te').upper(),
-                      is_upcoming=is_upcoming,
-                      is_rerelease=is_rerelease,
-                      release_date=rel_date,
-                      tmdb_id=tmdb_id,
-                      youtube_trailer_key=trailer_key or None,
-                      trailer_video_path=trailer_path)
-        db.session.add(movie)
+            return redirect(search_url, code=303)
+        movie = matching_local_movie(fields)
+        if movie is None:
+            movie = create_movie(tmdb_id, fields)
+            db.session.add(movie)
+        else:
+            movie.tmdb_id = tmdb_id
+            apply_metadata(movie, fields)
+        movie.tmdb_last_checked_at = utc_now()
+        category = request.form.get('category')
+        if category in {'showing', 'upcoming'}:
+            movie.is_upcoming = category == 'upcoming'
+            movie.lock_tmdb_fields('is_upcoming')
+        movie.is_rerelease = request.form.get('release_type') == 'rerelease'
+        release = parse_release_date(request.form.get('release_date'))
+        if release and release != fields['tmdb_original_release_date']:
+            movie.release_date = release
+            movie.lock_tmdb_fields('release_date')
+        trailer_path = save_trailer_upload(trailer_upload)
+        if trailer_path or trailer_key:
+            movie.youtube_trailer_key = None if trailer_path else trailer_key
+            movie.trailer_video_path = trailer_path
+            movie.lock_tmdb_fields('youtube_trailer_key')
         db.session.flush()
-        if featured_position is not None:
+        if featured_position is not None and not movie.is_archived:
             _apply_featured_order(movie, featured_position)
         db.session.commit()
-
-        # Credits are fetched for the exact selected TMDb ID.
-        cast_saved = _store_movie_cast(movie, tmdb_id)
-
-        cat_label = 'Coming Soon' if is_upcoming else 'Now Showing'
-        rel_label = ' (Re-Release)' if is_rerelease else ''
-        cast_note = ' with cast' if cast_saved else ''
-        flash(f'Imported "{movie.title}" as {cat_label}{rel_label}{cast_note}.')
+        flash(f'Saved “{movie.title}” in the CineWave catalogue.')
         return redirect(url_for('movies.movie_detail', movie_id=movie.id), code=303)
-    except (requests.RequestException, ValueError, TypeError):
+    except (TMDBError, ValueError) as failure:
         db.session.rollback()
-        flash('TMDb did not return usable details. The film was not imported; try again shortly.')
-        return redirect(url_for('admin.import_movie'), code=303)
+        flash(str(failure) if isinstance(failure, TMDBError) else 'Check the trailer file and try again.')
     except IntegrityError:
         db.session.rollback()
         existing = Movie.query.filter_by(tmdb_id=tmdb_id).first()
         if existing:
-            flash(f'"{existing.title}" is already stored in CineWave.')
+            flash(f'“{existing.title}” is already stored in CineWave.')
             return redirect(url_for('movies.movie_detail', movie_id=existing.id), code=303)
         flash('The import conflicted with another update. Search again and retry.')
-        return redirect(url_for('admin.import_movie'), code=303)
+    return redirect(search_url, code=303)
 
 
 @bp.route('/admin/toggle_movie_status/<int:movie_id>', methods=['POST'])
@@ -294,8 +359,9 @@ def toggle_movie_status(movie_id):
     guard = admin_required()
     if guard:
         return guard
-    movie = Movie.query.get_or_404(movie_id)
+    movie = Movie.query.filter_by(id=movie_id).with_for_update().first_or_404()
     movie.is_upcoming = not movie.is_upcoming
+    movie.lock_tmdb_fields('is_upcoming')
     db.session.commit()
     status_str = "Coming Soon" if movie.is_upcoming else "Now Showing"
     flash(f"Movie '{movie.title}' status changed to {status_str}!")
@@ -391,17 +457,24 @@ def fetch_cast(movie_id):
     if guard:
         return guard
     movie = Movie.query.get_or_404(movie_id)
-
-    tmdb_id = movie.tmdb_id or _tmdb_find_id(movie.title)
-    if not tmdb_id:
-        flash(f"Could not find '{movie.title}' on TMDb. Try adding the TMDb id manually.")
-        return redirect(url_for('admin.admin'))
-
-    if _store_movie_cast(movie, tmdb_id):
-        flash(f"Cast updated for '{movie.title}'!")
+    if not movie.tmdb_id:
+        flash('Use TMDB import to link a verified match before fetching cast.')
+        return redirect(url_for('admin.admin'), code=303)
+    try:
+        with TMDBClient(attempts=1) as client:
+            fields = movie_metadata(client.details(movie.tmdb_id), client.region)
+    except TMDBError as failure:
+        flash(str(failure))
+        return redirect(url_for('admin.admin'), code=303)
+    if fields['cast_json']:
+        movie = Movie.query.filter_by(id=movie_id).with_for_update().first_or_404()
+        movie.cast_json = fields['cast_json']
+        movie.tmdb_snapshot = {**(movie.tmdb_snapshot or {}), 'cast_json': movie.cast_json}
+        db.session.commit()
+        flash(f'Cast updated for “{movie.title}”.')
     else:
-        flash(f"TMDb reachable but no cast found for '{movie.title}'.")
-    return redirect(url_for('admin.admin'))
+        flash('TMDB has no cast information for this movie.')
+    return redirect(url_for('admin.admin'), code=303)
 
 
 @bp.route('/admin/toggle_rerelease/<int:movie_id>', methods=['POST'])
@@ -672,34 +745,44 @@ def add_showtime():
     guard = admin_required()
     if guard:
         return guard
-    movies = Movie.query.all()
+    movies = Movie.query.filter_by(is_archived=False).order_by(Movie.title).all()
     theaters = Theater.query.all()
     screens_list = Screen.query.all()
 
     if request.method == 'POST':
-        screen = Screen.query.get_or_404(int(request.form['screen_id']))
+        screen = Screen.query.get_or_404(request.form.get('screen_id', type=int))
+        movie = Movie.query.filter_by(id=request.form.get('movie_id', type=int),
+                                      is_archived=False).first_or_404()
         overrides = {}
         for cls in screen.layout.get('classes', []):
             val = request.form.get(f"price_{cls['code']}", '').strip()
             if val:
                 try:
-                    overrides[cls['code']] = float(val)
+                    price = float(val)
+                    if not 0 < price < float('inf'):
+                        raise ValueError
+                    overrides[cls['code']] = price
                 except ValueError:
-                    pass
+                    abort(400, description='Enter a positive ticket price.')
 
-        show = Showtime(movie_id=int(request.form['movie_id']),
+        show_date = parse_release_date(request.form.get('show_date'))
+        if not show_date:
+            abort(400, description='Enter a valid screening date.')
+        show = Showtime(movie_id=movie.id,
                         screen_id=screen.id,
                         theater=screen.theater.name,
-                        show_date=datetime.strptime(request.form['show_date'], '%Y-%m-%d').date(),
-                        show_time=request.form['show_time'],
+                        show_date=show_date,
+                        show_time=request.form.get('show_time', '')[:20],
                         price_overrides_json=json.dumps(overrides))
+        if not show.show_datetime or show.show_datetime <= cinema_now():
+            abort(400, description='Enter a future screening date and time.')
         db.session.add(show)
         db.session.commit()
         flash("Showtime added successfully!")
         return redirect(url_for('admin.admin'))
 
     return render_template('add_showtime.html', movies=movies, theaters=theaters,
-                           screens=screens_list)
+                           screens=screens_list, selected_movie=request.args.get('movie_id', type=int))
 
 
 @bp.route('/admin/recharges')

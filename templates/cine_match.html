@@ -62,10 +62,10 @@
             <a class="cm-poster" href="{{ url_for('movies.movie_detail', movie_id=movie.id) }}" aria-label="Explore {{ movie.title }}">
               {% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster" loading="lazy" decoding="async" onerror="this.hidden=true;this.parentElement.classList.add('cm-poster-fallback');this.parentElement.querySelector('.cm-poster-placeholder').hidden=false">
               {% endif %}<span class="cm-poster-placeholder" {% if movie.poster %}hidden{% endif %}><i class="fa-solid fa-film" aria-hidden="true"></i><strong>{{ movie.title }}</strong><small>Poster unavailable</small></span>
-              <span class="cm-rating">★ {{ '%.1f'|format(movie.display_rating) }}</span>
+              {% if movie.display_rating is not none %}<span class="cm-rating">★ {{ '%.1f'|format(movie.display_rating) }}/5</span>{% elif movie.tmdb_rating is not none %}<span class="cm-rating">TMDB {{ '%.1f'|format(movie.tmdb_rating) }}/10</span>{% endif %}
             </a>
             <div class="cm-card-body">
-              <div class="cm-card-meta"><span>{{ movie.language or 'Language not listed' }}</span><span>{{ movie.duration }} min</span></div>
+              <div class="cm-card-meta"><span>{{ movie.language or 'Language not listed' }}</span>{% if movie.duration %}<span>{{ movie.duration }} min</span>{% endif %}</div>
               <h3><a href="{{ url_for('movies.movie_detail', movie_id=movie.id) }}">{{ movie.title }}</a></h3>
               {% if result.why %}<p class="cm-why">{{ result.why|join(' · ') }}</p>{% endif %}
               <a class="cm-card-link" href="{{ url_for('movies.movie_detail', movie_id=movie.id) }}">Explore film &amp; showtimes <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>

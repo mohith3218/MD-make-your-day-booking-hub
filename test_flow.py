@@ -434,7 +434,9 @@ def main():
     print("15. cast OK - director + actors render on the movie page")
 
     # admin fetch-cast action answers gracefully with or without TMDb access
-    r = admin.post(f'/admin/fetch_cast/{m_id}', follow_redirects=True)
+    with admin.session_transaction() as state:
+        token = state['_csrf_token']
+    r = admin.post(f'/admin/fetch_cast/{m_id}', data={'csrf_token': token}, follow_redirects=True)
     assert r.status_code == 200, r.status_code
     r = c1.get('/admin/analytics', follow_redirects=False)  # sanity: nothing broke
     assert r.status_code == 302

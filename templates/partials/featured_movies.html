@@ -10,12 +10,12 @@
     <article class="cw-feature-slide{% if loop.first %} is-active{% endif %}" data-feature-slide data-slide-index="{{ loop.index0 }}" role="group" aria-roledescription="slide" aria-label="{{ loop.index }} of {{ featured_movies|length }}: {{ movie.title }}" aria-hidden="{{ 'false' if loop.first else 'true' }}" {% if not loop.first %}inert{% endif %}>
       <div class="cw-feature-grid">
         <div class="cw-feature-copy">
-          <div class="cw-feature-kickers"><span class="cw-feature-badge"><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i> Featured on CineWave</span><span class="cw-feature-status">{% if movie.is_upcoming %}Coming soon{% else %}Now showing{% endif %}{% if movie.is_rerelease %} · Re-release{% endif %}</span></div>
+          <div class="cw-feature-kickers"><span class="cw-feature-badge"><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i> Featured on CineWave</span><span class="cw-feature-status">{% if show %}Available to book{% elif movie.is_upcoming %}Coming soon{% elif movie.id in scheduled_ids %}Sold out{% else %}No screenings scheduled{% endif %}{% if movie.is_rerelease %} · Re-release{% endif %}</span></div>
           <h1 id="cw-feature-title-{{ movie.id }}">{{ movie.title }}</h1>
-          <p class="cw-feature-meta">{% if movie.cast_info.director %}<span>Directed by <strong>{{ movie.cast_info.director }}</strong></span>{% endif %}<span>{{ movie.language or 'Language TBA' }}</span>{% if movie.release_date %}<span>{{ movie.release_date.strftime('%d %b %Y') }}</span>{% endif %}<span>{{ movie.duration }} min</span>{% if movie.certificate %}<span>{{ movie.certificate }}</span>{% endif %}</p>
+          <p class="cw-feature-meta">{% if movie.cast_info.director %}<span>Directed by <strong>{{ movie.cast_info.director }}</strong></span>{% endif %}<span>{{ movie.language or 'Language TBA' }}</span>{% if movie.release_date %}<span>{{ movie.release_date.strftime('%d %b %Y') }}</span>{% endif %}{% if movie.duration %}<span>{{ movie.duration }} min</span>{% endif %}{% if movie.certificate %}<span>{{ movie.certificate }}</span>{% endif %}</p>
           {% if movie.description %}<p class="cw-feature-description">{{ movie.description|truncate(210, True) }}</p>{% endif %}
           <div class="cw-feature-facts">
-            {% if movie.rating is not none or movie.user_ratings|length %}<span class="cw-feature-rating"><span aria-hidden="true">★</span><strong>{{ '%.1f'|format(movie.display_rating) }}</strong><small>/ {{ 5 if movie.user_ratings|length else 10 }}</small></span>{% endif %}
+            {% if movie.display_rating is not none or movie.tmdb_rating is not none %}<span class="cw-feature-rating"><span aria-hidden="true">★</span><strong>{{ '%.1f'|format(movie.display_rating if movie.display_rating is not none else movie.tmdb_rating) }}</strong><small>{{ '/ 5' if movie.display_rating is not none else '/ 10 TMDB' }}</small></span>{% endif %}
             {% if movie.is_upcoming and hype_total %}<span class="cw-feature-hype"><i class="fa-solid fa-bolt" aria-hidden="true"></i> {{ hype_total }} fan {% if hype_total == 1 %}is{% else %}fans are{% endif %} excited</span>{% endif %}
           </div>
           <div class="cw-feature-actions">
@@ -29,7 +29,7 @@
           {% if image_url %}<img data-feature-image src="{{ image_url }}" alt="{{ movie.title }}{% if movie.backdrop %} backdrop{% else %} poster{% endif %}" {% if loop.first %}fetchpriority="high" loading="eager"{% else %}loading="lazy"{% endif %} decoding="async" onerror="this.hidden=true;this.closest('.cw-feature-art').classList.add('is-missing')">{% endif %}
           <div class="cw-feature-art-fallback" aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ movie.title }}</span><small>Artwork unavailable</small></div>
           <div class="cw-feature-art-shade" aria-hidden="true"></div>
-          <figcaption class="cw-feature-art-caption"><span>{% if show %}Screening available{% elif movie.is_upcoming %}Coming soon to CineWave{% else %}Explore this film{% endif %}</span>{% if show %}<strong>{{ show.theater }} · {{ show.screen_label }}</strong>{% elif movie.release_date %}<strong>{{ movie.release_date.strftime('%d %b %Y') }}</strong>{% else %}<strong>{{ movie.title }}</strong>{% endif %}</figcaption>
+          <figcaption class="cw-feature-art-caption"><span>{% if show %}Screening available{% elif movie.is_upcoming %}Upcoming release{% else %}Explore this film{% endif %}</span>{% if show %}<strong>{{ show.theater }} · {{ show.screen_label }}</strong>{% elif movie.release_date %}<strong>{{ movie.release_date.strftime('%d %b %Y') }}</strong>{% else %}<strong>{{ movie.title }}</strong>{% endif %}</figcaption>
         </figure>
       </div>
     </article>

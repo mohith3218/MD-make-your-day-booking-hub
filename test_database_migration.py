@@ -1,6 +1,6 @@
 """Migration safety tests. Only temporary SQLite files are ever written."""
 import copy
-from datetime import date
+from datetime import date, datetime
 from importlib import import_module
 from io import StringIO
 import json
@@ -19,7 +19,7 @@ from alembic.config import Config
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import MetaData, Table, create_engine, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.pool import NullPool
 from sqlalchemy.schema import CreateTable
@@ -47,18 +47,26 @@ class MigrationTests(unittest.TestCase):
             'booking': dict(id=15, user_id=10, showtime_id=14, seats='A1', status='PAID', total_amount=120),
             'payment': dict(id=16, booking_id=15, gateway='historical', status='CAPTURED'),
             'movie_rating': dict(id=17, user_id=10, movie_id=13, rating=4),
-            'movie_hype_vote': dict(id=18, user_id=10, movie_id=13, level='SUPER_HYPED'),
+            'movie_hype_vote': dict(id=18, user_id=10, movie_id=13, level='SUPER_HYPED',
+                                    updated_at=datetime(2025, 1, 1)),
         }
         with legacy.begin() as conn:
             cfg.attributes['connection'] = conn
             command.upgrade(cfg, '20261119_01')
+            legacy_tables = {name: Table(name, MetaData(), autoload_with=conn) for name in rows}
             for name, values in rows.items():
-                conn.execute(db.metadata.tables[name].insert(), values)
-            before = {name: conn.execute(select(db.metadata.tables[name])).mappings().all() for name in rows}
+                if name == 'user':
+                    values.update(email_verified=False, email_otp_attempts=0, alternative_id='legacy-10')
+                if name == 'booking':
+                    values.update(reference='CW-LEGACY')
+                conn.execute(legacy_tables[name].insert(), values)
+            before = {name: conn.execute(select(table)).mappings().all()
+                      for name, table in legacy_tables.items()}
         with legacy.begin() as conn:
             cfg.attributes['connection'] = conn
             command.upgrade(cfg, 'head')
-            after = {name: conn.execute(select(db.metadata.tables[name])).mappings().all() for name in rows}
+            after = {name: conn.execute(select(table)).mappings().all()
+                     for name, table in legacy_tables.items()}
             self.assertEqual(before, after)
             for name in ('screen_review', 'screen_review_report', 'screen_review_moderation'):
                 self.assertEqual(conn.execute(select(db.metadata.tables[name])).all(), [])
@@ -78,6 +86,40 @@ class MigrationTests(unittest.TestCase):
         self.assertIn('TIMESTAMP WITHOUT TIME ZONE', ddl)
         for operation in ('DROP ', 'DELETE ', 'UPDATE ', 'ALTER TABLE '):
             self.assertNotIn(operation, ddl)
+
+    def test_tmdb_upgrade_preserves_duplicate_legacy_records(self):
+        cfg = Config(str(Path(__file__).with_name('alembic.ini')))
+        engine = create_engine('sqlite:///' + (self.folder / 'before-tmdb.db').as_posix(),
+                               poolclass=NullPool)
+        with engine.begin() as conn:
+            cfg.attributes['connection'] = conn
+            command.upgrade(cfg, '20261123_01')
+            conn.execute(text("INSERT INTO movie (id, title, description, duration, tmdb_id) VALUES "
+                              "(1, 'One', 'Synopsis one', 97, 42), (2, 'Two', 'Synopsis two', 89, 42)"))
+            conn.execute(text("INSERT INTO showtime (id, movie_id, theater, show_date, show_time) "
+                              "VALUES (3, 2, 'Existing theatre', '2025-01-01', '10:00')"))
+        with engine.begin() as conn:
+            cfg.attributes['connection'] = conn
+            command.upgrade(cfg, 'head')
+            self.assertEqual(conn.execute(text(
+                'SELECT id, tmdb_id, tmdb_legacy_id FROM movie ORDER BY id')).all(),
+                [(1, 42, None), (2, None, 42)])
+            self.assertEqual(conn.execute(text(
+                'SELECT movie_id, is_cancelled FROM showtime WHERE id = 3')).one(), (2, 0))
+        self.assertTrue(check_database(engine, db.metadata)['ok'])
+
+    def test_tmdb_migration_emits_postgres_ddl(self):
+        output = StringIO()
+        context = MigrationContext.configure(dialect_name='postgresql',
+                                             opts={'as_sql': True, 'output_buffer': output})
+        with Operations.context(context):
+            import_module('migrations.versions.20261125_01_tmdb_sync').upgrade()
+        ddl = output.getvalue()
+        self.assertIn('CREATE UNIQUE INDEX ix_movie_tmdb_id ON movie (tmdb_id)', ddl)
+        self.assertIn('ALTER TABLE showtime ADD COLUMN is_cancelled BOOLEAN', ddl)
+        self.assertIn('CREATE TABLE movie_sync_state', ddl)
+        self.assertNotIn('DROP TABLE', ddl)
+        self.assertNotIn('DELETE FROM', ddl)
 
     def test_legacy_party_and_jagadamba_upgrade(self):
         import vizag_theaters as theaters
@@ -110,7 +152,8 @@ class MigrationTests(unittest.TestCase):
                     {'id': 1, 'name': '70MM Main', 'layout': json.dumps(layout)},
                     {'id': 2, 'name': 'Other screen', 'layout': '{"classes":[]}'}])
                 from datetime import date, datetime
-                conn.execute(db.metadata.tables['showtime'].insert(), dict(id=1, movie_id=1, screen_id=1,
+                legacy_showtime = Table('showtime', MetaData(), autoload_with=conn)
+                conn.execute(legacy_showtime.insert(), dict(id=1, movie_id=1, screen_id=1,
                              theater='Jagadamba Theatre', show_date=date.today(), show_time='18:30'))
                 conn.execute(db.metadata.tables['party_session'].insert(), dict(id=1, code='ABC123', showtime_id=1, host_id=1))
                 conn.execute(db.metadata.tables['party_member'].insert(), [

@@ -198,6 +198,7 @@ class FeaturedMovieTests(unittest.TestCase):
 
     def test_add_movie_can_store_backdrop_and_assign_feature_order(self):
         response = self.admin_client.post('/admin/add_movie', data={
+            'csrf_token': self.csrf_token(),
             'title': 'Added Feature Fixture', 'description': 'Added movie description',
             'duration': '118', 'category': 'upcoming', 'release_type': 'fresh',
             'language': 'Telugu', 'certificate': 'U/A',

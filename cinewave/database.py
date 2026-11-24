@@ -40,7 +40,12 @@ def auto_migrate():
                   ('is_archived', 'BOOLEAN NOT NULL DEFAULT 0'),
                   ('tmdb_id', 'INTEGER'), ('cast_json', 'TEXT'),
                   ('youtube_trailer_key', 'VARCHAR(20)'),
-                  ('trailer_video_path', 'VARCHAR(300)')],
+                  ('trailer_video_path', 'VARCHAR(300)'),
+                  ('tmdb_legacy_id', 'INTEGER'), ('tmdb_metadata', 'JSON'),
+                  ('tmdb_snapshot', 'JSON'), ('tmdb_overrides', 'JSON'),
+                  ('tmdb_managed', 'BOOLEAN NOT NULL DEFAULT 0'),
+                  ('tmdb_original_release_date', 'DATE'), ('tmdb_regional_release_date', 'DATE'),
+                  ('tmdb_rating', 'FLOAT'), ('tmdb_last_checked_at', 'DATETIME')],
         'theater': [('city', "VARCHAR(80)"), ('address', "VARCHAR(400)"),
                     ('verification_status', "VARCHAR(20) NOT NULL DEFAULT 'unverified'"),
                     ('verification_source_url', 'VARCHAR(500)'), ('verification_notes', 'TEXT'),
@@ -48,7 +53,8 @@ def auto_migrate():
         'screen': [('verification_status', "VARCHAR(20) NOT NULL DEFAULT 'unverified'"),
                    ('verification_source_url', 'VARCHAR(500)'), ('verification_notes', 'TEXT'),
                    ('verification_reviewed_at', 'DATETIME'), ('verification_reviewed_by_id', 'INTEGER')],
-        'showtime': [('screen_id', 'INTEGER'), ('price_overrides_json', 'TEXT')],
+        'showtime': [('screen_id', 'INTEGER'), ('price_overrides_json', 'TEXT'),
+                     ('is_cancelled', 'BOOLEAN NOT NULL DEFAULT 0')],
         'booking': [('reference', 'VARCHAR(20)'), ('seat_meta_json', 'TEXT'),
                     ('ticket_amount', 'FLOAT'), ('convenience_fee', 'FLOAT'),
                     ('gst', 'FLOAT'), ('status', "VARCHAR(20)"),
@@ -69,6 +75,19 @@ def auto_migrate():
             if col not in existing:
                 db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {coltype}'))
                 print(f"  migrated: {table}.{col}")
+    index = next((item for item in insp.get_indexes('movie') if item['name'] == 'ix_movie_tmdb_id'), None)
+    if not index or not index['unique']:
+        db.session.execute(text("""
+            UPDATE movie SET tmdb_legacy_id = tmdb_id, tmdb_id = NULL
+            WHERE tmdb_id IS NOT NULL AND EXISTS (
+                SELECT 1 FROM movie AS canonical
+                WHERE canonical.tmdb_id = movie.tmdb_id AND canonical.id < movie.id
+            )
+        """))
+        db.session.execute(text('DROP INDEX IF EXISTS ix_movie_tmdb_id'))
+        db.session.execute(text('CREATE UNIQUE INDEX ix_movie_tmdb_id ON movie (tmdb_id)'))
+    db.session.execute(text(
+        'CREATE INDEX IF NOT EXISTS ix_movie_tmdb_refresh ON movie (tmdb_last_checked_at)'))
     for account in User.query.filter((User.alternative_id.is_(None)) | (User.alternative_id == '')).all():
         account.alternative_id = secrets.token_urlsafe(32)
     db.session.commit()

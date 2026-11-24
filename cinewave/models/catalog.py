@@ -1,13 +1,11 @@
 from datetime import date, datetime, timedelta
 import json
-import requests
 from sqlalchemy import func as sa_func
 import seat_layout as sl
 from vizag_theaters import correct_jagadamba_levels
 from ..extensions import db
 from ..time import cinema_now
 from .booking import BookedSeat, SeatHold
-from ..config import TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE
 
 
 
@@ -27,7 +25,17 @@ class Movie(db.Model):
     is_archived = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     release_date = db.Column(db.Date, nullable=True)
     moods_json = db.Column(db.Text, default='[]')
-    tmdb_id = db.Column(db.Integer, nullable=True, index=True)
+    tmdb_id = db.Column(db.Integer, nullable=True, index=True, unique=True)
+    tmdb_legacy_id = db.Column(db.Integer)
+    tmdb_managed = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    tmdb_metadata = db.Column(db.JSON)
+    tmdb_snapshot = db.Column(db.JSON)
+    tmdb_overrides = db.Column(db.JSON)
+    tmdb_original_release_date = db.Column(db.Date)
+    tmdb_regional_release_date = db.Column(db.Date)
+    tmdb_rating = db.Column(db.Float)
+    tmdb_last_checked_at = db.Column(db.DateTime)
+    __table_args__ = (db.Index('ix_movie_tmdb_refresh', 'tmdb_last_checked_at'),)
     cast_json = db.Column(db.Text, nullable=True, default=None)
     youtube_trailer_key = db.Column(db.String(20), nullable=True)
     trailer_video_path = db.Column(db.String(300), nullable=True)
@@ -62,7 +70,10 @@ class Movie(db.Model):
         ratings = [r.rating for r in self.user_ratings]
         if ratings:
             return round(sum(ratings) / len(ratings), 1)
-        return round(self.rating, 1) if getattr(self, 'rating', None) else 4.5
+        return None
+
+    def lock_tmdb_fields(self, *fields):
+        self.tmdb_overrides = sorted(set(self.tmdb_overrides or ()).union(fields))
 
     def get_user_rating(self, user):
         if not user or not getattr(user, 'is_authenticated', False):
@@ -72,23 +83,7 @@ class Movie(db.Model):
 
     @property
     def trailer_video_key(self):
-        """Return the admin-selected trailer, or a YouTube trailer found through TMDb."""
-        if self.trailer_video_path:
-            return None
-        if self.youtube_trailer_key:
-            return self.youtube_trailer_key
-        if self.tmdb_id:
-            try:
-                url = f"{TMDB_BASE_URL}/movie/{self.tmdb_id}/videos?api_key={TMDB_API_KEY}"
-                resp = requests.get(url, timeout=3)
-                if resp.status_code == 200:
-                    results = resp.json().get('results', [])
-                    for v in results:
-                        if v.get('site') == 'YouTube' and v.get('type') in ('Trailer', 'Teaser'):
-                            return v.get('key')
-            except Exception:
-                pass
-        return None
+        return None if self.trailer_video_path else self.youtube_trailer_key
 
     @property
     def moods(self):
@@ -245,6 +240,7 @@ class Showtime(db.Model):
     show_date = db.Column(db.Date, nullable=False)
     show_time = db.Column(db.String(20), nullable=False)
     price_overrides_json = db.Column(db.Text, default='{}')      # {"RECLINER": 400}
+    is_cancelled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
 
     movie = db.relationship('Movie', backref=db.backref('showtimes', lazy=True))
     screen = db.relationship('Screen', backref=db.backref('showtimes', lazy=True))
@@ -303,7 +299,8 @@ class Showtime(db.Model):
 
     @property
     def status(self):
-        """Returns 'upcoming', 'live', or 'ended' based on current time."""
+        if self.is_cancelled:
+            return 'cancelled'
         dt = self.show_datetime
         if not dt:
             return 'unavailable'
@@ -315,6 +312,10 @@ class Showtime(db.Model):
         elif now <= end_dt:
             return 'live'
         return 'ended'
+
+    @property
+    def accepts_bookings(self):
+        return bool(self.screen and self.status == 'upcoming' and not self.movie.is_archived)
 
     @property
     def dynamic_pricing_info(self):

@@ -25,11 +25,12 @@ def profile():
     purge_expired_holds()
     user_stats = current_user.stats
     film_dna = current_user.film_dna
-    watchlist_movies = current_user.watchlist_movies
+    watchlist_movies = [movie for movie in current_user.watchlist_movies if not movie.is_archived]
     recent_bookings = (Booking.query.filter_by(user_id=current_user.id, status='PAID')
                       .order_by(Booking.booked_at.desc()).limit(6).all())
     hype_stickers = (MovieHypeVote.query.filter_by(user_id=current_user.id)
-                     .join(Movie).order_by(MovieHypeVote.updated_at.desc()).all())
+                     .join(Movie).filter(Movie.is_archived.is_(False))
+                     .order_by(MovieHypeVote.updated_at.desc()).all())
     return render_template(
         'profile.html',
         stats=user_stats,

@@ -1266,3 +1266,5 @@ body#app-body :is(.cw-review-link, .cw-review-text-button) {
 @media (forced-colors:active) {
   .cw-stars input:checked+span,.cw-hype-choice[aria-pressed="true"] { border-color:Highlight; }
 }
+.cw-footer-credits { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem .875rem; margin-block:1rem; color:var(--cw-muted); }
+.cw-footer-credits img { width:82px; height:auto; }

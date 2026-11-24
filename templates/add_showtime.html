@@ -20,9 +20,10 @@
     </div>
   {% else %}
     <form method="POST" class="space-y-4">
-      <select name="movie_id" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
-        <option value="" disabled selected>Select movie</option>
-        {% for m in movies %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <select name="movie_id" aria-label="Movie" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
+        <option value="" disabled {% if selected_movie not in movies|map(attribute='id')|list %}selected{% endif %}>Select movie</option>
+        {% for m in movies %}<option value="{{ m.id }}" {% if m.id == selected_movie %}selected{% endif %}>{{ m.title }}</option>{% endfor %}
       </select>
 
       <select name="screen_id" id="screen-select" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">

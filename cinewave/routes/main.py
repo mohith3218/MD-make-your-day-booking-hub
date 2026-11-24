@@ -1,5 +1,7 @@
 from flask import Blueprint
+from sqlalchemy.orm import joinedload, selectinload
 from ._support import *
+from ..services.seat import screening_availability
 
 bp = Blueprint("main", __name__)
 
@@ -7,26 +9,27 @@ bp = Blueprint("main", __name__)
 @bp.route('/')
 def home():
     # Now Showing
-    now_showing_releases = Movie.query.filter(
+    catalogue = Movie.query.options(selectinload(Movie.user_ratings))
+    now_showing_releases = catalogue.filter(
         Movie.is_archived.is_(False),
         (Movie.is_upcoming.is_(False)) | (Movie.is_upcoming.is_(None)),
         (Movie.is_rerelease.is_(False)) | (Movie.is_rerelease.is_(None))
     ).order_by(Movie.id.desc()).all()
     
-    now_showing_rereleases = Movie.query.filter(
+    now_showing_rereleases = catalogue.filter(
         Movie.is_archived.is_(False),
         (Movie.is_upcoming.is_(False)) | (Movie.is_upcoming.is_(None)),
         Movie.is_rerelease.is_(True)
     ).order_by(Movie.id.desc()).all()
 
     # Coming Soon
-    coming_soon_releases = Movie.query.filter(
+    coming_soon_releases = catalogue.filter(
         Movie.is_archived.is_(False),
         Movie.is_upcoming.is_(True),
         (Movie.is_rerelease.is_(False)) | (Movie.is_rerelease.is_(None))
     ).order_by(Movie.release_date.asc(), Movie.id.desc()).all()
 
-    coming_soon_rereleases = Movie.query.filter(
+    coming_soon_rereleases = catalogue.filter(
         Movie.is_archived.is_(False),
         Movie.is_upcoming.is_(True),
         Movie.is_rerelease.is_(True)
@@ -34,15 +37,21 @@ def home():
 
     # The landing-page screening cards use the same live schedule as booking.
     scheduled_shows = (Showtime.query.join(Movie, Showtime.movie_id == Movie.id)
-                       .filter(Movie.is_archived.is_(False), Showtime.show_date >= cinema_now().date())
+                       .options(joinedload(Showtime.screen), joinedload(Showtime.movie))
+                       .filter(Movie.is_archived.is_(False), Showtime.is_cancelled.is_(False),
+                               Showtime.screen_id.is_not(None), Showtime.show_date >= cinema_now().date())
                        .order_by(Showtime.show_date, Showtime.id).all())
-    scheduled_shows = [show for show in scheduled_shows if show.status == 'upcoming' and show.seats_left > 0]
+    scheduled_shows = [show for show in scheduled_shows if show.accepts_bookings]
+    scheduled_ids = {show.movie_id for show in scheduled_shows}
+    availability = screening_availability(scheduled_shows)
+    scheduled_shows = [show for show in scheduled_shows if availability[show.id]['bookable']]
+    bookable_ids = {show.movie_id for show in scheduled_shows}
     screening_dates = sorted({show.show_date for show in scheduled_shows})[:5]
     screening_groups = {}
     for show in scheduled_shows:
         if show.show_date in screening_dates:
             screening_groups.setdefault(show.show_date, {}).setdefault(show.theater, []).append(show)
-    featured_movies = (Movie.query.filter(
+    featured_movies = (catalogue.filter(
         Movie.is_archived.is_(False), Movie.featured_order.isnot(None)
     ).order_by(Movie.featured_order.asc(), Movie.id.asc()).limit(5).all())
     # Keep the hero populated from the live catalogue until an administrator
@@ -97,7 +106,10 @@ def home():
         featured_movies=featured_movies,
         screening_dates=screening_dates,
         screening_groups=screening_groups,
+        screening_cards=availability,
         featured_shows_by_movie=featured_shows_by_movie,
+        scheduled_ids=scheduled_ids,
+        bookable_ids=bookable_ids,
         active_category=active_category,
         search_query=search_query,
         hype_counts=hype_counts,

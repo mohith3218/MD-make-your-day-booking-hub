@@ -1,3 +1,5 @@
+from math import isfinite
+
 from flask import Blueprint
 from ._support import *
 from ..services.screen_reviews import review_invitation
@@ -19,7 +21,7 @@ def book(showtime_id):
         flash("This showtime has no screen assigned. Ask an admin to fix it.")
         return redirect(url_for('movies.movie_detail', movie_id=movie.id))
 
-    if showtime.status != 'upcoming' or showtime.show_datetime is None:
+    if not showtime.accepts_bookings:
         flash("This show has started or is unavailable. Please choose an upcoming showtime.")
         return redirect(url_for('movies.movie_detail', movie_id=movie.id))
 
@@ -64,6 +66,9 @@ def book(showtime_id):
 
         # ---- hold the seats, then create a PENDING booking ----
         ticket_amount, meta = price_seats(showtime, seats_list)
+        if any(not isfinite(seat['price']) or seat['price'] <= 0 for seat in meta):
+            flash('One or more selected seats are unavailable.')
+            return redirect(url_for('booking.book', showtime_id=showtime_id))
         amounts = payments.compute_amounts(ticket_amount, len(seats_list))
 
         lock = SeatLock(showtime_id=showtime.id, user_id=current_user.id,

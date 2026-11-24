@@ -66,7 +66,9 @@ def register_hooks(application):
         protected = {'auth.login', 'auth.register', 'auth.verify_email', 'auth.resend_email_otp',
                      'auth.logout', 'auth.forgot_password', 'auth.reset_password',
                      'wallet.wallet_convert_points', 'admin.import_movie_add',
-                     'admin.set_movie_featured_order',
+                     'admin.set_movie_featured_order', 'admin.queue_movie_sync', 'admin.edit_movie',
+                     'admin.update_movie_trailer', 'admin.toggle_movie_status', 'admin.fetch_cast',
+                     'admin.add_showtime', 'admin.add_movie', 'admin.toggle_rerelease', 'admin.delete_movie',
                      'admin.verify_theater', 'admin.verify_screen', 'admin.archive_movie',
                      'movies.vote_movie_hype', 'screen_reviews.edit', 'screen_reviews.dismiss',
                      'screen_reviews.withdraw', 'screen_reviews.report', 'screen_reviews.moderate'}

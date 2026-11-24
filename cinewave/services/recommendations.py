@@ -22,6 +22,9 @@ from ..models import Movie, MovieRating, Watchlist
 
 
 def cinematch_genres(movie):
+    imported = (movie.tmdb_metadata or {}).get('genres')
+    if imported:
+        return imported
     text_content = f'{movie.title or ""} {movie.description or ""}'.casefold()
     found = []
     for genre, keywords in CINEMATCH_GENRE_KEYWORDS.items():

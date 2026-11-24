@@ -1,5 +1,7 @@
+from collections import defaultdict
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from math import isfinite
 from sqlalchemy.exc import IntegrityError
 import seat_layout as sl
 from ..extensions import db
@@ -41,6 +43,38 @@ def show_seat_prices(showtime, *, pricing_info=None):
                for seat in (row.get('blocked') or [])}
     return {seat: price for seat, price in sl.seat_price_map(layout, effective_overrides).items()
             if seat not in blocked}
+
+
+def screening_availability(shows):
+    """Read booked and held seats once for a set of upcoming screenings."""
+    ids = [show.id for show in shows]
+    booked, held = defaultdict(set), defaultdict(set)
+    if ids:
+        for show_id, seat in db.session.query(BookedSeat.showtime_id, BookedSeat.seat_id).filter(
+                BookedSeat.showtime_id.in_(ids)):
+            booked[show_id].add(seat)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        for show_id, seat in db.session.query(SeatHold.showtime_id, SeatHold.seat_id).filter(
+                SeatHold.showtime_id.in_(ids), SeatHold.expires_at > now):
+            held[show_id].add(seat)
+    cards = {}
+    for show in shows:
+        total, pricing, available = 0, {}, []
+        try:
+            pricing = show.pricing_info(booked_count=len(booked[show.id]))
+            taken = booked[show.id] | held[show.id]
+            available = [price for seat, price in show_seat_prices(show, pricing_info=pricing).items()
+                         if seat not in taken and isfinite(price) and price > 0]
+            total = sl.count_seats(show.layout)
+        except (TypeError, ValueError, AttributeError, OverflowError, KeyError):
+            available = []
+        start = show.show_datetime
+        end = start + timedelta(minutes=show.movie.duration) if start and show.movie.duration else None
+        cards[show.id] = {'show': show, 'remaining': len(available), 'total': total,
+                          'price': min(available, default=None), 'start': start, 'end': end,
+                          'format': show.screen.screen_type or 'Unspecified',
+                          'bookable': bool(available), 'pricing_label': pricing.get('badge') if total else None}
+    return cards
 
 
 def price_seats(showtime, seat_ids):
@@ -89,6 +123,9 @@ def finalise_paid_booking(booking, payment, *, wallet_debit_uncommitted=False):
     """Commit seats, mark paid, drop the lock. Returns (ok, message)."""
     if not payment.is_demo:
         return False, 'Only demo payments can be completed by this application.'
+    if booking.showtime.status != 'upcoming':
+        db.session.rollback()
+        return False, 'This screening is no longer available. No payment was completed.'
     try:
         if booking.status == 'PENDING':
             claimed = Booking.query.filter_by(id=booking.id, status='PENDING').update(

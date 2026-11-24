@@ -40,8 +40,9 @@ recovery requires a Brevo API v3 key, a verified sender, and the exact trusted
 HTTPS origin. Without those values, the page reports that recovery email is
 unavailable and does not claim to have sent a message.
 
-Optional: `TMDB_API_KEY` for movie import and cast lookup. It is unnecessary for
-browsing stored movies. ADMIN_PASSWORD is not required for existing production
+Set `TMDB_READ_TOKEN` or `TMDB_API_KEY` on the web service to enable staff
+import, cast lookup and the sync button. Browsing stored movies works without
+a TMDB credential. ADMIN_PASSWORD is not required for existing production
 accounts. The development-only SQLite seeder is never used in production.
 
 ## Protect the existing database
@@ -51,12 +52,46 @@ transfer scripts or an automatic migration as a build step.
 Existing IDs, users, movies, theatres, layouts, bookings, wallet values and payment
 history stay intact. Apply the additive changes once from the service root with
 `alembic upgrade head`, then run `python database_health.py`; the expected head is
-`20261123_01`. Apply migrations as an operator step after reviewing the backup,
+`20261125_01`. Apply migrations as an operator step after reviewing the backup,
 never as a build command. Do not run a baseline over populated tables.
 
 Only a fresh local development database may be created using `python app.py` and
 an explicitly supplied ADMIN_PASSWORD. Development deliberately uses SQLite even
 if a private Supabase URL is present. Tests assign fresh disposable SQLite files.
+
+## Schedule the TMDB catalogue worker
+
+The included GitHub Actions workflow runs independently of the Render Free
+service. It checks at :17 and :47 UTC each hour. The database schedules the
+first sync when the worker first checks in, then runs every six hours by
+default. A staff request queues a run for the next check-in. GitHub may delay
+scheduled jobs and disables them on inactive public repositories after 60 days.
+A host with cron can run the same command at a suitable check-in frequency.
+See [GitHub scheduling](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) and [Render cron pricing](https://render.com/docs/cronjobs#compute-plans-and-billing).
+
+1. Apply the reviewed database migration before deploying the web version or enabling production sync.
+2. Add Actions secret `CINEWAVE_SYNC_DATABASE_URL` with the existing PostgreSQL
+   Session pooler URI and `CINEWAVE_SYNC_TMDB_READ_TOKEN` or
+   `CINEWAVE_SYNC_TMDB_API_KEY`. Keep the Flask session secret on Render.
+3. Run **Sync TMDB movie catalogue** once from Actions on the default branch
+   and check the admin status for the attempt, counts, and next due time.
+
+The workflow accepts optional Actions variables `TMDB_REGION` (default `IN`),
+`TMDB_SYNC_INTERVAL_MINUTES` (360), `TMDB_SYNC_LOOKBACK_DAYS` (45),
+`TMDB_SYNC_LOOKAHEAD_DAYS` (180), and `TMDB_SYNC_MAX_PAGES` (25 per feed).
+Use a shorter check-in schedule if the desired interval is below 30 minutes.
+Incomplete metadata is rechecked by TMDB ID with backoff. Recently released
+and upcoming records are eligible for a daily metadata refresh. The worker
+preserves hidden movies and local field edits. A movie only offers tickets
+after an administrator schedules an available screening.
+
+For a self-managed scheduler, run `python -m flask --app app sync-movies`
+from the project root with the configured database, TMDB credential, and
+installed dependencies. Use `--force` for an immediate run when no other
+worker owns the sync lease.
+
+TMDB provides catalogue information and images. Confirm the applicable
+TMDB license before operating a commercial service. [TMDB API FAQ](https://developer.themoviedb.org/docs/faq)
 
 ## Demo transaction meaning
 

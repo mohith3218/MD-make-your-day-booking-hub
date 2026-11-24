@@ -14,6 +14,7 @@ MODULES = (
     'test_database_migration',
     'test_admin_movie_deletion',
     'test_auditorium_geometry',
+    'test_tmdb_sync',
 )
 
 

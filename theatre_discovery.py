@@ -1,14 +1,12 @@
 """Public theatre discovery using the same ORM database and booking records."""
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
-import math
+from datetime import date
 import re
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 
-import seat_layout as sl
 from cinewave.time import CINEMA_TIMEZONE, cinema_now
 
 
@@ -45,14 +43,15 @@ def validate_booking_context(show):
     return expected if supplied else {}
 
 
-def create_theatre_blueprint(db, models, price_map):
+def create_theatre_blueprint(db, models):
     """Reuse existing models without another engine, schema or booking system."""
     from cinewave.services.screen_reviews import combined_theatre_score, review_summaries
+    from cinewave.services.seat import screening_availability
     from cinewave.models import ScreenReview
 
     bp = Blueprint('theatre_discovery', __name__)
     Theater, Screen, Showtime = models.Theater, models.Screen, models.Showtime
-    Movie, BookedSeat, SeatHold = models.Movie, models.BookedSeat, models.SeatHold
+    Movie = models.Movie
 
     def scheduled(theatre_id=None):
         query = (Showtime.query.join(Screen, Showtime.screen_id == Screen.id)
@@ -64,41 +63,11 @@ def create_theatre_blueprint(db, models, price_map):
                  .filter(Showtime.show_date >= cinema_now().date()))
         if theatre_id is not None:
             query = query.filter(Screen.theater_id == theatre_id)
-        return sorted((show for show in query.all() if show.status == 'upcoming'
-                       and show.show_datetime is not None), key=lambda show: (show.show_datetime, show.id))
+        return sorted((show for show in query.all() if show.accepts_bookings),
+                      key=lambda show: (show.show_datetime, show.id))
 
     def availability(shows):
-        """Two batched seat queries; overlapping held/booked IDs count once."""
-        ids = [show.id for show in shows]
-        booked, held = defaultdict(set), defaultdict(set)
-        if ids:
-            for show_id, seat in db.session.query(BookedSeat.showtime_id, BookedSeat.seat_id).filter(
-                    BookedSeat.showtime_id.in_(ids)):
-                booked[show_id].add(seat)
-            utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
-            for show_id, seat in db.session.query(SeatHold.showtime_id, SeatHold.seat_id).filter(
-                    SeatHold.showtime_id.in_(ids), SeatHold.expires_at > utc_now):
-                held[show_id].add(seat)
-        cards = []
-        for show in shows:
-            try:
-                pricing = show.pricing_info(booked_count=len(booked[show.id]))
-                prices = price_map(show, pricing_info=pricing)
-                # Only physical seats in the persisted layout may be offered.
-                available = {seat: price for seat, price in prices.items()
-                             if seat not in booked[show.id] | held[show.id]
-                             and math.isfinite(price) and price > 0}
-                total = sl.count_seats(show.layout)
-            except (TypeError, ValueError, KeyError, AttributeError, OverflowError):
-                available, total = {}, 0
-            start = show.show_datetime
-            end = start + timedelta(minutes=show.movie.duration) if show.movie.duration and show.movie.duration > 0 else None
-            cards.append({'show': show, 'remaining': len(available), 'total': total,
-                          'price': min(available.values()) if available else None,
-                          'start': start, 'end': end,
-                          'format': show.screen.screen_type or 'Unspecified',
-                          'bookable': bool(available), 'pricing_label': pricing['badge'] if total else None})
-        return cards
+        return list(screening_availability(shows).values())
 
     @bp.errorhandler(SQLAlchemyError)
     def unavailable(error):
@@ -192,7 +161,7 @@ def create_theatre_blueprint(db, models, price_map):
                 .filter_by(id=showtime_id).first_or_404())
         if not show.screen or show.screen.theater_id != theatre_id:
             abort(404, description='This show does not belong to the selected theatre.')
-        if show.status != 'upcoming' or not show.show_datetime:
+        if not show.accepts_bookings:
             return render_template('theatre_discovery_error.html',
                                    message='This show has started or is no longer available. Choose another screening.'), 409
         if not availability([show])[0]['bookable']:

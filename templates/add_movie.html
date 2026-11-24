@@ -9,6 +9,7 @@
   </div>
 
   <form method="POST" enctype="multipart/form-data" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="text" name="title" placeholder="Movie title" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">
     <textarea name="description" rows="3" placeholder="Description" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]"></textarea>
     <input type="number" name="duration" placeholder="Duration (minutes)" required class="w-full bg-slate-900 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#C9A84C]">

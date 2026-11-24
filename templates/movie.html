@@ -21,15 +21,22 @@
     </div>
     <div class="flex flex-wrap gap-2 text-[11px]">
       <span id="movie-avg-badge" class="px-2 py-1 rounded-lg bg-amber-400/10 text-amber-400 border border-amber-400/20 font-bold">
-        ★ {{ '%.1f'|format(movie.display_rating) }} ({{ movie.user_ratings|length }} ratings)
+        {% if movie.display_rating is not none %}★ {{ '%.1f'|format(movie.display_rating) }}/5 · CineWave{% else %}No CineWave ratings yet{% endif %}
       </span>
-      <span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300"><i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} min</span>
+      {% if movie.tmdb_rating is not none %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">TMDB {{ '%.1f'|format(movie.tmdb_rating) }}/10</span>{% endif %}
+      {% if movie.duration %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300"><i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} min</span>{% endif %}
+      {% if movie.release_date %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ 'Upcoming · ' if movie.is_upcoming else 'Released · ' }}{{ movie.release_date.strftime('%d %b %Y') }}</span>{% elif movie.is_upcoming %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">Upcoming · Date to be announced</span>{% endif %}
       {% if movie.language %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ movie.language }}</span>{% endif %}
       {% if movie.certificate %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ movie.certificate }}</span>{% endif %}
     </div>
     <p class="text-slate-300 text-sm leading-relaxed">{{ movie.description or 'No description provided.' }}</p>
 
-    <!-- Interactive User Rating Widget -->
+    {% if movie.tmdb_metadata and movie.tmdb_metadata.genres %}<p class="text-xs text-slate-400">{{ movie.tmdb_metadata.genres|join(' · ') }}</p>{% endif %}
+    {% if movie.trailer_video_path or movie.trailer_video_key %}
+      <a class="cw-button cw-button-white cw-button-small" target="_blank" rel="noopener noreferrer"
+         href="{{ url_for('static', filename=movie.trailer_video_path) if movie.trailer_video_path else ('https://www.youtube.com/watch?v=' ~ movie.trailer_video_key) }}">Watch trailer</a>
+    {% endif %}
+    {% if can_review %}
     <div class="mt-4 pt-4 border-t border-white/[.08] flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2 flex-wrap">
         <span class="text-xs font-bold text-slate-300">Rate this film:</span>
@@ -56,6 +63,7 @@
         <span class="text-[11px] text-slate-400 hidden sm:inline"><i class="fa-solid fa-coins mr-1 text-amber-400"></i>+5 CinePass Pts</span>
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
 
@@ -127,11 +135,11 @@
           <div class="flex flex-wrap gap-3">
             {% for s in shows %}
               {% set st = s.status %}
-              {% if st == 'ended' %}
+              {% if st != 'live' and not remaining_seats.get(s.id) %}
                 {# ---- ENDED: greyed out, not clickable ---- #}
                 <div class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed text-center">
                   <p class="text-sm font-bold text-slate-400">{{ s.show_time }}</p>
-                  <p class="text-[10px] text-slate-600">{{ s.screen_label }} · Show Over</p>
+                  <p class="text-[10px] text-slate-600">{{ s.screen_label }} · {{ 'Sold out' if s.id in remaining_seats else 'Unavailable' }}</p>
                 </div>
               {% elif st == 'live' %}
                 {# ---- LIVE: pulsing red badge ---- #}
@@ -150,7 +158,7 @@
                     <p class="text-sm font-bold text-white">{{ s.show_time }}</p>
                     <p class="text-[10px] text-slate-500">
                       {{ s.screen_label }} ·
-                      <span id="seats-{{ s.id }}">{{ s.seats_left }} left</span>
+                      <span id="seats-{{ s.id }}">{{ remaining_seats[s.id] }} left</span>
                     </p>
                     {% if s.show_datetime %}
                       <p class="text-[9px] text-emerald-400 font-mono mt-0.5"
@@ -174,11 +182,11 @@
       {% endfor %}
     </div>
   {% else %}
-    <p class="text-slate-500 text-sm">No showtimes currently scheduled for this movie.</p>
+    <p class="text-slate-500 text-sm">No screenings scheduled yet.</p>
   {% endfor %}
 </section>
 
-<!-- Audience Reviews & Ratings Section -->
+{% if can_review %}
 <section class="space-y-5 pt-6 border-t border-white/[.08]">
   <div class="flex items-center justify-between flex-wrap gap-3">
     <div>
@@ -300,6 +308,9 @@
     </form>
   </div>
 </div>
+{% else %}
+<p class="cw-empty">Complete an eligible booked screening to read or write audience reviews.</p>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

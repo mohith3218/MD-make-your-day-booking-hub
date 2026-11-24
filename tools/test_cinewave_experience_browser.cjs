@@ -104,6 +104,8 @@ async function verify(browser, info) {
         form: '/booking/' + info.references[1] + '/screen-review', admin: '/admin/screen-reviews',
         ticket: '/ticket/' + info.references[1], seats: '/book/' + info.show,
         checkout: '/checkout/QA-CHECKOUT',
+        'imported-movie': '/movie/' + info.importedMovie,
+        'admin-movies': '/admin?source=tmdb&schedule=unscheduled#movies',
     };
     const cast = (reference) => '/booking/' + reference + '/screen-review';
     const go = async (url, ready) => {
@@ -203,6 +205,18 @@ async function verify(browser, info) {
     assert.equal(await evaluate(`document.querySelector('[value="EXTREME_HYPED"]').getAttribute('aria-pressed')`), 'true');
     console.log('Hype votes and failure feedback verified.');
 
+    await go(fixture['imported-movie'], '.cw-detail-poster');
+    assert(await evaluate("document.body.textContent.includes('No screenings scheduled yet.')"));
+    assert.equal(await evaluate("document.querySelector('a[href^=\"/book/\"]')"), null);
+    assert.equal(await evaluate("document.querySelector('#reviewModal')"), null);
+    await go(fixture['admin-movies'], '#movie-sync');
+    assert(await evaluate(`document.querySelector('#movies-table').textContent.includes(${JSON.stringify(info.importedTitle)})`));
+    assert(await evaluate("document.querySelector('#movie-sync').textContent.includes('Last successful')"));
+    await evaluate("document.querySelector('#movie-sync form').requestSubmit()");
+    await until(() => evaluate("document.querySelector('#movie-sync')?.textContent.includes('Manual sync queued')"),
+        'The admin sync request was not queued.');
+    console.log('Imported movie availability, review gating, and the admin sync action verified.');
+
     await go(fixture.ticket, '.cw-ticket-invitation');
     await go(cast(info.references[0]), '.cw-review-form');
     await evaluate(`document.querySelector('[name="overall_rating"][value="5"]').click();
@@ -237,6 +251,7 @@ async function verify(browser, info) {
     const pages = {
         login: '#login-username', register: '#register-email', home: '.cw-featured-hero',
         'home-hype': '.cw-movie-card[data-category="upcoming"]:not([hidden])', movie: '#movie-hype',
+        'imported-movie': '.cw-detail-poster', 'admin-movies': '#movie-sync',
         'cine-match': '.cm-form',
         theatres: '.td-venue-card', theatre: '#theatre-screens', reviews: '.cw-review-card',
         form: '.cw-review-form', admin: '.cw-review-card', ticket: '.cw-ticket-invitation',

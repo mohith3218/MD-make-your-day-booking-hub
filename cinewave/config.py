@@ -6,7 +6,6 @@ from pathlib import Path
 from database_config import database_settings
 
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
-TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "").strip()
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 TMDB_BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
@@ -43,6 +42,13 @@ def configure_app(application, overrides=None):
         BREVO_SENDER_EMAIL=os.environ.get("BREVO_SENDER_EMAIL", "").strip(),
         BREVO_SENDER_NAME=os.environ.get("BREVO_SENDER_NAME", "CineWave").strip(),
         PASSWORD_RESET_ORIGIN=os.environ.get("PASSWORD_RESET_ORIGIN", "").strip().rstrip("/"),
+        TMDB_API_KEY=os.environ.get("TMDB_API_KEY", "").strip(),
+        TMDB_READ_TOKEN=os.environ.get("TMDB_READ_TOKEN", "").strip(),
+        TMDB_REGION=os.environ.get("TMDB_REGION", "IN").strip().upper(),
+        TMDB_SYNC_INTERVAL_MINUTES=int(os.environ.get("TMDB_SYNC_INTERVAL_MINUTES", "360")),
+        TMDB_SYNC_LOOKBACK_DAYS=int(os.environ.get("TMDB_SYNC_LOOKBACK_DAYS", "45")),
+        TMDB_SYNC_LOOKAHEAD_DAYS=int(os.environ.get("TMDB_SYNC_LOOKAHEAD_DAYS", "180")),
+        TMDB_SYNC_MAX_PAGES=int(os.environ.get("TMDB_SYNC_MAX_PAGES", "25")),
     )
     env = dict(os.environ)
     if environment == "development":

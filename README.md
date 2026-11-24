@@ -5,14 +5,38 @@ Everything is Vizag-only (Visakhapatnam theatres seeded on first run).
 
 ## 1. Run it
 
-```bash
-pip install -r requirements.txt
-python app.py           # http://127.0.0.1:5000
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip check
+.venv\Scripts\python.exe app.py
 ```
+
+Use Python 3.12 for local development and the hosted worker. On Linux and macOS,
+use `.venv/bin/python` in place of `.venv\Scripts\python.exe`. The local site
+listens on http://127.0.0.1:5000. Recreate virtual environments when moving the
+project between machines.
 
 On a fresh local database, set `ADMIN_PASSWORD` before first startup to create the admin account. Passwords are never printed and existing credentials are preserved. Set `SECRET_KEY` to a long random value to keep sessions valid across restarts. For an HTTPS deployment, also set `SESSION_COOKIE_SECURE=1`. Flask debug mode is off by default; set `FLASK_DEBUG=1` only for local development.
 Your old `vizag_movies.db` keeps working — `auto_migrate()` adds the new columns on startup.
 Keep the original database and its backups. For Supabase PostgreSQL configuration, versioned schema migrations and safe data transfer, see [the Supabase setup guide](docs/SUPABASE_SETUP.md) and [migration verification report](docs/SUPABASE_DATABASE_MIGRATION_REPORT.md).
+
+### Movie catalogue synchronization
+
+Set `TMDB_READ_TOKEN` or `TMDB_API_KEY` in the existing untracked `.env`.
+After initializing the local SQLite schema, run the initial sync from the
+project root. The command uses the same database as the Flask app.
+
+```powershell
+.venv\Scripts\python.exe -m flask --app app sync-movies
+```
+
+The command checks the database for the next due run or an admin request.
+To keep a development PC syncing, use Windows Task Scheduler to repeat that
+command with the project root as **Start in**. On Linux or macOS, use cron and
+set the same working directory. Run it more frequently than the configured
+sync interval so queued requests are picked up promptly. The web process
+does not schedule the job. See [production scheduling and configuration](docs/PRODUCTION_DEPLOYMENT_GUIDE.md#schedule-the-tmdb-catalogue-worker).
 
 ### Email verification and ticket delivery
 

@@ -1,53 +1,226 @@
+"""Shared TMDB client and movie metadata mapping for admin and worker use."""
 import json
+import re
+from datetime import date, datetime, timezone
+from email.utils import parsedate_to_datetime
+from time import sleep
+from urllib.parse import urlsplit
+
 import requests
-from ..extensions import db
-from ..models import Movie
-from ..config import TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE
+from flask import current_app
+
+from ..config import TMDB_BACKDROP_BASE, TMDB_BASE_URL, TMDB_IMAGE_BASE
+from ..time import cinema_now
+
+LANGUAGES = {
+    'bn': 'Bengali', 'en': 'English', 'gu': 'Gujarati', 'hi': 'Hindi',
+    'kn': 'Kannada', 'ml': 'Malayalam', 'mr': 'Marathi', 'or': 'Odia',
+    'pa': 'Punjabi', 'ta': 'Tamil', 'te': 'Telugu', 'ur': 'Urdu',
+}
+IMAGE_PATH = re.compile(r'/[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)', re.I)
+VIDEO_KEY = re.compile(r'[A-Za-z0-9_-]{11}')
 
 
+class TMDBError(Exception):
+    def __init__(self, message, *, status=None, retry_after=0):
+        super().__init__(message)
+        self.status = status
+        self.retry_after = retry_after
 
-def _tmdb_find_id(title):
-    """Best-effort TMDb lookup by title; returns the first result's id or None."""
+
+def retry_delay(value):
     try:
-        res = requests.get(f"{TMDB_BASE_URL}/search/movie",
-                           params={'api_key': TMDB_API_KEY, 'query': title},
-                           timeout=10).json()
-        for item in res.get('results', []):
-            if item.get('id'):
-                return item['id']
-    except Exception:
-        pass
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        try:
+            retry_at = parsedate_to_datetime(value).astimezone(timezone.utc)
+            return max(0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+        except (TypeError, ValueError, OverflowError):
+            return 0
+
+
+class TMDBClient:
+    def __init__(self, *, heartbeat=None, attempts=3):
+        self.key = current_app.config['TMDB_API_KEY']
+        self.token = current_app.config['TMDB_READ_TOKEN']
+        self.region = current_app.config['TMDB_REGION']
+        self.session = requests.Session()
+        self.heartbeat = heartbeat
+        self.attempts = attempts
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *error):
+        self.session.close()
+
+    def get(self, path, **params):
+        if not self.key and not self.token:
+            raise TMDBError('TMDB credentials are missing.')
+        headers = {'Accept': 'application/json'}
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+        else:
+            params['api_key'] = self.key
+        for attempt in range(self.attempts):
+            if self.heartbeat:
+                self.heartbeat()
+            try:
+                with self.session.get(TMDB_BASE_URL + path, params=params, headers=headers,
+                                      timeout=(3.05, 10), allow_redirects=False) as response:
+                    status = response.status_code
+                    if status == 200:
+                        payload = response.json()
+                        if isinstance(payload, dict):
+                            return payload
+                        raise ValueError('Invalid response shape')
+                    error = TMDBError(f'TMDB returned HTTP {status}.', status=status,
+                                      retry_after=retry_delay(response.headers.get('Retry-After')))
+            except (requests.RequestException, ValueError):
+                error = TMDBError('TMDB returned an invalid response or could not be reached.')
+            if error.status not in (None, 429) and error.status < 500:
+                break
+            delay = max(2 ** attempt, error.retry_after)
+            if attempt + 1 == self.attempts or delay > 30:
+                break
+            sleep(delay)
+        raise error from None
+
+    def search(self, query):
+        return self.get('/search/movie', query=query, region=self.region, include_adult='false')
+
+    def details(self, movie_id):
+        detail = self.get(f'/movie/{movie_id}',
+                          append_to_response='credits,videos,release_dates,images',
+                          include_image_language='en,null')
+        if type(detail.get('id')) is not int or detail['id'] != movie_id:
+            raise TMDBError('TMDB returned details for an unexpected movie.', status=422)
+        language = clean_text(detail.get('original_language'))
+        if not meaningful_overview(detail.get('overview')) and language and language != 'en':
+            original = self.get(f'/movie/{movie_id}', language=language)
+            if original.get('id') == movie_id:
+                if meaningful_overview(original.get('overview')):
+                    detail['overview'] = original['overview']
+                for field in ('title', 'poster_path', 'tagline'):
+                    if not clean_text(detail.get(field)) and clean_text(original.get(field)):
+                        detail[field] = original[field]
+        return detail
+
+
+def clean_text(value, length=None):
+    value = value.strip() if isinstance(value, str) else ''
+    return (value[:length] if length else value) or None
+
+
+def meaningful_overview(value):
+    value = clean_text(value)
+    if value and any(char.isalnum() for char in value):
+        if value.casefold().rstrip('.') not in {
+            'tba', 'n/a', 'tbd', 'no overview available', 'no description available'
+        }:
+            return value
     return None
 
 
-def _tmdb_fetch_credits(tmdb_id):
-    """
-    Returns (cast_entries, director_name) for a TMDb movie id; ([], None) on any
-    failure so callers never hard-fail when TMDb is unreachable.
-    """
+def parse_release_date(value):
     try:
-        res = requests.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}/credits",
-                           params={'api_key': TMDB_API_KEY}, timeout=10).json()
-        cast_entries = []
-        for c in (res.get('cast') or [])[:12]:
-            cast_entries.append({
-                'name': c.get('name') or '',
-                'character': c.get('character') or '',
-                'profile': f"{TMDB_IMAGE_BASE}{c['profile_path']}" if c.get('profile_path') else None,
-            })
-        director = next((c.get('name') for c in (res.get('crew') or [])
-                         if c.get('job') == 'Director'), None)
-        return cast_entries, director
-    except Exception:
-        return [], None
+        return date.fromisoformat(value[:10]) if isinstance(value, str) else None
+    except ValueError:
+        return None
 
 
-def _store_movie_cast(movie, tmdb_id):
-    """Fetch credits for tmdb_id and store them on the movie. Returns True if anything was saved."""
-    cast_entries, director = _tmdb_fetch_credits(tmdb_id)
-    if not cast_entries and not director:
-        return False
-    movie.tmdb_id = tmdb_id
-    movie.cast_json = json.dumps({'director': director, 'cast': cast_entries})
-    db.session.commit()
-    return True
+def image_url(path, base=TMDB_IMAGE_BASE):
+    if isinstance(path, str) and IMAGE_PATH.fullmatch(path):
+        return base + path
+    return None
+
+
+def poster_identity(url):
+    try:
+        parts = urlsplit(url or '')
+    except ValueError:
+        return None
+    path = '/' + parts.path.rsplit('/', 1)[-1]
+    if parts.hostname == 'image.tmdb.org' and IMAGE_PATH.fullmatch(path):
+        return path
+    return None
+
+
+def entries(value):
+    return [entry for entry in value if isinstance(entry, dict)] if isinstance(value, list) else []
+
+
+def section_entries(payload, section, field='results'):
+    value = payload.get(section)
+    return entries(value.get(field)) if isinstance(value, dict) else []
+
+
+def normalized(value):
+    return ' '.join((value or '').casefold().split())
+
+
+def movie_metadata(detail, region, *, source=None):
+    original_date = parse_release_date(detail.get('release_date'))
+    release_rows = next((entries(group.get('release_dates'))
+                         for group in section_entries(detail, 'release_dates')
+                         if group.get('iso_3166_1') == region), [])
+    dates = [(row['type'], released, clean_text(row.get('certification'), 10))
+             for row in release_rows if row.get('type') in (2, 3)
+             if (released := parse_release_date(row.get('release_date')))]
+    dates.sort(key=lambda item: (-item[0], item[1]))
+    regional_date = dates[0][1] if dates else None
+    certification = next((cert for _, _, cert in dates if cert), None)
+    today = cinema_now().date()
+    release_date = regional_date or original_date
+    upcoming = release_date > today if release_date else (
+        source == 'upcoming' or detail.get('status') in {'Planned', 'In Production', 'Post Production'})
+
+    language_code = clean_text(detail.get('original_language'), 12)
+    spoken_languages = {item.get('iso_639_1'): item.get('english_name')
+                        for item in entries(detail.get('spoken_languages'))}
+    language = LANGUAGES.get(language_code) or spoken_languages.get(language_code) or language_code
+    runtime = detail.get('runtime')
+    rating = detail.get('vote_average')
+    votes = detail.get('vote_count')
+    trailer_candidates = [video for video in section_entries(detail, 'videos')
+                          if video.get('site') == 'YouTube' and video.get('type') in ('Trailer', 'Teaser')
+                          and isinstance(video.get('key'), str) and VIDEO_KEY.fullmatch(video['key'])]
+    trailer_candidates.sort(key=lambda video: (video['type'] == 'Trailer', video.get('official') is True),
+                            reverse=True)
+    cast = [{'name': person['name'], 'character': clean_text(person.get('character')),
+             'profile': image_url(person.get('profile_path'))}
+            for person in section_entries(detail, 'credits', 'cast')[:12] if clean_text(person.get('name'))]
+    director = next((person['name'] for person in section_entries(detail, 'credits', 'crew')
+                     if person.get('job') == 'Director' and clean_text(person.get('name'))), None)
+    poster = image_url(detail.get('poster_path')) or next((
+        url for item in section_entries(detail, 'images', 'posters')
+        if (url := image_url(item.get('file_path')))), None)
+    return {
+        'title': clean_text(detail.get('title'), 200) or clean_text(detail.get('original_title'), 200),
+        'description': meaningful_overview(detail.get('overview')),
+        'poster': poster,
+        'backdrop': image_url(detail.get('backdrop_path'), TMDB_BACKDROP_BASE),
+        'duration': runtime if type(runtime) is int and 0 < runtime <= 9999 else None,
+        'language': clean_text(language, 50),
+        'certificate': certification,
+        'is_upcoming': upcoming,
+        'release_date': release_date,
+        'tmdb_original_release_date': original_date,
+        'tmdb_regional_release_date': regional_date,
+        'tmdb_rating': (rating if type(rating) in (int, float) and 0 <= rating <= 10
+                        and type(votes) is int and votes > 0 else None),
+        'youtube_trailer_key': trailer_candidates[0]['key'] if trailer_candidates else None,
+        'cast_json': json.dumps({'director': director, 'cast': cast}, ensure_ascii=False) if cast or director else None,
+        'tmdb_metadata': {
+            'genres': [item['name'] for item in entries(detail.get('genres')) if clean_text(item.get('name'))],
+            'production_companies': [item['name'] for item in entries(detail.get('production_companies'))
+                                     if clean_text(item.get('name'))],
+            'original_language': language_code,
+            'original_title': clean_text(detail.get('original_title')),
+            'tagline': clean_text(detail.get('tagline')),
+        },
+    }
+
+
+def minimum_metadata(fields):
+    return all(fields[key] for key in ('title', 'description', 'poster'))

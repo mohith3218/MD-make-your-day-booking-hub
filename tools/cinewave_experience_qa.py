@@ -11,7 +11,7 @@ database_url = f'sqlite:///{database.as_posix()}'
 os.environ.update(APP_ENV='testing', DATABASE_URL=database_url, TEST_DATABASE_URL=database_url,
                   SESSION_COOKIE_SECURE='0', SECRET_KEY='local-browser-fixture',
                   SMTP_HOST='qa-mail.example.invalid', SMTP_FROM_EMAIL='qa@example.invalid',
-                  TMDB_API_KEY='')
+                  TMDB_API_KEY='isolated-browser-fixture', TMDB_READ_TOKEN='')
 
 from alembic import command
 from alembic.config import Config
@@ -19,6 +19,8 @@ from werkzeug.serving import make_server
 
 from app import app, db
 from cinewave.models import Booking, Movie, Screen, Showtime, Theater, User
+from cinewave.services import movie_sync
+from cinewave.services.movies import TMDBClient
 from cinewave.time import cinema_now
 
 with app.app_context():
@@ -53,10 +55,19 @@ with app.app_context():
                            status='PENDING', ticket_amount=150, total_amount=160,
                            expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)))
     db.session.commit()
+    title = 'Imported Film Fixture'
+    details = {'id': 120025, 'title': title, 'overview': 'An imported festival film for browser testing.',
+               'poster_path': '/browser-fixture.jpg', 'original_language': 'ta'}
+    with patch.object(movie_sync, 'discover', return_value={120025: 'recent'}), \
+            patch.object(TMDBClient, 'details', return_value=details):
+        counts, error = movie_sync.run_sync()
+    assert not error and counts['imported'] == 1
+    imported = Movie.query.filter_by(tmdb_id=120025).one()
     server = make_server('127.0.0.1', 0, app)
     print(json.dumps({'port': server.server_port, 'theater': theater.id,
                       'screen': screen.id, 'screenWithoutReviews': extra_screen.id,
-                      'movie': upcoming.id, 'show': shows[-1].id, 'references': references}), flush=True)
+                      'movie': upcoming.id, 'show': shows[-1].id, 'references': references,
+                      'importedMovie': imported.id, 'importedTitle': title}), flush=True)
 
 with patch('cinewave.routes.auth.password_recovery_is_configured', return_value=True), \
         patch('cinewave.routes.auth.send_password_recovery_email', return_value=False):

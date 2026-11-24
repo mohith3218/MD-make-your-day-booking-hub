@@ -70,14 +70,14 @@ class User(UserMixin, db.Model):
 
         current_year = datetime.utcnow().year
         films_this_year = sum(1 for b in paid_bookings if b.booked_at and b.booked_at.year == current_year)
-        total_minutes = sum((m.duration or 120) for m in distinct_movies.values())
+        total_minutes = sum((m.duration or 0) for m in distinct_movies.values())
         hours_watched = round(total_minutes / 60, 1) if total_minutes else 0.0
 
         user_ratings = [r.rating for r in self.movie_ratings]
         if user_ratings:
             avg_rating = round(sum(user_ratings) / len(user_ratings), 1)
         elif distinct_movies:
-            movie_ratings = [m.display_rating for m in distinct_movies.values()]
+            movie_ratings = [rating for m in distinct_movies.values() if (rating := m.display_rating) is not None]
             avg_rating = round(sum(movie_ratings) / len(movie_ratings), 1) if movie_ratings else 0.0
         else:
             avg_rating = 0.0

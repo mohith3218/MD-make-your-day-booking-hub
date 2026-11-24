@@ -1,5 +1,6 @@
 from flask import Blueprint
 from ._support import *
+from ..services.seat import screening_availability
 
 bp = Blueprint("theatre", __name__)
 
@@ -107,10 +108,13 @@ def showtime_live_info(showtime_id):
     """Public endpoint: returns real-time seats left, show status, and countdown seconds."""
     purge_expired_holds()
     showtime = Showtime.query.get_or_404(showtime_id)
+    if showtime.movie.is_archived:
+        abort(404)
     dt = showtime.show_datetime
-    seconds_to_start = int((dt - datetime.now()).total_seconds()) if dt else 0
+    availability = screening_availability([showtime])[showtime_id] if showtime.accepts_bookings else None
+    seconds_to_start = int((dt - cinema_now()).total_seconds()) if availability else 0
     return jsonify({
-        'seats_left': showtime.seats_left,
+        'seats_left': availability['remaining'] if availability else 0,
         'total_seats': sl.count_seats(showtime.layout),
         'status': showtime.status,
         'seconds_to_start': max(0, seconds_to_start),
