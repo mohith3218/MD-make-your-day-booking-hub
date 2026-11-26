@@ -447,7 +447,7 @@ def run_sync(*, force=False):
                 try:
                     outcome, reason = save_movie(movie_id, source, detail, client.region, lower, upper)
                     db.session.flush()
-                except (DataError, IntegrityError):
+                except (DataError, IntegrityError, UnicodeError):
                     db.session.rollback()
                     update_lease(token)
                     if Movie.query.filter_by(tmdb_id=movie_id).first():

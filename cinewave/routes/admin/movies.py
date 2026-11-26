@@ -316,6 +316,9 @@ def import_movie_add(tmdb_id):
         db.session.commit()
         flash(f'Saved “{movie.title}” in the CineWave catalogue.')
         return redirect(url_for('movies.movie_detail', movie_id=movie.id), code=303)
+    except UnicodeError:
+        db.session.rollback()
+        flash('CineWave could not store the imported text. Check that the database uses UTF-8.')
     except (TMDBError, ValueError) as failure:
         db.session.rollback()
         flash(str(failure))
