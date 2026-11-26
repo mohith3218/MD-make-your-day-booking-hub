@@ -37,20 +37,23 @@
     <div><h2 id="movie-sync-title" class="text-lg font-bold text-white">TMDB synchronization</h2><p class="text-xs text-slate-400">{{ sync_status }}</p></div>
     <form method="post" action="{{ url_for('admin.queue_movie_sync') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button class="cw-button cw-button-primary cw-button-small disabled:opacity-50" type="submit" {% if not sync_configured %}disabled{% endif %}>Sync Movies Now</button>
+      <button class="cw-button cw-button-primary cw-button-small" type="submit">Queue movie sync</button>
     </form>
   </div>
+  <p class="text-xs text-slate-300">This queues a request until the external worker checks in. GitHub may delay scheduled runs. To run it directly, open <a class="underline" href="https://github.com/mohith3218/MD-make-your-day-booking-hub/actions/workflows/tmdb-sync.yml" target="_blank" rel="noopener">the GitHub Actions workflow</a> and choose Run workflow.</p>
+  <p class="text-xs text-slate-400">Web TMDB credentials {{ 'configured' if sync_configured else 'missing' }} · {{ sync_total_movies }} TMDB-linked movies · {{ sync_pending_candidates }} candidates ready{% if sync_state and sync_state.requested_at %} · Manual request pending{% endif %}</p>
   <dl class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300">
-    {% for label, value in [('Last attempted', sync_state.last_attempt_at if sync_state else none),
+    {% for label, value in [('Last worker check-in', sync_state.worker_seen_at if sync_state else none),
+                           ('Last attempted', sync_state.last_attempt_at if sync_state else none),
                            ('Last successful', sync_state.last_success_at if sync_state else none),
-                           ('Next scheduled', sync_state.next_run_at if sync_state else none)] %}
+                           ('Next due', sync_state.next_run_at if sync_state else none)] %}
       <div><dt class="text-slate-400">{{ label }}</dt><dd>{{ value.strftime('%d %b %Y, %H:%M UTC') if value else '—' }}</dd></div>
     {% endfor %}
   </dl>
   {% if sync_state and sync_state.counts %}
-    <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-300">
-      {% for label, key in [('Imported', 'imported'), ('Updated', 'updated'), ('Skipped', 'skipped'), ('Failed', 'failed')] %}
-        <div><dt class="text-slate-400">{{ label }}</dt><dd>{{ sync_state.counts[key] }}</dd></div>
+    <dl class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs text-slate-300">
+      {% for label, key in [('Discovered', 'discovered'), ('Imported', 'imported'), ('Updated', 'updated'), ('Skipped', 'skipped'), ('Failed', 'failed')] %}
+        <div><dt class="text-slate-400">{{ label }}</dt><dd>{{ sync_state.counts.get(key, '—') }}</dd></div>
       {% endfor %}
     </dl>
   {% endif %}

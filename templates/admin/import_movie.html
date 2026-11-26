@@ -2,26 +2,51 @@
 {% block title %}Import movies · CineWave Admin{% endblock %}
 {% block content %}
 <section class="space-y-6 max-w-5xl mx-auto" aria-labelledby="tmdb-title">
-  <header class="flex flex-wrap items-end justify-between gap-4"><div><p class="cw-overline">Catalog tools</p><h1 id="tmdb-title">Import a film from TMDb</h1><p class="text-sm text-slate-600 mt-1">Search the catalog, choose its customer status, then review the stored film page.</p></div><a class="cw-button cw-button-white" href="{{ url_for('admin.admin') }}">← Admin</a></header>
-  <form method="get" class="glass-card rounded-2xl p-4 flex flex-wrap gap-3" role="search"><label class="sr-only" for="tmdb-query">Movie title</label><input id="tmdb-query" type="search" name="query" value="{{ query }}" maxlength="120" placeholder="Search movie titles" class="flex-1 min-w-[180px] rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900"><button class="cw-button cw-button-primary" type="submit">Search TMDb</button></form>
-  {% if query and not results %}<div class="cw-empty" role="status"><h2>No results found</h2><p>Try another title. Existing CineWave films remain available when TMDb is unavailable.</p><a href="{{ url_for('main.home') }}">Browse stored films</a></div>{% endif %}
+  <header class="flex flex-wrap items-end justify-between gap-4"><h1 id="tmdb-title">Import a film from TMDb</h1><a class="cw-button cw-button-white" href="{{ url_for('admin.admin') }}#movies">← Admin movies</a></header>
+  <form method="get" action="{{ url_for('admin.import_movie') }}" class="glass-card rounded-2xl p-4 flex flex-wrap gap-3" role="search"><label class="sr-only" for="tmdb-query">Movie title or TMDb ID</label><input id="tmdb-query" type="search" name="query" value="{{ query }}" maxlength="120" placeholder="Movie title or TMDb ID" class="flex-1 min-w-[180px] rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900"><button class="cw-button cw-button-primary" type="submit">Search TMDb</button></form>
+  {% if search_error %}
+  <div class="cw-empty" role="alert"><h2>TMDb search could not finish</h2><p>{{ search_error }}</p></div>
+  {% elif query and not results %}
+  <div class="cw-empty" role="status"><h2>No results found</h2><p>Try another title, the original spelling, or a TMDb movie ID.</p></div>
+  {% endif %}
+  {% if completion %}<div class="cw-empty" role="alert"><h2>Complete the movie information</h2><p>TMDb did not supply {% if missing_description %}a description{% endif %}{% if missing_description and missing_poster %} or {% endif %}{% if missing_poster %}a valid poster{% endif %}. Add the missing information below.</p></div>{% endif %}
   <div class="space-y-4">
   {% for movie in results %}
     <article class="glass-card rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row gap-4">
       <div class="w-24 shrink-0">{% if movie.poster_url %}<img src="{{ movie.poster_url }}" alt="{{ movie.title }} poster" loading="lazy" class="aspect-[2/3] w-full rounded-xl object-cover" onerror="this.hidden=true;this.nextElementSibling.hidden=false">{% endif %}<div {% if movie.poster_url %}hidden{% endif %} class="aspect-[2/3] rounded-xl bg-amber-50 border border-amber-200 grid place-items-center p-2 text-center text-xs text-amber-950"><span>{{ movie.title }}<br><small>Artwork unavailable</small></span></div></div>
-      <div class="min-w-0 flex-1"><div class="flex flex-wrap items-baseline gap-x-2"><h2 class="text-xl font-bold text-slate-900">{{ movie.title }}</h2>{% if movie.year %}<span class="text-sm text-slate-600">{{ movie.year }}</span>{% endif %}</div><p class="mt-2 text-sm text-slate-600">{{ movie.overview or 'No synopsis is available from TMDb.' }}</p><p class="mt-2 text-xs text-slate-600">Release: {{ movie.release_date or 'Date to be announced' }} · TMDb ID {{ movie.tmdb_id }}</p>
+      <div class="min-w-0 flex-1"><div class="flex flex-wrap items-baseline gap-x-2"><h2 class="text-xl font-bold text-slate-900">{{ movie.title }}</h2>{% if movie.year %}<span class="text-sm text-slate-600">{{ movie.year }}</span>{% endif %}{% if movie.language %}<span class="text-sm text-slate-600">{{ movie.language }}</span>{% endif %}</div><p class="mt-2 text-sm text-slate-600">{{ movie.overview or 'No synopsis is available from TMDb.' }}</p><p class="mt-2 text-xs text-slate-600">Release date {{ movie.release_date or 'unavailable' }} · TMDb ID {{ movie.tmdb_id }}</p>
+      {% if movie.existing %}
+      <p class="mt-3 font-semibold">Already imported{% if movie.existing.is_archived %} · Archived{% endif %}</p>
+      <a class="cw-button cw-button-white mt-2" href="{{ url_for('admin.edit_movie', movie_id=movie.existing.id) }}">View stored record</a>
+      {% else %}
       <form method="post" action="{{ url_for('admin.import_movie_add', tmdb_id=movie.tmdb_id) }}" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="query" value="{{ query }}">
-        <label class="text-xs text-slate-700">Customer catalog status<select name="category" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="showing" {% if movie.suggested_category == 'showing' %}selected{% endif %}>Now Showing</option><option value="upcoming" {% if movie.suggested_category == 'upcoming' %}selected{% endif %}>Upcoming</option></select></label>
-        <label class="text-xs text-slate-700">Release type<select name="release_type" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="fresh">First release</option><option value="rerelease">Re-release</option></select></label>
-        <label class="text-xs text-slate-700">Release date<input type="date" name="release_date" value="{{ movie.release_date }}" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"></label>
-        <label class="text-xs text-slate-700">Homepage feature order<select name="featured_order" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="">Do not feature</option>{% for rank in range(1, 6) %}<option value="{{ rank }}">{{ rank }}{% if rank == 1 %}st{% elif rank == 2 %}nd{% elif rank == 3 %}rd{% else %}th{% endif %}</option>{% endfor %}</select></label>
-        <label class="text-xs text-slate-700">YouTube trailer (optional)<input type="text" name="youtube_trailer" maxlength="200" placeholder="Link or video ID" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"></label>
+        {% set form = completion or {} %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="query" value="{{ query }}"><input type="hidden" name="page" value="{{ page }}">
+        <label class="text-xs text-slate-700">Customer catalog status<select name="category" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="auto">Use regional release information</option><option value="showing" {% if form.get('category') == 'showing' %}selected{% endif %}>Released</option><option value="upcoming" {% if form.get('category') == 'upcoming' %}selected{% endif %}>Upcoming</option></select></label>
+        <label class="text-xs text-slate-700">Release type<select name="release_type" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="fresh">First release</option><option value="rerelease" {% if form.get('release_type') == 'rerelease' %}selected{% endif %}>Re-release</option></select></label>
+        <label class="text-xs text-slate-700">Release date override (optional)<input type="date" name="release_date" value="{{ form.get('release_date', '') }}" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"></label>
+        <label class="text-xs text-slate-700">Homepage feature order<select name="featured_order" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="">Do not feature</option>{% for rank in range(1, 6) %}<option value="{{ rank }}" {% if form.get('featured_order')|int == rank %}selected{% endif %}>{{ rank }}</option>{% endfor %}</select></label>
+        <label class="text-xs text-slate-700">YouTube trailer (optional)<input type="text" name="youtube_trailer" maxlength="200" value="{{ form.get('youtube_trailer', '') }}" placeholder="Link or video ID" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"></label>
+        {% if completion %}
+          {% if missing_description %}<label class="text-xs text-slate-700 sm:col-span-2">Description<textarea name="description" required maxlength="4000" rows="4" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900">{{ form.get('description', '') }}</textarea></label>
+          {% elif form.get('description') %}<input type="hidden" name="description" value="{{ form.get('description') }}">{% endif %}
+          {% if missing_poster %}<label class="text-xs text-slate-700 sm:col-span-2">Authorised HTTPS poster URL<input type="url" name="poster_url" required maxlength="500" value="{{ form.get('poster_url', '') }}" placeholder="https://" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"></label>
+          {% elif form.get('poster_url') %}<input type="hidden" name="poster_url" value="{{ form.get('poster_url') }}">{% endif %}
+        {% endif %}
         <button class="cw-button cw-button-primary sm:col-span-2" type="submit">Import this film</button>
-      </form></div>
+      </form>
+      {% endif %}
+      </div>
     </article>
   {% endfor %}
   </div>
+  {% if total_pages > 1 and not search_error %}
+  <nav class="flex flex-wrap items-center gap-3" aria-label="TMDb search pages">
+    {% if page > 1 %}<a class="cw-button cw-button-white" rel="prev" href="{{ url_for('admin.import_movie', query=query, page=page-1) }}">Previous</a>{% endif %}
+    <span>Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}<a class="cw-button cw-button-white" rel="next" href="{{ url_for('admin.import_movie', query=query, page=page+1) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
   <p class="text-xs text-slate-600">Movie data and artwork are provided by <a href="https://www.themoviedb.org/" rel="noopener">The Movie Database (TMDb)</a>.</p>
 </section>
 {% endblock %}

@@ -1,6 +1,8 @@
 """Shared TMDB client and movie metadata mapping for admin and worker use."""
 import json
+import logging
 import re
+import socket
 from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 from time import sleep
@@ -21,11 +23,40 @@ LANGUAGES = {
 IMAGE_PATH = re.compile(r'/[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)', re.I)
 
 
+class TMDBRequestLogFilter(logging.Filter):
+    def filter(self, record):
+        message = record.getMessage()
+        if 'api.themoviedb.org' in message and 'api_key=' in message:
+            record.msg = re.sub(r'api_key=[^&\s"\']+', 'api_key=[redacted]', message)
+            record.args = ()
+        return True
+
+
+logging.getLogger('urllib3.connectionpool').addFilter(TMDBRequestLogFilter())
+
+
 class TMDBError(Exception):
-    def __init__(self, message, *, status=None, retry_after=0):
+    def __init__(self, message, *, status=None, retry_after=0, category='invalid_response'):
         super().__init__(message)
         self.status = status
         self.retry_after = retry_after
+        self.category = category
+
+
+def connection_error(failure):
+    if isinstance(failure, requests.Timeout):
+        return TMDBError('The connection to TMDB timed out. Try again shortly.', category='timeout')
+    pending, inspected = [failure], set()
+    while pending:
+        error = pending.pop()
+        if id(error) in inspected:
+            continue
+        inspected.add(id(error))
+        if isinstance(error, socket.gaierror):
+            return TMDBError('DNS could not resolve TMDB.', category='dns_failure')
+        pending.extend(part for part in (*error.args, error.__cause__, error.__context__,
+                                         getattr(error, 'reason', None)) if isinstance(part, BaseException))
+    return TMDBError('Could not connect securely to TMDB.', category='connection_failed')
 
 
 def retry_delay(value):
@@ -40,9 +71,13 @@ def retry_delay(value):
 
 
 class TMDBClient:
-    def __init__(self, *, heartbeat=None, attempts=3):
-        self.key = current_app.config['TMDB_API_KEY']
-        self.token = current_app.config['TMDB_READ_TOKEN']
+    def __init__(self, *, heartbeat=None, attempts=3, auth=None):
+        token = re.sub(r'^(?:Bearer\s+)+', '', current_app.config['TMDB_READ_TOKEN'].strip(), flags=re.I)
+        key = current_app.config['TMDB_API_KEY'].strip()
+        self.credentials = {method: value for method, value in [('read_token', token), ('api_key', key)]
+                            if value and (auth is None or auth == method)}
+        self.auth_method = None
+        self.rejected = set()
         self.region = current_app.config['TMDB_REGION']
         self.session = requests.Session()
         self.heartbeat = heartbeat
@@ -54,15 +89,39 @@ class TMDBClient:
     def __exit__(self, *error):
         self.session.close()
 
-    def get(self, path, **params):
-        if not self.key and not self.token:
-            raise TMDBError('TMDB credentials are missing.')
+    def get(self, path, *, attempts=None, **params):
+        failure = None
+        methods = ([self.auth_method] if self.auth_method else []) + list(self.credentials)
+        for method in dict.fromkeys(methods):
+            if method in self.rejected:
+                continue
+            value = self.credentials[method]
+            try:
+                if not re.fullmatch(r'[A-Za-z0-9_.~-]+', value):
+                    raise TMDBError('TMDB credentials have an invalid format.', category='invalid_credentials')
+                result = self._get(path, method, value, attempts or self.attempts, **params)
+            except TMDBError as error:
+                if error.category != 'invalid_credentials':
+                    raise
+                self.rejected.add(method)
+                current_app.logger.info('tmdb_auth_rejected method=%s', method)
+                failure = error
+            else:
+                if self.auth_method != method:
+                    current_app.logger.info('tmdb_auth_verified method=%s', method)
+                self.auth_method = method
+                return result
+        if self.credentials:
+            raise failure or TMDBError('TMDB rejected the configured credentials.', category='invalid_credentials')
+        raise TMDBError('TMDB credentials are missing.', category='missing_credentials')
+
+    def _get(self, path, method, value, attempts, **params):
         headers = {'Accept': 'application/json'}
-        if self.token:
-            headers['Authorization'] = f'Bearer {self.token}'
+        if method == 'read_token':
+            headers['Authorization'] = f'Bearer {value}'
         else:
-            params['api_key'] = self.key
-        for attempt in range(self.attempts):
+            params['api_key'] = value
+        for attempt in range(attempts):
             if self.heartbeat:
                 self.heartbeat()
             try:
@@ -74,44 +133,81 @@ class TMDBClient:
                         if isinstance(payload, dict):
                             return payload
                         raise ValueError('Invalid response shape')
-                    error = TMDBError(f'TMDB returned HTTP {status}.', status=status,
+                    category, message = {
+                        401: ('invalid_credentials', 'TMDB rejected the configured credentials.'),
+                        403: ('access_denied', 'TMDB denied access with the configured credentials.'),
+                        404: ('not_found', 'This movie was not found on TMDB.'),
+                        429: ('rate_limited', 'TMDB rate limit reached (HTTP 429). Try again later.'),
+                    }.get(status, ('unavailable', f'TMDB is temporarily unavailable (HTTP {status}).')
+                          if status >= 500 else ('invalid_response', f'TMDB returned unexpected HTTP {status}.'))
+                    error = TMDBError(message, status=status, category=category,
                                       retry_after=retry_delay(response.headers.get('Retry-After')))
-            except (requests.RequestException, ValueError):
-                error = TMDBError('TMDB returned an invalid response or could not be reached.')
+            except (ValueError, requests.exceptions.JSONDecodeError):
+                error = TMDBError('TMDB returned an invalid response.')
+            except requests.RequestException as failure:
+                error = connection_error(failure)
             if error.status not in (None, 429) and error.status < 500:
                 break
             delay = max(2 ** attempt, error.retry_after)
-            if attempt + 1 == self.attempts or delay > 30:
+            if attempt + 1 == attempts or delay > 30:
                 break
             sleep(delay)
         raise error from None
 
-    def search(self, query):
-        return self.get('/search/movie', query=query, region=self.region, include_adult='false')
+    def search(self, query, *, page=1):
+        return self.get('/search/movie', query=query, region=self.region, include_adult='false', page=page)
 
     def details(self, movie_id):
-        detail = self.get(f'/movie/{movie_id}',
-                          append_to_response='credits,videos,release_dates,images',
-                          include_image_language='en,null')
+        path = f'/movie/{movie_id}'
+        try:
+            detail = self.get(path, append_to_response='credits,videos,release_dates,images',
+                              include_image_language='en,null')
+        except TMDBError as error:
+            if error.status not in {400, 422, 502, 503, 504}:
+                raise
+            detail = self.get(path, attempts=1)
         if type(detail.get('id')) is not int or detail['id'] != movie_id:
             raise TMDBError('TMDB returned details for an unexpected movie.', status=422)
         language = clean_text(detail.get('original_language'))
-        if not meaningful_overview(detail.get('overview')) and language and language != 'en':
-            original = self.get(f'/movie/{movie_id}', language=language)
+        preferred = language if language and re.fullmatch(r'[a-z]{2}', language) else 'en'
+
+        def optional(endpoint, **params):
+            if detail.get('lookup_rate_limit'):
+                return {}, None
+            try:
+                return self.get(endpoint, attempts=1, **params), None
+            except TMDBError as error:
+                if error.status == 429:
+                    detail['lookup_rate_limit'] = error
+                return {}, error
+
+        if preferred != 'en' and not meaningful_overview(detail.get('overview')):
+            original, _ = optional(path, language=preferred)
             if original.get('id') == movie_id:
                 if meaningful_overview(original.get('overview')):
                     detail['overview'] = original['overview']
                 for field in ('title', 'poster_path', 'tagline'):
                     if not clean_text(detail.get(field)) and clean_text(original.get(field)):
                         detail[field] = original[field]
+        if not meaningful_overview(detail.get('overview')):
+            translations, _ = optional(f'{path}/translations')
+            rows = sorted(entries(translations.get('translations')),
+                          key=lambda item: item.get('iso_639_1') not in {preferred, 'en'})
+            for row in rows:
+                data = row.get('data')
+                if isinstance(data, dict) and meaningful_overview(data.get('overview')):
+                    detail['overview'] = data['overview']
+                    break
+        if not tmdb_poster(detail):
+            images, _ = optional(f'{path}/images')
+            if images:
+                detail['images'] = images
         videos = section_entries(detail, 'videos')
-        preferred = language if language and re.fullmatch(r'[a-z]{2}', language) else 'en'
         if not any(official_trailer(video) and video.get('iso_639_1') == preferred
                    and playable_video(video) for video in videos):
-            try:
-                payload = self.get(f'/movie/{movie_id}/videos', language=preferred)
-                videos.extend(entries(payload.get('results')))
-            except TMDBError as error:
+            payload, error = optional(f'{path}/videos', language=preferred)
+            videos.extend(entries(payload.get('results')))
+            if error:
                 detail['trailer_lookup_error'] = error
         detail['videos'] = {'results': videos}
         return detail
@@ -165,6 +261,25 @@ def section_entries(payload, section, field='results'):
     return entries(value.get(field)) if isinstance(value, dict) else []
 
 
+def tmdb_poster(detail):
+    return image_url(detail.get('poster_path')) or next((
+        url for item in section_entries(detail, 'images', 'posters')
+        if (url := image_url(item.get('file_path')))), None)
+
+
+def authorized_poster_url(value):
+    value = (value or '').strip()
+    if len(value) > 500 or any(char.isspace() or ord(char) < 32 for char in value):
+        return None
+    try:
+        url = urlsplit(value)
+        if url.scheme == 'https' and url.hostname and '.' in url.hostname and not url.username and not url.password:
+            return value
+    except ValueError:
+        pass
+    return None
+
+
 def official_trailer(video):
     return video.get('official') is True and video.get('type') == 'Trailer'
 
@@ -216,13 +331,10 @@ def movie_metadata(detail, region, *, source=None):
             for person in section_entries(detail, 'credits', 'cast')[:12] if clean_text(person.get('name'))]
     director = next((person['name'] for person in section_entries(detail, 'credits', 'crew')
                      if person.get('job') == 'Director' and clean_text(person.get('name'))), None)
-    poster = image_url(detail.get('poster_path')) or next((
-        url for item in section_entries(detail, 'images', 'posters')
-        if (url := image_url(item.get('file_path')))), None)
     return {
         'title': clean_text(detail.get('title'), 200) or clean_text(detail.get('original_title'), 200),
         'description': meaningful_overview(detail.get('overview')),
-        'poster': poster,
+        'poster': tmdb_poster(detail),
         'backdrop': image_url(detail.get('backdrop_path'), TMDB_BACKDROP_BASE),
         'duration': runtime if type(runtime) is int and 0 < runtime <= 9999 else None,
         'language': clean_text(language, 50),

@@ -23,5 +23,7 @@ def create_app(config=None):
     from .routes import register_blueprints
     register_blueprints(application)
     from .workers.movie_sync import register_sync_command
+    from .workers.tmdb_doctor import register_tmdb_doctor
     register_sync_command(application)
+    register_tmdb_doctor(application)
     return application

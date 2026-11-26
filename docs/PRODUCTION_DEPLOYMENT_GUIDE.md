@@ -69,6 +69,18 @@ scheduled jobs and disables them on inactive public repositories after 60 days.
 A host with cron can run the same command at a suitable check-in frequency.
 See [GitHub scheduling](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule) and [Render cron pricing](https://render.com/docs/cronjobs#compute-plans-and-billing).
 
+To act immediately, open **Actions → Sync TMDB movie catalogue → Run workflow**.
+Enable **force** to run before the next due time. An active worker lease and a
+TMDB rate-limit cooldown still take precedence. Open the job summary to see
+whether discovery ran, how many candidates were processed, and whether another
+batch remains. A missing required secret fails the job before checkout.
+
+Render uses `TMDB_READ_TOKEN` and `TMDB_API_KEY` for manual imports. The client
+checks the read token first and uses the explicitly configured API key if TMDB
+rejects the token with HTTP 401. Run `python -m flask --app app tmdb-doctor` in
+the environment you want to verify. The command tests each configured credential
+and checks the database schema without modifying the catalogue.
+
 1. Apply the reviewed database migration before deploying the web version or enabling production sync.
 2. Add Actions secret `CINEWAVE_SYNC_DATABASE_URL` with the existing PostgreSQL
    Session pooler URI and `CINEWAVE_SYNC_TMDB_READ_TOKEN` or
