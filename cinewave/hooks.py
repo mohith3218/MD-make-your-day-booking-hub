@@ -1,6 +1,7 @@
 """Request policy, CSRF, response hardening, and template context hooks."""
 import hmac
 import os
+from posixpath import normpath
 import secrets
 from datetime import date
 from flask import abort, current_app, flash, g, jsonify, redirect, request, session, url_for
@@ -40,6 +41,10 @@ def register_hooks(application):
 
     @application.before_request
     def require_sign_in_for_application_routes():
+        if request.endpoint == 'static':
+            filename = normpath((request.view_args or {}).get('filename', '')).lower()
+            if filename.startswith('uploads/trailers/'):
+                abort(404)
         g.pop('_login_user', None)
         public = {'static', 'auth.login', 'auth.register', 'auth.verify_email',
                   'auth.resend_email_otp', 'auth.forgot_password', 'auth.reset_password',
@@ -75,7 +80,7 @@ def register_hooks(application):
                      'movies.vote_movie_hype', 'screen_reviews.edit', 'screen_reviews.dismiss',
                      'screen_reviews.withdraw', 'screen_reviews.report', 'screen_reviews.moderate',
                      'movie_reviews.edit', 'movie_reviews.withdraw', 'movie_reviews.report',
-                     'movie_reviews.moderate', 'movies.rate_movie'}
+                     'movie_reviews.moderate', 'movies.rate_movie', 'post_show.edit', 'post_show.edit_theatre'}
         if request.method == 'POST' and request.endpoint in protected:
             expected = session.get('_csrf_token', '')
             supplied = request.form.get('csrf_token', '')

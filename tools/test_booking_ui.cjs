@@ -5,10 +5,12 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const vm = require('node:vm');
 const html = fs.readFileSync(process.env.BOOKING_QA_HTML, 'utf8');
-const script = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
-    .map(m => m[2]).find(s => s.includes('function toggleTheaterView'));
+const bookingContext = JSON.parse(html.match(/<script[^>]+id="booking-context"[^>]*>([\s\S]*?)<\/script>/)[1]);
+const staticScript = fs.readFileSync(path.join(__dirname, '../static/js/booking.js'), 'utf8');
+const script = staticScript.split('\n').map((line) => '  ' + line).join('\n');
 function slice(start, end) {
     const a = script.indexOf(start), b = script.indexOf(end, a);
     assert.ok(a >= 0 && b > a, start);
@@ -49,7 +51,7 @@ function booking() {
                 || selector.includes('seat-held') && s.classes.has('seat-held')
                 || selector.includes('data-party-owner') && s.dataset.partyOwner);
         }};
-    const ctx=vm.createContext({document:doc, window:{location:{origin:'http://localhost'},addEventListener:(type,fn)=>listeners[type]=fn},
+    const ctx=vm.createContext({bookingContext, document:doc, window:{location:{origin:'http://localhost'},addEventListener:(type,fn)=>listeners[type]=fn},
         location:{origin:'http://localhost',href:'http://localhost/book/1'}, history:{replaceState(){}}, URL,
         navigator:{clipboard:{writeText:async()=>{}}},
         setInterval:fn=>{timers.add(fn);return fn;},clearInterval:fn=>timers.delete(fn),
@@ -57,7 +59,7 @@ function booking() {
         input:{value:''},display:{},priceOut:{},btn:{},classLine:{},
         updateInspector(){},showSeatARPreview(){},renderVRCinemaSeatMap(){},draw3dArScreen(){},updateImmersiveBookingPanel(){},alert(){},
     });
-    vm.runInContext(`const selected=new Map();let activePovSeat=null,arTrailerMode=false,activePartyCode=''; const partyCSRF='fixture', MAX_SEATS=2;let inlineTourTimer=null; const inlineVrFrame=document.getElementById('vr-inline-frame');function toggleInlineTour(){inlineTourTimer=null;}`
+    vm.runInContext(`const selected=new Map(), reservedSeats=[], draftKey='test'; let activePovSeat=null,arTrailerMode=false,activePartyCode=''; const partyCSRF='fixture', MAX_SEATS=2;let inlineTourTimer=null; const inlineVrFrame=document.getElementById('vr-inline-frame');function toggleInlineTour(){inlineTourTimer=null;}`
         + slice('  function paint(', '  // Build the booking view')
         + slice('  function toggleSeatSelection(', "  document.querySelectorAll('.seat-btn').forEach(b => {")
         + slice('  // ---- WATCH TOGETHER:', '  let availabilityPollRunning')
@@ -72,6 +74,7 @@ function booking() {
 }
 
 test('every actual Flask-rendered inline JavaScript block parses',()=>{
+    new vm.Script(staticScript);
     for(const [_,attrs,code] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
         if(!/src=|application\/ld\+json|application\/json/.test(attrs) && code.trim()) new vm.Script(code);
     }

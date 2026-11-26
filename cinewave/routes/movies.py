@@ -3,7 +3,8 @@ from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ._support import *
 from .movie_reviews import own_rating, review_values, save_review
-from ..services.movie_reviews import ACCESS_MESSAGE, eligible_booking
+from ..services.movie_reviews import ACCESS_MESSAGE, eligible_booking, published_movie_reviews
+from sqlalchemy.orm import joinedload
 from ..services.reviews import completed_booking_source
 from ..services.seat import screening_availability
 
@@ -91,7 +92,7 @@ def cine_match():
         results = [{'movie': movie, 'why': why or ['From the CineWave catalogue']}
                    for _, movie, why in candidates[:3]]
 
-    return render_template('cine_match.html', results=results, mood=mood, language=language,
+    return render_template('movies/cine_match.html', results=results, mood=mood, language=language,
                            genre=genre, runtime=runtime, genres=available_genres,
                            languages=languages, personalization_count=personalization_count)
 
@@ -142,9 +143,15 @@ def movie_detail(movie_id):
 
     hype_counts = MovieHypeVote.counts_for(movie.id) if movie.is_upcoming and not movie.is_archived else {}
     vote = MovieHypeVote.query.filter_by(user_id=current_user.id, movie_id=movie.id).first() if hype_counts else None
-    return render_template('movie.html', movie=movie, showtimes=shows, grouped=grouped,
+    review_booking = eligible_booking(movie.id, current_user.id)
+    recent_reviews = []
+    if review_booking:
+        recent_reviews = (published_movie_reviews().filter_by(movie_id=movie.id)
+                          .options(joinedload(MovieRating.user))
+                          .order_by(MovieRating.created_at.desc(), MovieRating.id.desc()).limit(3).all())
+    return render_template('movies/movie.html', movie=movie, showtimes=shows, grouped=grouped,
                            remaining_seats=remaining_seats,
-                           review_booking=eligible_booking(movie.id, current_user.id),
+                           review_booking=review_booking, recent_reviews=recent_reviews,
                            movie_review_access_message=ACCESS_MESSAGE,
                            movie_hype_counts=hype_counts, movie_hype_mine=vote.level if vote else None)
 

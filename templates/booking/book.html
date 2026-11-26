@@ -1,0 +1,406 @@
+{% extends "booking/booking_base.html" %}
+{% from "components/booking_steps.html" import booking_steps %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='css/booking-preview.css') }}">{% endblock %}
+{% block title %}Select Seats · {{ movie.title }}{% endblock %}
+
+{% block content %}
+{{ booking_steps('seats', movie, showtime) }}
+<header class="cw-seat-heading">
+  <div>
+    <h1>Choose your seats</h1>
+    <p><strong>{{ movie.title }}</strong> · {{ showtime.theater }} · {{ screen.name }}</p>
+    <p>{{ showtime.show_date.strftime('%a, %d %b') }} · {{ showtime.show_time }}</p>
+  </div>
+  <div>
+    <a class="cw-review-link" href="{{ url_for('movies.movie_detail', movie_id=movie.id, _anchor='screening-' ~ showtime.show_date.isoformat()) }}">Change screening</a>
+    {% if showtime.show_datetime %}
+    <p id="book-countdown" data-target="{{ showtime.show_datetime.strftime('%Y-%m-%dT%H:%M:00') }}+05:30"
+       data-movie-url="{{ url_for('movies.movie_detail', movie_id=movie.id) }}"></p>
+    {% endif %}
+  </div>
+</header>
+<form id="booking-form" method="post" class="cw-seat-layout">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% for name, value in discovery_context.items() %}
+  <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+  <input type="hidden" name="selected_seats" id="selected_seats_input">
+  <div class="cw-seat-main">
+<!-- 🎬 2D / 3D THEATER MAP SWITCHER & ✨ SMART SEAT SUGGESTION BAR -->
+<div id="seat-map-mode-controls" class="cw-seat-mode">
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-extrabold text-white flex items-center gap-1.5">
+      <span>Seat map</span>
+    </span>
+    <div class="flex flex-wrap items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/60">
+      <button type="button" id="btn-view-2d" aria-pressed="true" onclick="toggleTheaterView('2d')" class="px-3 py-1 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white shadow">
+        2D Seat Selection
+      </button>
+      <button type="button" id="btn-view-3d" aria-pressed="false" onclick="toggleTheaterView('3d')" class="px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+        3D Seat Preview
+      </button>
+    </div>
+  </div>
+
+  <details class="cw-seat-details"><summary>Find seats together</summary>
+  <div class="flex flex-wrap items-center gap-2">
+    <span class="text-xs font-extrabold text-amber-300 flex items-center gap-1">
+      <span>✨ Find seats together:</span>
+    </span>
+    <select id="smart-party-size" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1 text-xs font-bold text-white focus:outline-none focus:border-amber-400">
+      <option value="1">1 Person</option>
+      <option value="2" selected>2 People (Couple)</option>
+      <option value="3">3 People (Group)</option>
+      <option value="4">4 People (Squad)</option>
+      <option value="6">6 People (Party)</option>
+    </select>
+    <button type="button" onclick="suggestSmartSeats()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition shadow-lg shadow-amber-500/20 flex items-center gap-1.5">
+      <span>Find Best Seats</span>
+    </button>
+  </div>
+</details>
+</div>
+<!-- legend -->
+<div id="seat-availability-legend" class="flex flex-wrap items-center gap-4 text-[11px] text-slate-400">
+  <span class="flex items-center gap-2"><span class="seat seat-avail inline-block"></span> Available</span>
+  <span class="flex items-center gap-2"><span class="seat seat-sel inline-block"></span> Selected</span>
+  <span class="flex items-center gap-2"><span class="seat seat-held inline-block"></span> Being booked</span>
+  <span class="flex items-center gap-2"><span class="seat seat-booked inline-block"></span> Sold</span>
+  <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full border-2 border-purple-400 inline-block animate-pulse"></span> Squad Friend Pick</span>
+  <span class="ml-auto">Max {{ max_seats }} seats per booking</span>
+</div>
+
+<!-- 🎥 AR SEAT PREVIEW PANEL -->
+<div id="ar-preview-panel" class="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-slate-950/80 shadow-2xl hidden">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+    <div class="flex items-center gap-2">
+      <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
+      <div>
+        <p class="text-xs font-extrabold text-white">3D theater preview</p>
+        <p class="text-[10px] text-slate-400" id="ar-preview-subtitle">Choose a seat to see its view in the real theater layout</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" onclick="open3dArModal()" class="px-2.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-[10px] font-bold text-cyan-200 flex items-center gap-1 transition">
+        <i class="fa-solid fa-expand text-[9px]"></i><span>Open full preview</span>
+      </button>
+      <span class="px-2.5 py-1 rounded-full border border-amber-500/25 bg-amber-500/10 text-[9px] font-bold uppercase tracking-wider text-amber-200">Live theater</span>
+    </div>
+  </div>
+
+  <!-- The booking page and fullscreen preview now share the same real 3D auditorium. -->
+  <div id="ar-theater-wrapper" class="relative w-full h-[300px] sm:h-[400px] rounded-2xl overflow-hidden bg-[#08090d] select-none border border-white/10 shadow-2xl group">
+    <iframe id="vr-inline-frame" title="Live 3D theater seat preview" data-src="{{ url_for('booking.vr_seat_preview', showtime_id=showtime.id, embed=1) }}" class="absolute inset-0 h-full w-full border-0 bg-[#07090e]" allow="fullscreen; autoplay"></iframe>
+    <div id="inline-camera-controls" class="absolute z-20 top-3 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-1.5 rounded-2xl border border-white/10 bg-slate-950/85 p-1.5 shadow-xl backdrop-blur-md">
+      <button type="button" data-preset="overview" onclick="setInlineCamera('overview')" class="inline-camera-btn active border border-cyan-400/40 bg-cyan-500/20 px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-white">Overview</button>
+      <button type="button" data-preset="stage" onclick="setInlineCamera('stage')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">From stage</button>
+      <button type="button" data-preset="balcony" onclick="setInlineCamera('balcony')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">Balcony</button>
+      <button type="button" data-preset="birdseye" onclick="setInlineCamera('birdseye')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">Bird’s eye</button>
+      <button type="button" id="inline-tour-btn" onclick="toggleInlineTour()" class="px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-amber-300">Auto tour</button>
+    </div>
+    <div class="absolute left-3 bottom-3 z-10 rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-[10px] text-slate-200 backdrop-blur-md pointer-events-none">
+      <span class="font-bold text-amber-200">Live theater view</span>
+      <span class="ml-2 text-slate-400">Click an available seat in the room to select it</span>
+    </div>
+    <canvas id="seatPovCanvas" class="hidden" aria-hidden="true"></canvas>
+    <div id="ar-empty-state" class="hidden"></div>
+  </div>
+
+  <div id="ar-info-strip" class="hidden mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Active Seat</p>
+      <p class="text-xs font-black text-amber-300" id="ar-info-zone">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Distance</p>
+      <p class="text-xs font-black text-white" id="ar-info-dist">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Field of View</p>
+      <p class="text-xs font-black text-white" id="ar-info-angle">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-slate-800">
+      <p class="text-[9px] uppercase tracking-wider text-slate-500 mb-0.5">Audio Estimate</p>
+      <p class="text-xs font-black text-sky-400" id="ar-info-sound">--</p>
+    </div>
+    <div class="bg-slate-900/80 rounded-xl p-2.5 text-center border border-emerald-500/30">
+      <p class="text-[9px] uppercase tracking-wider text-emerald-400 mb-0.5">Nearest Exit Way</p>
+      <p class="text-xs font-black text-emerald-300" id="ar-info-exit">--</p>
+    </div>
+  </div>
+</div>
+
+<div id="seating-viewport" class="glass-card rounded-2xl p-4 sm:p-6 transition-all duration-700" role="region" aria-label="2D seat map" tabindex="0">
+    <div id="seating-grid-container" class="min-w-max mx-auto space-y-1 transition-all duration-700 origin-bottom">
+      <!-- Top Rear Exit Indicators on 2D Seat Map -->
+      <div class="flex items-center justify-between px-2 pb-2 text-[10px] font-bold text-emerald-400">
+        <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 3 (Rear Left)</span>
+        <span class="text-slate-500 uppercase tracking-widest text-[9px]">Rear Concourse Walkway</span>
+        <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 4 (Rear Right)</span>
+      </div>
+
+      {% for cls in grid %}
+        <div class="pt-4 pb-1 flex items-center gap-3">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300">{{ cls.name }}</span>
+          <span class="text-[10px] text-[#C9A84C] font-bold">₹{{ '%.0f'|format(cls.price) }}</span>
+          <span class="flex-1 border-t border-dashed border-slate-800"></span>
+          <span class="text-[10px] text-slate-600">{{ cls.seats }} seats</span>
+        </div>
+
+        {% for row in cls.rows %}
+          <div class="flex items-center gap-1.5 justify-center">
+            <span class="w-8 text-[10px] text-slate-500 font-bold text-right pr-1">{{ row.label }}</span>
+            {% for cell in row.cells %}
+              {% if cell.kind == 'aisle' %}
+                <span class="aisle inline-block"></span>
+              {% elif cell.kind == 'pad' %}
+                <span class="pad inline-block"></span>
+              {% elif cell.kind == 'blocked' %}
+                <span class="seat seat-blocked inline-flex items-center justify-center">×</span>
+              {% else %}
+                <button type="button"
+                        data-seat="{{ cell.id }}"
+                        data-seat-row="{{ row.label }}"
+                        data-seat-number="{{ cell.num }}"
+                        data-price="{{ cell.price }}"
+                        data-class="{{ cell.cls }}"
+                        data-class-code="{{ cell.code }}"
+                        data-score="{{ cell.pov.score if cell.pov else '80' }}"
+                        data-pov-name="{{ cell.pov.zone_name if cell.pov else 'Standard Seat' }}"
+                        data-pov-badge="{{ cell.pov.comfort_badge if cell.pov else '' }}"
+                        data-pov-angle="{{ cell.pov.view_angle if cell.pov else '15' }}°"
+                        data-pov-dist="{{ cell.pov.screen_dist_pct if cell.pov else '50' }}%"
+                        data-pov-rows-ahead="{{ cell.pov.rows_ahead if cell.pov else '8' }}"
+                        data-pov-row-index="{{ cell.pov.row_index if cell.pov else '0' }}"
+                        data-pov-side-angle="{{ cell.pov.side_angle_deg if cell.pov else '0' }}"
+                        data-sound-score="{{ (cell.pov.sound_score ~ '%') if cell.pov else '' }}"
+                        data-sound-exp="{{ cell.pov.sound_exp if cell.pov else 'Balanced Surround' }}"
+                        data-vibe-code="{{ cell.pov.vibe_code if cell.pov else 'FAMILY' }}"
+                        data-vibe-badge="{{ cell.pov.vibe_badge if cell.pov else '👨‍👩‍👧 Family Zone' }}"
+                        data-vibe-desc="{{ cell.pov.vibe_desc if cell.pov else '' }}"
+                        {% if cell.status == 'available' %}
+                          class="seat seat-avail seat-btn font-semibold transition {% if cell.span == 2 %}seat-wide{% endif %}"
+                        {% elif cell.status == 'held' %}
+                          disabled title="Someone is booking this seat"
+                          class="seat seat-held font-semibold {% if cell.span == 2 %}seat-wide{% endif %}"
+                        {% else %}
+                          disabled title="Sold"
+                          class="seat seat-booked font-semibold {% if cell.span == 2 %}seat-wide{% endif %}"
+                        {% endif %}>{{ cell.num }}</button>
+              {% endif %}
+            {% endfor %}
+            <span class="w-8 text-[10px] text-slate-500 font-bold pl-1">{{ row.label }}</span>
+          </div>
+        {% endfor %}
+      {% endfor %}
+
+      <!-- Front Exit Indicators & Screen Bar -->
+      <div class="pt-6 pb-2">
+        <div class="flex items-center justify-between px-2 mb-3 text-[10px] font-bold text-emerald-400">
+          <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 1 (Front Left)</span>
+          <span class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">🚪 EXIT 2 (Front Right)</span>
+        </div>
+        <div class="h-2 bg-gradient-to-r from-[#C9A84C]/10 via-[#C9A84C] to-[#C9A84C]/10 rounded-full screen-glow w-2/3 mx-auto"></div>
+        <p class="text-[10px] tracking-[0.3em] text-center text-slate-500 uppercase mt-2">Cinema screen · all eyes this way</p>
+      </div>
+    </div>
+  </div>
+
+  
+    <details class="cw-seat-details"><summary>Seat filters &amp; viewing details</summary>
+{% if dynamic_info and dynamic_info.badge %}
+<div id="dynamic-pricing-banner" class="glass-card rounded-xl p-3 flex items-center justify-between border border-amber-500/20 bg-amber-500/10">
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-bold text-amber-400">{{ dynamic_info.badge }}</span>
+    <span class="text-[10px] text-slate-400">· Real-time demand engine pricing active</span>
+  </div>
+  <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold uppercase tracking-wider">Dynamic Pricing</span>
+</div>
+{% endif %}
+
+<!-- 🎭 SEAT VIBE ZONE FILTER BAR -->
+<div id="seat-vibe-filters" class="glass-card rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 border border-slate-800 bg-slate-900/60">
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-bold text-slate-300">🎭 Seat Vibe Filter:</span>
+    <span class="text-[10px] text-slate-500">Highlight zones</span>
+  </div>
+  <div class="flex flex-wrap items-center gap-2" id="vibe-filter-bar">
+    <button type="button" onclick="filterVibe('ALL', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-[#C9A84C] text-white">
+      ✨ All Seats
+    </button>
+    <button type="button" onclick="filterVibe('COUPLES', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      💑 Couples Corner
+    </button>
+    <button type="button" onclick="filterVibe('QUIET', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      🔇 Quiet Zone
+    </button>
+    <button type="button" onclick="filterVibe('FANS', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      📣 Fans · Front Rows
+    </button>
+    <button type="button" onclick="filterVibe('FUN', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      😂 Fun & Social
+    </button>
+    <button type="button" onclick="filterVibe('FAMILY', this)" class="vibe-filter-btn px-3 py-1 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:text-white">
+      👨‍👩‍👧 Family & Easy Exit
+    </button>
+  </div>
+</div>
+
+<!-- Smart Seat POV & Acoustic Inspector Card -->
+<div id="seat-inspector" class="glass-card rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-4 border border-indigo-500/20 bg-slate-900/90 shadow-lg">
+  <div class="flex items-center gap-3">
+    <div class="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-sm shrink-0" id="insp-seat-id">
+      --
+    </div>
+    <div>
+      <p class="text-xs font-bold text-white flex items-center gap-2">
+        <span id="insp-zone-name">Inspect a seat for viewing angles, audio estimates and the nearest exit</span>
+      </p>
+      <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+        <span class="text-[11px] text-indigo-300 font-medium" id="insp-badge">Smart Seat POV Inspector</span>
+        <span class="text-[11px] text-slate-500">·</span>
+        <span class="text-[11px] text-emerald-400 font-semibold" id="insp-vibe-badge">🎭 Vibe Tag</span>
+        <span class="text-[11px] text-slate-500">·</span>
+        <span class="text-[11px] text-purple-400 font-semibold">Estimates use seat position</span>
+        <span class="text-[11px] text-slate-500">·</span>
+        <span class="text-[11px] text-emerald-300 font-bold" id="insp-exit-info">🚪 Exit: --</span>
+      </div>
+    </div>
+  </div>
+  <div class="grid grid-cols-3 gap-3 min-w-0 max-w-full items-center text-xs text-slate-400">
+    <div class="text-right">
+      <p class="text-[10px] text-slate-500 uppercase tracking-wider">Screen Distance</p>
+      <p class="font-bold text-white text-sm" id="insp-dist">--</p>
+    </div>
+    <div class="text-right">
+      <p class="text-[10px] text-slate-500 uppercase tracking-wider">Vertical Viewing Angle</p>
+      <p class="font-bold text-white text-sm" id="insp-angle">--</p>
+    </div>
+    <div class="text-right pl-2 border-l border-slate-800">
+      <p class="text-[10px] text-purple-400 uppercase tracking-wider font-bold">Audio Estimate</p>
+      <p class="font-black text-purple-300 text-sm" id="insp-sound-score">--</p>
+    </div>
+  </div>
+</div>
+
+<!-- 👁️ Seat-specific viewing information -->
+<div id="seat-pov-badge" class="glass-card rounded-xl p-2.5 border border-cyan-500/20 bg-slate-950/80 shadow-lg flex flex-wrap items-center justify-between gap-3 text-xs hidden">
+  <div class="flex items-center gap-3 min-w-0">
+    <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
+    <div class="min-w-0">
+      <p class="font-extrabold text-white" id="pov-badge-title">Row C Seat 8 — Prime center</p>
+      <p class="text-[10px] text-slate-400" id="pov-badge-detail"></p>
+    </div>
+  </div>
+  <!-- Quick Inline Arrow & Exit Controls -->
+  <div class="flex items-center gap-1.5">
+    <span class="text-[10px] text-slate-400 mr-1 hidden sm:inline">Move Seat:</span>
+    <button type="button" onclick="stepVrSeat(0, -1)" title="Move to Left Side Seat" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">◀</button>
+    <button type="button" onclick="stepVrSeat(1, 0)" title="Move 1 Row Closer to Screen" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">▲</button>
+    <button type="button" onclick="stepVrSeat(-1, 0)" title="Move 1 Row Back" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">▼</button>
+    <button type="button" onclick="stepVrSeat(0, 1)" title="Move to Right Side Seat" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/20 border border-slate-700 hover:border-cyan-400 text-white text-xs font-bold flex items-center justify-center transition">▶</button>
+    <button type="button" onclick="lookAtNearestExit()" class="ml-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-[11px] flex items-center gap-1 transition">
+      <span>🏃‍♂️ Exit Way</span>
+    </button>
+  </div>
+</div>
+
+
+      {% if movie.trailer %}<button type="button" onclick="openTrailerWithSeatPOV()" class="cw-button cw-button-white">Trailer in seat preview</button>{% endif %}
+      <button type="button" onclick="open3dArModal()" class="cw-button cw-button-white">Open seat preview</button>
+      <a class="cw-review-link" href="{{ url_for('screen_reviews.detail', theatre_id=screen.theater_id, screen_id=screen.id) }}">Read screen reviews</a>
+    </details>
+    <details class="cw-seat-details" {% if party_code %}open{% endif %}><summary>Watch Together</summary>
+      <button type="button" onclick="initOrShowParty()" class="cw-button cw-button-white">Manage party <span id="party-btn-badge">{{ ('Code: ' ~ party_code) if party_code else '' }}</span></button>
+<div class="flex flex-wrap items-center gap-2">
+  <label for="party-code-input" class="text-xs text-slate-300">Join Watch Together</label>
+  <input id="party-code-input" maxlength="6" placeholder="Party code" autocomplete="off" class="w-32 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase text-white">
+  <button type="button" onclick="joinPartyCode()" class="cw-button cw-button-white">Join party</button>
+  <span id="party-status" role="status" aria-live="polite" class="text-xs text-slate-400"></span>
+</div>
+<!-- 👥 WATCH TOGETHER SQUAD BANNER -->
+<div id="party-squad-banner" class="glass-card rounded-2xl p-4 border border-purple-500/30 bg-purple-950/20 space-y-3 {% if not party_code %}hidden{% endif %}">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-purple-600/30 border border-purple-500/40 flex items-center justify-center text-lg">
+        👥
+      </div>
+      <div>
+        <p class="text-xs font-extrabold text-white flex items-center gap-2">
+          <span>Squad Watch Party Room</span>
+          <span class="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-bold" id="squad-room-code">{{ party_code or '' }}</span>
+        </p>
+        <p class="text-[11px] text-slate-400">Updates every 2 seconds. Party picks are reserved at checkout; other customers may still book them.</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" onclick="copySquadLink()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5">
+        <i class="fa-regular fa-copy"></i>
+        <span>Copy Party Link</span>
+      </button>
+    </div>
+  </div>
+  <div class="flex gap-2">
+    <button type="button" onclick="leaveParty(false)" class="rounded-xl bg-slate-800 px-3 py-2 text-xs text-white">Leave party</button>
+    <button id="party-close" type="button" onclick="leaveParty(true)" class="hidden rounded-xl bg-red-900 px-3 py-2 text-xs text-white">Close party (host)</button>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-purple-900/40" id="squad-member-roster">
+    <span class="text-[11px] text-slate-400 font-semibold">Squad Members:</span>
+    <span class="text-xs text-purple-300 font-mono" id="squad-loading">Syncing active friends...</span>
+  </div>
+</div>
+
+
+    </details>
+  </div>
+  <aside class="cw-seat-summary" aria-labelledby="seat-summary-title">
+    <h2 id="seat-summary-title">Your selection</h2>
+    <div aria-live="polite"><p class="cw-seat-summary-detail">Selected seats</p><p id="selected-display">No seats selected</p><p id="selected-classes" class="cw-seat-summary-detail"></p></div>
+    <div><p class="cw-seat-summary-detail">Ticket subtotal</p><p id="total-price" class="cw-seat-total">₹0</p></div>
+    <button type="submit" id="confirm-btn" disabled class="cw-button cw-button-primary">Continue</button>
+    <p class="cw-seat-summary-detail"><span id="live-seats-left">{{ stats.left }} / {{ stats.total }}</span> seats available</p>
+  </aside>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script type="application/json" id="booking-context">
+  {{ dict(
+    maxSeats=max_seats, reservedSeats=edit_reservation.seat_list if edit_reservation else [],
+    draftKey='cinewave.seats.' ~ current_user.id ~ '.' ~ showtime.id, showtimeId=showtime.id,
+    partyCode=party_code or '', partyCSRF=session['party_csrf'], layout=screen.layout,
+    partyCreateUrl=url_for('party.party_create', showtime_id=showtime.id),
+    liveInfoUrl=url_for('theatre.showtime_live_info', showtime_id=showtime.id),
+    availabilityUrl=url_for('theatre.seat_availability', showtime_id=showtime.id,
+                            reservation=edit_reservation.reference if edit_reservation else none),
+    movie=dict(poster=movie.poster or '', title=movie.title, language=movie.language,
+               certificate=movie.certificate, duration=movie.duration or none,
+               tmdbRating=movie.tmdb_rating, trailerKey=movie.trailer_video_key,
+               videoUrl=movie.trailer.url if movie.trailer and movie.trailer.provider == 'cloudinary' else '')
+  )|tojson }}
+</script>
+<script defer src="{{ url_for('static', filename='js/booking.js') }}"></script>
+
+<!-- 🎬 Trailer Video Modal -->
+<div id="trailerModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 hidden">
+  <div class="relative w-full max-w-3xl bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
+    <div class="p-4 bg-slate-900 flex items-center justify-between border-b border-slate-800">
+      <div class="flex items-center gap-2 text-white font-bold text-sm">
+        <i class="fa-solid fa-circle-play text-amber-500"></i>
+        <span>{{ movie.title }} — Official Trailer</span>
+        <span id="trailer-status" class="ml-2 text-amber-300 text-[10px] font-semibold animate-pulse">Loading…</span>
+      </div>
+      <button type="button" onclick="closeTrailerModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="relative aspect-video w-full bg-black">
+      <video id="trailer-video" class="hidden w-full h-full" controls autoplay muted playsinline></video>
+      <iframe id="trailer-iframe" class="w-full h-full" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  </div>
+</div>
+
+
+
+{% endblock %}

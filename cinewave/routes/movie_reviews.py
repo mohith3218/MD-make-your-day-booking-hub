@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
-from theatre_discovery import validate_booking_context
+from cinewave.routes.theatre_discovery import validate_booking_context
 from ._reviews import moderate_review, moderation_context, report_review, reported_ids
 from ..extensions import db
 from ..models import Booking, Movie, MovieRating, MovieReviewModeration, MovieReviewReport, User
@@ -47,12 +47,10 @@ def review_values(data):
         except ValueError as error:
             errors[field] = str(error)
             values[field] = submitted[:limit] if isinstance(submitted, str) else ''
-    if not values['review']:
-        errors.setdefault('review', 'Write a review before publishing.')
     return values, errors
 
 
-def save_review(booking, source, review, values):
+def save_review(booking, source, review, values, *, commit=True):
     created = review is None
     if created:
         # Preserve the first-rating CinePass reward and serialize point updates.
@@ -68,6 +66,8 @@ def save_review(booking, source, review, values):
     review.updated_at = datetime.utcnow()
     for field, value in values.items():
         setattr(review, field, value)
+    if not commit:
+        return review
     try:
         db.session.commit()
     except IntegrityError:
@@ -83,7 +83,7 @@ def detail(movie_id):
     movie = db.get_or_404(Movie, movie_id)
     booking = eligible_booking(movie_id, current_user.id if current_user.is_authenticated else None)
     if not booking:
-        response = make_response(render_template('movie_reviews.html', movie=movie, access_message=ACCESS_MESSAGE), 403)
+        response = make_response(render_template('reviews/movie_reviews.html', movie=movie, access_message=ACCESS_MESSAGE), 403)
     else:
         query = published_movie_reviews().filter_by(movie_id=movie_id)
         score = query.with_entities(db.func.count(MovieRating.id).label('count'),
@@ -91,7 +91,7 @@ def detail(movie_id):
         filtered, filters = filtered_reviews(query, MovieRating, MovieRating.rating, spoilers=True)
         page = filtered.options(joinedload(MovieRating.user)).paginate(per_page=10)
         response = make_response(render_template(
-            'movie_reviews.html', movie=movie, booking=booking, page=page, filters=filters,
+            'reviews/movie_reviews.html', movie=movie, booking=booking, page=page, filters=filters,
             score=score if score.count else None, distribution=rating_distribution(query, MovieRating.rating),
             reported=reported_ids(MovieReviewReport, page.items),
             reveal=request.args.get('reveal', type=int),
@@ -131,7 +131,7 @@ def edit(reference):
                 return redirect(url_for('.edit', reference=reference), code=303)
             flash('Your review was saved. It is currently hidden.' if saved.hidden else 'Your movie review was saved.')
             return redirect(url_for('.detail', movie_id=movie.id), code=303)
-    return render_template('movie_review_form.html', booking=booking, movie=movie, review=review,
+    return render_template('reviews/movie_review_form.html', booking=booking, movie=movie, review=review,
                            values=values, errors=errors), 422 if errors else 200
 
 
@@ -166,7 +166,7 @@ def moderation():
         abort(403)
     context = moderation_context(MovieRating, booked_movie_reviews(), MovieReviewReport,
                                  MovieReviewModeration, joinedload(MovieRating.movie))
-    return render_template('admin_screen_reviews.html', review_type='movie', **context)
+    return render_template('admin/admin_screen_reviews.html', review_type='movie', **context)
 
 
 @bp.post('/admin/movie-reviews/<int:review_id>/moderate')

@@ -3,6 +3,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from ._support import *
 from ..services.screen_reviews import review_invitation
 from ..services.movie_reviews import movie_review_states
+from ..services.post_show import experience_states, pending_experiences
 
 bp = Blueprint("profile", __name__)
 
@@ -18,8 +19,10 @@ def dashboard():
                          joinedload(Booking.showtime).joinedload(Showtime.screen).joinedload(Screen.theater))
                 .order_by(Booking.booked_at.desc()).all())
     review_states = {booking.id: review_invitation(booking, current_user.id) for booking in bookings}
-    return render_template('dashboard.html', bookings=bookings, review_states=review_states,
-                           movie_review_states=movie_review_states(bookings, current_user.id))
+    states = experience_states(bookings, current_user.id)
+    return render_template('account/dashboard.html', bookings=bookings, review_states=review_states,
+                           movie_review_states={booking_id: state['movie'] for booking_id, state in states.items()},
+                           experience_states=states, pending_reviews=pending_experiences(bookings, states))
 
 
 @bp.route('/profile')
@@ -35,7 +38,7 @@ def profile():
                      .join(Movie).filter(Movie.is_archived.is_(False))
                      .order_by(MovieHypeVote.updated_at.desc()).all())
     return render_template(
-        'profile.html',
+        'account/profile.html',
         stats=user_stats,
         film_dna=film_dna,
         watchlist_movies=watchlist_movies,

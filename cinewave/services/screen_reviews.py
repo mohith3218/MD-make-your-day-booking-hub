@@ -29,7 +29,7 @@ def review_invitation(booking, user_id):
     if screen is None:
         return None
     review = booking.screen_review
-    if review:
+    if review and review.has_screen_feedback:
         if review.withdrawn_at is None and (review.user_id, review.screen_id, review.theater_id) == (
                 user_id, screen.id, screen.theater_id):
             return 'edit'
@@ -42,7 +42,7 @@ def review_invitation(booking, user_id):
 def public_reviews():
     return (published_reviews(ScreenReview)
             .join(Screen, Screen.id == ScreenReview.screen_id)
-            .filter(Screen.theater_id == ScreenReview.theater_id))
+            .filter(Screen.theater_id == ScreenReview.theater_id, ScreenReview.has_screen_feedback.is_(True)))
 
 
 def review_summaries(group, ids):
@@ -58,14 +58,6 @@ def review_summaries(group, ids):
     )
     return {row[0]: row for row in public_reviews().with_entities(*selected)
             .filter(group.in_(ids)).group_by(group)}
-
-
-def combined_theatre_score(screen_scores):
-    count = sum(score.count for score in screen_scores.values())
-    if not count:
-        return None
-    return {'count': count,
-            'overall_rating': sum(score.overall_total for score in screen_scores.values()) / count}
 
 
 def review_distribution(screen_id):

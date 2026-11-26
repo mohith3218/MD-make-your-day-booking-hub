@@ -9,9 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
 import payments
 import seat_layout as sl
-from theatre_service import TheatreService
+from cinewave.services.theatres import TheatreService
 from vizag_theaters import seed_vizag_theaters
-from theatre_discovery import cinema_now, validate_booking_context
+from cinewave.routes.theatre_discovery import cinema_now, validate_booking_context
 from ..config import *
 from ..data import *
 from ..extensions import db

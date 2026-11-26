@@ -1,0 +1,46 @@
+{% extends "public_base.html" %}
+{% from "components/screen_review_ui.html" import csrf, stars %}
+{% block title %}{{ 'Edit' if review else 'Review' }} {{ screen.name }} · CineWave{% endblock %}
+{% block content %}
+<div class="cw-review-page cw-review-form-page">
+  <a class="cw-review-link" href="{{ url_for('booking.ticket', reference=booking.reference) }}">← Back to ticket</a>
+  <section class="cw-review-panel" aria-labelledby="screen-review-title">
+    <header class="cw-review-header">
+      <p class="cw-overline">{{ screen.theater.name }} · {{ screen.name }}</p>
+      <h1 id="screen-review-title">{{ 'Edit your screen review' if review else 'How was your movie experience?' }}</h1>
+      <p>{{ booking.showtime.movie.title }} · {{ booking.showtime.show_date.strftime('%d %b %Y') }} · {{ booking.showtime.show_time }}</p>
+      <p>Rate the screen overall. You can skip any of the other questions.</p>
+      {% if review and review.hidden %}<p class="cw-review-badge">Hidden by moderation</p>{% endif %}
+    </header>
+    {% if errors %}
+      <div class="cw-review-error" role="alert"><strong>Check the highlighted questions and try again.</strong></div>
+    {% endif %}
+    <form class="cw-review-form" method="post">
+      {{ csrf(csrf_token) }}
+      <input type="hidden" name="intent" value="{{ 'edit' if review else 'create' }}">
+      {% for field, question in questions %}
+      {{ stars(field, question, values[field], errors.get(field), field == 'overall_rating') }}
+      {% endfor %}
+      <label class="cw-review-comment">
+        <span>Additional comments <small>Optional</small></span>
+        <textarea name="review_text" rows="4" maxlength="1000" {% if errors.review_text %}aria-invalid="true" aria-describedby="error-review-text"{% endif %} placeholder="Tell us about sound, seating, visibility or cleanliness.">{{ values.review_text or '' }}</textarea>
+      </label>
+      {% if errors.review_text %}<p id="error-review-text" class="cw-review-error">{{ errors.review_text }}</p>{% endif %}
+      <div class="cw-review-actions">
+        <button class="cw-button cw-button-primary" type="submit">{{ 'Save changes' if review else 'Publish review' }}</button>
+        <a class="cw-review-link" href="{{ url_for('booking.ticket', reference=booking.reference) }}">Cancel</a>
+      </div>
+    </form>
+    {% if review %}
+    <details class="cw-review-withdraw">
+      <summary>Remove your review</summary>
+      <p>Removal takes the review and its ratings out of public view. Each booking can be reviewed once.</p>
+      <form method="post" action="{{ url_for('screen_reviews.withdraw', reference=booking.reference) }}">
+        {{ csrf(csrf_token) }}
+        <button class="cw-review-text-button" type="submit">Confirm removal</button>
+      </form>
+    </details>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

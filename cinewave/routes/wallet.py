@@ -16,7 +16,7 @@ def wallet_page():
         .filter(Booking.user_id == current_user.id, Booking.status == 'PENDING',
                 Booking.expires_at > datetime.utcnow()).scalar() or 0)
     available_points = max(0, (current_user.points or 0) - reserved_points)
-    return render_template('wallet.html', wallet=wallet, txns=txns, requests=reqs,
+    return render_template('account/wallet.html', wallet=wallet, txns=txns, requests=reqs,
                            available_points=available_points,
                            conversion_key=secrets.token_urlsafe(24))
 

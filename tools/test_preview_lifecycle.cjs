@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname, '../templates/vr_seat_preview.html'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../templates/booking/vr_seat_preview.html'), 'utf8');
 
 function preview() {
     const listeners = {};

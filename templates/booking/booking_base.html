@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block body_class %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300 cw-booking-shell{% endblock %}
+{% block site_header %}{% include "components/cw_booking_header.html" %}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/booking.css') }}">{% endblock %}
+{% block demo_notice %}
+  <div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>
+{% endblock %}

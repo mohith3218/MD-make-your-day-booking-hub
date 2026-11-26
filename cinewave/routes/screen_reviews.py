@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
-from theatre_discovery import validate_booking_context
+from cinewave.routes.theatre_discovery import validate_booking_context
 from ._reviews import moderate_review, moderation_context, report_review, reported_ids
 from ..extensions import db
 from ..models import Booking, Screen, ScreenReview, ScreenReviewModeration, ScreenReviewReport
@@ -31,7 +31,8 @@ def edit(reference):
     screen = eligible_screen(booking, current_user.id)
     if screen is None:
         abort(403, description='Screen reviews require an eligible paid booking after the show ends.')
-    review = booking.screen_review
+    stored = booking.screen_review
+    review = stored if stored and stored.has_screen_feedback else None
     if review and (review.withdrawn_at or review.user_id != current_user.id
                    or review.screen_id != screen.id or review.theater_id != screen.theater_id):
         abort(409, description='This review is no longer editable.')
@@ -56,12 +57,15 @@ def edit(reference):
             errors['review_text'] = str(error)
             values['review_text'] = values['review_text'][:1000]
         if not errors:
-            creating = review is None
+            creating = stored is None
             source = completed_booking_source(booking, current_user.id)
             if creating:
                 review = ScreenReview(booking_id=booking.id, user_id=current_user.id,
                                       theater_id=screen.theater_id, screen_id=screen.id)
                 db.session.add(review)
+            elif review is None:
+                review = stored
+            review.has_screen_feedback = True
             review.verified = source == 'verified'
             review.is_demo = source == 'demo'
             for field, value in values.items():
@@ -77,7 +81,7 @@ def edit(reference):
                 return redirect(url_for('.edit', reference=reference), code=303)
             flash('Your review was saved. It is currently hidden.' if review.hidden else 'Your screen review was saved.')
             return redirect(url_for('booking.ticket', reference=reference), code=303)
-    return render_template('screen_review_form.html', booking=booking, screen=screen,
+    return render_template('reviews/screen_review_form.html', booking=booking, screen=screen,
                            review=review, questions=QUESTIONS, values=values, errors=errors), 422 if errors else 200
 
 
@@ -85,7 +89,8 @@ def edit(reference):
 @login_required
 def dismiss(reference):
     booking = owned_booking(reference)
-    if eligible_screen(booking, current_user.id) is None or booking.screen_review:
+    if eligible_screen(booking, current_user.id) is None or (
+            booking.screen_review and booking.screen_review.has_screen_feedback):
         abort(403)
     booking.screen_review_dismissed_at = datetime.utcnow()
     db.session.commit()
@@ -96,7 +101,7 @@ def dismiss(reference):
 @login_required
 def withdraw(reference):
     review = owned_booking(reference).screen_review
-    if review is None or review.user_id != current_user.id:
+    if review is None or not review.has_screen_feedback or review.user_id != current_user.id:
         abort(404)
     if review.withdrawn_at is None:
         review.withdrawn_at = datetime.utcnow()
@@ -113,7 +118,7 @@ def detail(theatre_id, screen_id):
         public_reviews().filter(ScreenReview.screen_id == screen.id), ScreenReview, ScreenReview.overall_rating)
     page = query.options(joinedload(ScreenReview.user)).paginate(per_page=10)
     score = review_summaries(ScreenReview.screen_id, [screen.id]).get(screen.id)
-    return render_template('screen_reviews.html', screen=screen, score=score, page=page, filters=filters,
+    return render_template('reviews/screen_reviews.html', screen=screen, score=score, page=page, filters=filters,
                            reported=reported_ids(ScreenReviewReport, page.items),
                            distribution=review_distribution(screen.id))
 
@@ -134,7 +139,7 @@ def moderation():
     context = moderation_context(
         ScreenReview, ScreenReview.query, ScreenReviewReport, ScreenReviewModeration,
         joinedload(ScreenReview.screen), joinedload(ScreenReview.theater))
-    return render_template('admin_screen_reviews.html', review_type='screen', **context)
+    return render_template('admin/admin_screen_reviews.html', review_type='screen', **context)
 
 
 @bp.post('/admin/screen-reviews/<int:review_id>/moderate')

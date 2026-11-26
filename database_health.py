@@ -4,7 +4,7 @@ import json
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
-SCHEMA_HEAD = '20261125_02'
+SCHEMA_HEAD = '20261126_02'
 
 
 def check_database(engine, metadata):

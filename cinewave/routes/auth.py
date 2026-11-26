@@ -19,7 +19,7 @@ def login():
         flash('Invalid username or password')
         login_args = {'next': next_url} if next_url else {}
         return redirect(url_for('auth.login', **login_args))
-    return render_template('login.html')
+    return render_template('auth/login.html')
 
 
 @bp.route('/forgot-password', methods=['GET', 'POST'])
@@ -32,7 +32,7 @@ def forgot_password():
             return redirect(url_for('auth.forgot_password'), code=303)
         user = User.query.filter(db.func.lower(User.email) == address).first() if address else None
         if not password_recovery_is_configured():
-            return render_template('forgot_password.html', unavailable=True)
+            return render_template('auth/forgot_password.html', unavailable=True)
         if user and user.email:
             token = secrets.token_urlsafe(32)
             db.session.query(PasswordReset).filter_by(user_id=user.id, used_at=None).update(
@@ -50,16 +50,16 @@ def forgot_password():
             if not delivered:
                 reset.used_at = datetime.utcnow()
                 db.session.commit()
-                return render_template('forgot_password.html', unavailable=True)
+                return render_template('auth/forgot_password.html', unavailable=True)
         flash('If an account matches that address, recovery instructions will be sent. Check your inbox shortly.')
         return redirect(url_for('auth.forgot_password'), code=303)
-    return render_template('forgot_password.html', unavailable=not password_recovery_is_configured())
+    return render_template('auth/forgot_password.html', unavailable=not password_recovery_is_configured())
 
 
 @bp.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
     if request.method == 'GET':
-        return render_template('reset_password.html', token='')
+        return render_template('auth/reset_password.html', token='')
     token = request.form.get('token', '')
     digest = hashlib.sha256(token.encode()).hexdigest() if re.fullmatch(r'[A-Za-z0-9_-]{40,60}', token) else ''
     reset = PasswordReset.query.filter_by(token_digest=digest, used_at=None).with_for_update().first() if digest else None
@@ -70,7 +70,7 @@ def reset_password():
     password = request.form.get('password', '')
     confirmation = request.form.get('confirm_password', '')
     if len(password) < 10 or len(password) > 256 or password != confirmation:
-        return render_template('reset_password.html', token=token,
+        return render_template('auth/reset_password.html', token=token,
             error='Use a password of at least 10 characters and enter it the same way twice.'), 400
     user = db.session.get(User, reset.user_id)
     if not user:
@@ -129,7 +129,7 @@ def register():
         login_user(user)
         flash('Your account is ready. Welcome to MD CineWave!')
         return redirect(url_for('main.home'))
-    return render_template('register.html')
+    return render_template('auth/register.html')
 
 
 @bp.route('/verify-email', methods=['GET', 'POST'])
@@ -166,7 +166,7 @@ def verify_email():
                 return redirect(url_for('auth.login'))
             db.session.commit()
             flash('That code is incorrect. Please try again.')
-    return render_template('verify_email.html', email=user.email)
+    return render_template('auth/verify_email.html', email=user.email)
 
 
 @bp.route('/verify-email/resend', methods=['POST'])

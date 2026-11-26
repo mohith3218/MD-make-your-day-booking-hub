@@ -102,7 +102,7 @@ def home():
         MovieHypeVote.user_id == current_user.id, MovieHypeVote.movie_id.in_(hype_ids)).all()} if hype_ids else {}
 
     return render_template(
-        'index.html',
+        'movies/index.html',
         featured_movies=featured_movies,
         screening_dates=screening_dates,
         screening_groups=screening_groups,

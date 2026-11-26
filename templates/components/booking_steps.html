@@ -1,0 +1,12 @@
+{% macro booking_steps(active, movie, showtime, booking=none) %}
+<nav class="cw-booking-steps" aria-label="Booking progress">
+  <ol>
+    <li><a href="{{ url_for('movies.movie_detail', movie_id=movie.id) }}">Movie</a></li>
+    <li><a href="{{ url_for('movies.movie_detail', movie_id=movie.id, _anchor='screening-' ~ showtime.show_date.isoformat()) }}">Showtime</a></li>
+    <li {% if active == 'seats' %}aria-current="step"{% endif %}>
+      {% if booking %}<a href="{{ url_for('booking.book', showtime_id=showtime.id, reservation=booking.reference) }}">Seats</a>{% else %}Seats{% endif %}
+    </li>
+    <li {% if active == 'payment' %}aria-current="step"{% endif %}>Review &amp; pay</li>
+  </ol>
+</nav>
+{% endmacro %}

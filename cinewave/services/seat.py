@@ -77,6 +77,15 @@ def screening_availability(shows):
     return cards
 
 
+def can_edit_seat_hold(booking):
+    from .split import _has_split_progress
+
+    return (booking.status == 'PENDING' and not booking.is_expired and bool(booking.lock_token)
+            and booking.showtime.accepts_bookings
+            and (not booking.payment or booking.payment.status not in {'CREATED', 'CAPTURED'})
+            and not _has_split_progress(booking))
+
+
 def price_seats(showtime, seat_ids):
     """Return (ticket_total, [{'id','class','price'}...]) including dynamic surge/discount."""
     layout = showtime.layout

@@ -99,8 +99,12 @@ def seat_availability(showtime_id):
     """Polled by the seat page so seats grey out live while you are choosing."""
     purge_expired_holds()
     showtime = Showtime.query.get_or_404(showtime_id)
+    reference = request.args.get('reservation')
+    reservation = Booking.query.filter_by(reference=reference, user_id=current_user.id, showtime_id=showtime_id,
+                                           status='PENDING').first() if reference else None
     return jsonify({'booked': sorted(showtime.booked_seat_ids()),
-                    'held': sorted(showtime.held_seat_ids())})
+                    'held': sorted(showtime.held_seat_ids(
+                        exclude_token=reservation.lock_token if reservation and not reservation.is_expired else None))})
 
 
 @bp.route('/api/showtime/<int:showtime_id>/live-info')

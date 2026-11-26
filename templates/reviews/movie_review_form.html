@@ -1,0 +1,46 @@
+{% extends "public_base.html" %}
+{% from "components/screen_review_ui.html" import csrf, stars %}
+{% block title %}{{ 'Edit' if review else 'Review' }} {{ movie.title }} · CineWave{% endblock %}
+{% block content %}
+<div class="cw-review-page cw-review-form-page">
+  <a class="cw-review-link" href="{{ url_for('booking.ticket', reference=booking.reference) }}">← Back to ticket</a>
+  <section class="cw-review-panel" aria-labelledby="movie-review-title">
+    <header class="cw-review-header">
+      <p class="cw-overline">{{ movie.title }}</p>
+      <h1 id="movie-review-title">{{ 'Edit your movie review' if review else 'Review This Movie' }}</h1>
+      {% if review and review.hidden %}<p class="cw-review-badge">Hidden by moderation</p>{% endif %}
+    </header>
+    {% if errors %}<p class="cw-review-error" role="alert">Check the highlighted fields and try again.</p>{% endif %}
+    <form class="cw-review-form" method="post">
+      {{ csrf(csrf_token) }}
+      <input type="hidden" name="intent" value="{{ 'edit' if review else 'create' }}">
+      {{ stars('rating', 'Overall movie rating', values.rating, errors.rating, true) }}
+      <label class="cw-review-comment">
+        <span>Review title <small>Optional</small></span>
+        <input name="title" maxlength="120" value="{{ values.title or '' }}" {% if errors.title %}aria-invalid="true" aria-describedby="movie-title-error"{% endif %}>
+      </label>
+      {% if errors.title %}<p class="cw-review-error" id="movie-title-error">{{ errors.title }}</p>{% endif %}
+      <label class="cw-review-comment">
+        <span>Written movie review <small>Optional</small></span>
+        <textarea name="review" rows="5" maxlength="500" {% if errors.review %}aria-invalid="true" aria-describedby="movie-review-error"{% endif %}>{{ values.review or '' }}</textarea>
+      </label>
+      {% if errors.review %}<p class="cw-review-error" id="movie-review-error">{{ errors.review }}</p>{% endif %}
+      <label class="cw-review-spoiler-toggle"><input type="checkbox" name="has_spoiler" value="1" {% if values.has_spoiler %}checked{% endif %}> This review contains spoilers</label>
+      <div class="cw-review-actions">
+        <button class="cw-button cw-button-primary" type="submit">{{ 'Save changes' if review else 'Publish movie review' }}</button>
+        <a class="cw-review-link" href="{{ url_for('movie_reviews.detail', movie_id=movie.id) }}">Read Movie Reviews</a>
+      </div>
+    </form>
+    {% if review %}
+    <details class="cw-review-withdraw">
+      <summary>Withdraw your review</summary>
+      <p>Withdrawing removes your review and rating from the movie review page.</p>
+      <form method="post" action="{{ url_for('movie_reviews.withdraw', reference=booking.reference) }}">
+        {{ csrf(csrf_token) }}
+        <button class="cw-review-text-button" type="submit">Confirm withdrawal</button>
+      </form>
+    </details>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

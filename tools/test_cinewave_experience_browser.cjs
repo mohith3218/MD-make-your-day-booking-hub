@@ -106,7 +106,9 @@ async function verify(browser, info) {
         checkout: '/checkout/QA-CHECKOUT',
         'movie-reviews': '/movies/' + info.reviewMovie + '/reviews',
         'imported-movie': '/movie/' + info.importedMovie,
+        'trailer-movie': '/movie/' + info.trailerMovie,
         'admin-movies': '/admin?source=tmdb&schedule=unscheduled#movies',
+        dashboard: '/dashboard#pending-reviews',
     };
     const cast = (reference) => '/booking/' + reference + '/screen-review';
     const go = async (url, ready) => {
@@ -125,8 +127,9 @@ async function verify(browser, info) {
         assert.equal(await evaluate('document.documentElement.dataset.theme'), mode);
         await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
     };
+    const heights = { 360: 800, 390: 844, 768: 1024, 1366: 768, 1920: 1080 };
     const setViewport = (width) => browser.call('Emulation.setDeviceMetricsOverride', {
-        width, height: width < 768 ? 900 : 1000, deviceScaleFactor: 1, mobile: width < 768,
+        width, height: heights[width] || (width < 768 ? 900 : 1000), deviceScaleFactor: 1, mobile: width < 768,
     });
     const checkContrast = async () => {
         const ratios = await evaluate(`(${readability})()`);
@@ -144,7 +147,7 @@ async function verify(browser, info) {
     await clickLink(fixture.theatres);
     await until(() => evaluate("!!document.querySelector('.td-venue-card')"), 'Guest theatre listing did not open.');
     assert(await evaluate("document.querySelector('.td-explore-link').textContent.includes('Be the first to review')"));
-    await clickLink(fixture.theatre + '#theatre-screens');
+    await clickLink(fixture.theatre + '#theatre-reviews');
     await until(() => evaluate("!!document.querySelector('#theatre-screens')"), 'Guest theatre detail did not open.');
     await clickLink(fixture.reviews);
     await until(() => evaluate("!!document.querySelector('.cw-review-overview')"), 'Guest screen reviews did not open.');
@@ -198,6 +201,11 @@ async function verify(browser, info) {
                   document.querySelector('#login-password').value = 'ScreenQaPassword!';
                   document.querySelector('.cw-auth-form').requestSubmit()`);
     await until(() => evaluate("!!document.querySelector('.cw-movie-grid')"), 'The browser login failed.');
+    await until(() => evaluate("!!document.querySelector('[data-post-show-dialog][open]')"), 'Review prompt did not open.');
+    await evaluate("document.querySelector('[data-close-review]').click()");
+    await go(fixture.dashboard, '#pending-reviews');
+    assert(await evaluate("document.querySelector('#pending-reviews').textContent.includes('Rate Theatre')"));
+    assert.equal(await evaluate("document.querySelector('[data-post-show-dialog][open]')"), null);
     console.log('Auth fields, theme preference, password toggles and login feedback verified.');
 
     await go(fixture.movie, '[data-hype-form]');
@@ -216,6 +224,25 @@ async function verify(browser, info) {
         'Failed vote did not show feedback.');
     assert.equal(await evaluate(`document.querySelector('[value="EXTREME_HYPED"]').getAttribute('aria-pressed')`), 'true');
     console.log('Hype votes and failure feedback verified.');
+
+    assert.equal(await evaluate("document.querySelector('#trailer-modal iframe')"), null);
+    await evaluate("document.querySelector('[data-trailer-provider=youtube]').click()");
+    assert.match(await evaluate("document.querySelector('#trailer-modal iframe').src"), /youtube-nocookie\.com\/embed/);
+    assert.equal(await evaluate("document.querySelector('#trailer-modal [data-trailer-external]').textContent"), 'Watch on YouTube');
+    await evaluate("document.querySelector('#trailer-modal').close()");
+    await until(() => evaluate("!document.querySelector('#trailer-modal iframe')"), 'YouTube player did not unload.');
+    await go(fixture['trailer-movie'], '[data-trailer-provider=cloudinary]');
+    await evaluate("document.querySelector('[data-trailer-provider=cloudinary]').click()");
+    await until(() => evaluate("document.querySelector('#trailer-modal video')?.readyState >= 1"),
+        'Cloudinary video metadata did not load.', 20000);
+    await evaluate("(() => { const video = document.querySelector('#trailer-modal video'); video.muted = true; return video.play().then(() => true) })()");
+    await until(() => evaluate("document.querySelector('#trailer-modal video').currentTime > 0"),
+        'Cloudinary video did not start playback.', 10000);
+    await evaluate("document.querySelector('#trailer-modal video').dispatchEvent(new Event('error'))");
+    assert(await evaluate("!document.querySelector('[data-trailer-error]').hidden"));
+    await evaluate("document.querySelector('#trailer-modal').close()");
+    await until(() => evaluate("!document.querySelector('#trailer-modal video')"), 'Cloudinary player did not unload.');
+    console.log('Trailer lazy loading, Cloudinary metadata, player cleanup and error fallback verified.');
 
     await go(fixture['imported-movie'], '.cw-detail-poster');
     assert(await evaluate("document.body.textContent.includes('No screenings scheduled yet.')"));
@@ -241,6 +268,8 @@ async function verify(browser, info) {
         'The browser review submission failed.');
     await go(fixture.reviews, '.cw-review-card');
     assert(await evaluate("document.querySelector('.cw-review-card').textContent.includes('Verified Booking')"));
+    await go(fixture.theatre, '#theatre-reviews');
+    assert(await evaluate("document.querySelector('#theatre-reviews').textContent.includes('Dialogue was clear')"));
     await go(fixture.empty, '.cw-review-overview');
     assert(await evaluate("document.querySelector('.cw-review-overview').textContent.includes('Not rated yet')"));
     await go(fixture.form, '.cw-review-form');
@@ -263,11 +292,18 @@ async function verify(browser, info) {
     assert(await evaluate("document.body.textContent.includes('Movie reviews become available after you complete your booked screening.')"));
     await go(fixture.theatre, '#theatre-screens');
     await clickLink(fixture.theatre + '/shows/' + info.demoShow + '/book');
-    await until(() => evaluate("!!document.querySelector('#booking-form')"), 'Demo screening seat map did not open.');
+    await until(() => evaluate("!!document.querySelector('#booking-form') && document.readyState === 'complete' && typeof toggleSeatSelection === 'function'"),
+        'Demo screening seat map did not initialize.');
     await evaluate("document.querySelector('.seat-btn[data-seat=A1]').click()");
     await until(() => evaluate("!document.querySelector('#confirm-btn').disabled"), 'Seat selection did not enable checkout.');
     await evaluate("document.querySelector('#confirm-btn').click()");
     await until(() => evaluate("!!document.querySelector('#confirm-payment')"), 'Demo checkout did not open.');
+    const checkoutPath = await evaluate('location.pathname');
+    await evaluate("document.querySelector('a[href*=reservation]').click()");
+    await until(() => evaluate("document.querySelector('#selected_seats_input')?.value === 'A1'"), 'Held seat was not restored.');
+    await evaluate("document.querySelector('#confirm-btn').click()");
+    await until(() => evaluate(`location.pathname === ${JSON.stringify(checkoutPath)} && !!document.querySelector('#confirm-payment')`),
+        'Seat edit did not return to the existing checkout.');
     await evaluate("document.querySelector('#confirm-payment').click()");
     await until(() => evaluate("!!document.querySelector('[name=outcome][value=success]')"), 'Demo payment did not open.');
     await evaluate("document.querySelector('[name=outcome][value=success]').click()");
@@ -312,7 +348,7 @@ async function verify(browser, info) {
     await clickLink(fixture.theatres);
     await until(() => evaluate("!!document.querySelector('.td-venue-card')"), 'Return to theatres failed.');
     assert(await evaluate("document.querySelector('.td-explore-link').textContent.includes('Read Reviews')"));
-    await clickLink(fixture.theatre + '#theatre-screens');
+    await clickLink(fixture.theatre + '#theatre-reviews');
     await until(() => evaluate("!!document.querySelector('#theatre-screens')"), 'Return to theatre detail failed.');
     await clickLink(fixture.reviews);
     await until(() => evaluate("document.body?.textContent.includes('Demo screening: balanced sound.')"),

@@ -1,8 +1,0 @@
-{% extends "base.html" %}
-
-{% block body_class %}bg-[#0F1016] text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300 cw-admin-shell{% endblock %}
-{% block site_header %}{% include "partials/cw_admin_header.html" %}{% endblock %}
-{% block demo_notice %}
-  <div role="note" class="cine-notice cw-demo-notice"><span><strong>DEMO — No real money is charged.</strong> Wallet balances and payments are virtual; demo tickets are not valid for theatre admission.{% if not demo_payments_enabled %} Demo payments are currently disabled.{% endif %}</span></div>
-{% endblock %}
-{% block site_footer %}<footer class="cw-admin-footer"><div class="cw-container">MD CineWave administration <span>·</span> Demo environment</div></footer>{% endblock %}

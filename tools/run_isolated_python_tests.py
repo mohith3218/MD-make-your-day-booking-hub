@@ -15,6 +15,7 @@ MODULES = (
     'test_admin_movie_deletion',
     'test_auditorium_geometry',
     'test_tmdb_sync',
+    'test_experience',
 )
 
 
@@ -23,13 +24,13 @@ def main():
     for module in MODULES:
         print(f'\n=== {module} ===', flush=True)
         result = subprocess.run(
-            [sys.executable, '-m', 'unittest', module], cwd=ROOT, check=False,
+            [sys.executable, '-m', 'unittest', f'tests.{module}'], cwd=ROOT, check=False,
         )
         if result.returncode:
             failures.append(module)
 
     print('\n=== test_flow.py ===', flush=True)
-    result = subprocess.run([sys.executable, 'test_flow.py'], cwd=ROOT, check=False)
+    result = subprocess.run([sys.executable, '-m', 'tests.test_flow'], cwd=ROOT, check=False)
     if result.returncode:
         failures.append('test_flow.py')
 

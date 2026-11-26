@@ -1,0 +1,27 @@
+{% from "components/screen_review_ui.html" import stars %}
+
+{% macro movie_review_fields(booking, values, errors) %}
+  <section class="cw-experience-section">
+    <header class="cw-experience-film">
+      {% if booking.showtime.movie.poster %}<img src="{{ booking.showtime.movie.poster }}" alt="" width="42" height="60" loading="lazy">{% endif %}
+      <h3>{{ booking.showtime.movie.title }}</h3>
+    </header>
+    {{ stars('rating', 'Movie rating', values.rating, errors.rating, false) }}
+    <label class="cw-review-comment">Written movie review (optional)
+      <textarea name="review" maxlength="500" rows="2">{{ values.review or '' }}</textarea>
+    </label>
+    {% if errors.review %}<p class="cw-review-error">{{ errors.review }}</p>{% endif %}
+    <label class="cw-review-spoiler-toggle"><input type="checkbox" name="has_spoiler" value="1" {% if values.has_spoiler %}checked{% endif %}> Contains spoilers</label>
+  </section>
+{% endmacro %}
+
+{% macro theatre_review_fields(booking, values, errors, required=false) %}
+  <section class="cw-experience-section">
+    <h3>{{ booking.showtime.screen.theater.name }}</h3>
+    <p class="cw-muted">{{ booking.showtime.screen_label }}</p>
+    {{ stars('theatre_rating', 'Theatre rating', values.theatre_rating, errors.theatre_rating, required) }}
+    <label class="cw-review-comment">Written theatre review (optional)
+      <textarea name="theatre_review" maxlength="1000" rows="2">{{ values.theatre_review or '' }}</textarea>
+    </label>
+  </section>
+{% endmacro %}

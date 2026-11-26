@@ -1,0 +1,17 @@
+.cw-trailer-dialog {
+  width: min(48rem, calc(100% - 2rem));
+  max-height: min(90dvh, 52rem);
+  overflow: auto;
+  border: 1px solid var(--cw-line);
+  border-radius: 1.125rem;
+  padding: clamp(.875rem, 3vw, 1.5rem);
+  color: var(--cw-ink);
+  background: var(--cw-surface);
+  box-shadow: var(--cw-shadow-soft);
+}
+.cw-trailer-dialog::backdrop { background: rgb(14 11 20 / .72); }
+.cw-trailer-header { display: flex; gap: .75rem; align-items: center; justify-content: space-between; margin-bottom: .75rem; }
+.cw-trailer-header h2 { font-size: 1.5rem; }
+.cw-trailer-player { aspect-ratio: 16/9; background: #181624; border-radius: .625rem; overflow: hidden; }
+.cw-trailer-player :is(iframe, video) { display: block; width: 100%; height: 100%; border: 0; }
+.cw-trailer-dialog [data-trailer-external], .cw-trailer-error { margin-top: .75rem; }

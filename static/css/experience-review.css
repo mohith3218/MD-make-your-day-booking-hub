@@ -1,0 +1,18 @@
+.cw-experience-dialog {
+  width: min(38rem, calc(100% - 1.25rem));
+  max-height: calc(100dvh - 1.25rem);
+  overflow: auto;
+  padding: clamp(.875rem, 3vw, 1.5rem);
+  border: 1px solid var(--cw-line);
+  border-radius: 1rem;
+  background: var(--cw-surface);
+  color: var(--cw-ink);
+  box-shadow: var(--cw-shadow-soft);
+}
+.cw-experience-dialog::backdrop { background: rgb(14 11 20 / .7); }
+.cw-experience-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.cw-experience-header h2 { font-size: clamp(1.25rem, 4vw, 1.7rem); }
+.cw-experience-section { display: grid; gap: .5rem; padding: .75rem 0; border-bottom: 1px solid var(--cw-line); }
+.cw-experience-section h3 { color: var(--cw-ink); font-size: 1.125rem; }
+.cw-experience-film { display: flex; align-items: center; gap: .625rem; }
+.cw-experience-film img { border-radius: .25rem; object-fit: cover; }

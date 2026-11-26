@@ -24,8 +24,8 @@ from cinewave.models import *
 from cinewave.services import *
 from cinewave.data import *
 from vizag_theaters import seed_vizag_theaters, correct_jagadamba_levels
-from theatre_service import TheatreService
-from theatre_discovery import cinema_now, validate_booking_context
+from cinewave.services.theatres import TheatreService
+from cinewave.routes.theatre_discovery import cinema_now, validate_booking_context
 import seat_layout as sl
 
 app = create_app()
