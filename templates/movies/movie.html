@@ -1,0 +1,255 @@
+{% extends "public_base.html" %}
+{% from "components/movie_hype.html" import hype %}
+{% from "components/trailer.html" import trailer_button, trailer_modal %}
+{% from "components/screen_review_ui.html" import booking_label %}
+{% block title %}{{ movie.title }} · MD CineWave{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/trailer.css') }}">{% endblock %}
+{% block trailer_player %}{% if movie.trailer %}{{ trailer_modal() }}<script src="{{ url_for('static', filename='js/trailer.js') }}" defer></script>{% endif %}{% endblock %}
+
+{% block content %}
+<div class="glass-card rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row gap-8 items-start">
+  <div class="cw-detail-poster">
+    {% if movie.poster %}<img src="{{ movie.poster }}" alt="{{ movie.title }} poster" loading="eager" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><div class="cw-poster-placeholder" hidden aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ movie.title }}</span></div>
+    {% else %}<div class="cw-poster-placeholder" aria-hidden="true"><i class="fa-solid fa-film"></i><span>{{ movie.title }}</span></div>{% endif %}
+  </div>
+
+  <div class="space-y-3 flex-1 min-w-0">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <h1 class="text-3xl sm:text-4xl font-black text-white break-words leading-tight">{{ movie.title }}</h1>
+      <button onclick="toggleWatchlistDetail({{ movie.id }}, this)"
+              class="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[.12] bg-slate-800/80 hover:bg-slate-700 {% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}text-amber-500 border-amber-500/30{% else %}text-slate-300 hover:text-white{% endif %} text-xs font-bold transition shadow-lg"
+              title="Save to Watchlist">
+        <i class="{% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}fa-solid{% else %}fa-regular{% endif %} fa-heart text-sm"></i>
+        <span id="watchlist-detail-label">{% if current_user.is_authenticated and movie.is_in_watchlist(current_user) %}Saved{% else %}Save to Watchlist{% endif %}</span>
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-2 text-[11px]">
+      <span id="movie-avg-badge" class="px-2 py-1 rounded-lg bg-amber-400/10 text-amber-400 border border-amber-400/20 font-bold">
+        {% if movie.display_rating is not none %}★ {{ '%.1f'|format(movie.display_rating) }}/5 · CineWave{% else %}No CineWave ratings yet{% endif %}
+      </span>
+      {% if movie.tmdb_rating is not none %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">TMDB {{ '%.1f'|format(movie.tmdb_rating) }}/10</span>{% endif %}
+      {% if movie.duration %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300"><i class="fa-regular fa-clock mr-1"></i>{{ movie.duration }} min</span>{% endif %}
+      {% if movie.release_date %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ 'Upcoming · ' if movie.is_upcoming else 'Released · ' }}{{ movie.release_date.strftime('%d %b %Y') }}</span>{% elif movie.is_upcoming %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">Upcoming · Date to be announced</span>{% endif %}
+      {% if movie.language %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ movie.language }}</span>{% endif %}
+      {% if movie.certificate %}<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300">{{ movie.certificate }}</span>{% endif %}
+    </div>
+    <p class="text-slate-300 text-sm leading-relaxed">{{ movie.description or 'No description provided.' }}</p>
+
+    {% if movie.tmdb_metadata and movie.tmdb_metadata.genres %}<p class="text-xs text-slate-400">{{ movie.tmdb_metadata.genres|join(' · ') }}</p>{% endif %}
+    {{ trailer_button(movie.trailer, classes='cw-button cw-button-primary') }}
+  </div>
+</div>
+
+<!-- Cast & Crew -->
+{% if movie.cast_info %}
+<section class="glass-card rounded-3xl p-6 sm:p-8 space-y-4">
+  <h2 class="text-lg font-black text-white flex items-center gap-2">
+    <i class="fa-solid fa-users-viewfinder text-[#C9A84C]"></i> Cast &amp; Crew
+  </h2>
+
+  {% if movie.cast_info.director %}
+    <p class="text-sm text-slate-300">
+      <span class="text-slate-500 text-xs uppercase tracking-wider font-bold mr-2">Director</span>
+      <span class="font-bold text-white">{{ movie.cast_info.director }}</span>
+    </p>
+  {% endif %}
+
+  {% set actors = movie.cast_info.cast or [] %}
+  {% if actors %}
+    <div class="flex gap-3 overflow-x-auto pb-2 rowscroll">
+      {% for person in actors %}
+        <div class="shrink-0 w-24 text-center space-y-1.5">
+          {% if person.profile %}
+            <img src="{{ person.profile }}" alt="{{ person.name }}"
+                 class="w-24 h-24 object-cover rounded-xl border border-slate-700/60">
+          {% else %}
+            <div class="w-24 h-24 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-500">
+              <i class="fa-solid fa-user text-2xl"></i>
+            </div>
+          {% endif %}
+          <p class="text-[11px] font-bold text-white leading-tight truncate" title="{{ person.name }}">{{ person.name }}</p>
+          <p class="text-[9px] text-slate-500 leading-tight truncate" title="{{ person.character }}">{{ person.character }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if movie_hype_counts %}
+<section class="cw-review-panel cw-movie-hype-panel" id="movie-hype" aria-labelledby="movie-hype-title">
+  <h2 id="movie-hype-title">How hyped are you?</h2>
+  <p>Your reaction stays selected until you pick another.</p>
+  {{ hype(movie, movie_hype_counts, movie_hype_mine, 'movie', csrf_token) }}
+</section>
+{% endif %}
+
+<section class="space-y-5">
+  <h2 class="text-xl font-bold text-white">Showtimes in Visakhapatnam</h2>
+
+  {% for show_date, theaters in grouped.items() %}
+    <div class="space-y-3" id="screening-{{ show_date.isoformat() }}">
+      <p class="text-xs font-bold uppercase tracking-wider text-[#C9A84C]">{{ show_date.strftime('%A, %d %b %Y') }}</p>
+
+      {% for theater_name, shows in theaters.items() %}
+        <div class="glass-card rounded-2xl p-5 space-y-3">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <p class="text-sm font-bold text-white break-words">{{ theater_name }}</p>
+              {% if shows[0].screen %}
+                <a class="cw-review-link" href="{{ url_for('theatre_discovery.detail', theatre_id=shows[0].screen.theater_id, _anchor='theatre-screens') }}">Explore screens and reviews</a>
+              {% endif %}
+            </div>
+            {% if shows[0].screen %}
+              <p class="text-[10px] text-slate-500">{{ shows[0].screen.theater.location }}</p>
+            {% endif %}
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            {% for s in shows %}
+              {% set st = s.status %}
+              {% if st != 'live' and not remaining_seats.get(s.id) %}
+                {# ---- ENDED: greyed out, not clickable ---- #}
+                <div class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed text-center">
+                  <p class="text-sm font-bold text-slate-400">{{ s.show_time }}</p>
+                  <p class="text-[10px] text-slate-600">{{ s.screen_label }} · {{ 'Sold out' if s.id in remaining_seats else 'Unavailable' }}</p>
+                </div>
+              {% elif st == 'live' %}
+                {# ---- LIVE: pulsing red badge ---- #}
+                <div class="relative px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-500/10 text-center">
+                  <span class="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full animate-pulse whitespace-nowrap">
+                    🔴 LIVE NOW
+                  </span>
+                  <p class="text-sm font-bold text-white mt-1">{{ s.show_time }}</p>
+                  <p class="text-[10px] text-red-400">{{ s.screen_label }} · In Progress</p>
+                </div>
+              {% else %}
+                {# ---- UPCOMING: normal booking card with countdown ---- #}
+                {% if current_user.is_authenticated %}
+                  <a href="{{ url_for('booking.book', showtime_id=s.id) }}"
+                     class="relative px-4 py-2.5 rounded-xl border border-slate-700 hover:border-[#C9A84C] bg-slate-900 hover:bg-slate-800 transition text-center group">
+                    <p class="text-sm font-bold text-white">{{ s.show_time }}</p>
+                    <p class="text-[10px] text-slate-500">
+                      {{ s.screen_label }} ·
+                      <span id="seats-{{ s.id }}">{{ remaining_seats[s.id] }} left</span>
+                    </p>
+                    {% if s.show_datetime %}
+                      <p class="text-[9px] text-emerald-400 font-mono mt-0.5"
+                         id="countdown-{{ s.id }}"
+                         data-target="{{ s.show_datetime.strftime('%Y-%m-%dT%H:%M:00') }}+05:30">
+                        ⏳ ...
+                      </p>
+                    {% endif %}
+                  </a>
+                {% else %}
+                  <a href="{{ url_for('auth.login') }}"
+                     class="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900 text-center">
+                    <p class="text-sm font-bold text-slate-300">{{ s.show_time }}</p>
+                    <p class="text-[10px] text-slate-500">Login to book</p>
+                  </a>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-slate-500 text-sm">No screenings scheduled yet.</p>
+  {% endfor %}
+</section>
+
+<section class="cw-review-panel cw-review-list" aria-labelledby="movie-audience-title">
+  <h2 id="movie-audience-title">Movie reviews</h2>
+  {% if review_booking %}
+    {% for review in recent_reviews %}
+      <article class="cw-review-card">
+        <header><strong>{{ review.user.username }}</strong> <span class="cw-review-badge">{{ booking_label(review) }}</span></header>
+        <p>{{ review.rating|int }}/5 · {{ review.created_at.strftime('%d %b %Y') }}</p>
+        {% if review.has_spoiler %}<p class="cw-muted">Contains spoilers. Open the full reviews page to reveal it.</p>
+        {% elif review.review %}<p class="break-words whitespace-pre-wrap">{{ review.review }}</p>{% endif %}
+      </article>
+    {% else %}<p>No CineWave reviews yet.</p>{% endfor %}
+    <a class="cw-review-link" href="{{ url_for('movie_reviews.detail', movie_id=movie.id) }}">Read Movie Reviews</a>
+  {% else %}
+    <p>{{ movie_review_access_message }}</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+{% if movie_hype_counts %}<script src="{{ url_for('static', filename='js/movie-hype.js') }}" defer></script>{% endif %}
+<script>
+  // ---- Countdown timers ----
+  document.querySelectorAll('[id^="countdown-"]').forEach(el => {
+    const target = new Date(el.dataset.target);
+    function tick() {
+      const diff = target - new Date();
+      if (diff <= 0) { el.textContent = '🔴 Show Started!'; el.className = 'text-[9px] text-red-400 font-mono mt-0.5 animate-pulse'; return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      el.textContent = h > 0
+        ? `⏳ Starts in ${h}h ${m}m ${s}s`
+        : `⏳ Starts in ${m}m ${s}s`;
+    }
+    tick();
+    setInterval(tick, 1000);
+  });
+
+  // ---- Live seat count refresh every 20 seconds ----
+  async function refreshSeats() {
+    const seatsEls = document.querySelectorAll('[id^="seats-"]');
+    for (const el of seatsEls) {
+      const showId = el.id.replace('seats-', '');
+      try {
+        const res = await fetch(`/api/showtime/${showId}/live-info`);
+        const d = await res.json();
+        el.textContent = `${d.seats_left} left`;
+        if (d.seats_left <= 5 && d.seats_left > 0) {
+          el.className = 'text-red-400 font-bold animate-pulse';
+        } else if (d.seats_left === 0) {
+          el.textContent = 'Houseful';
+          el.className = 'text-amber-600 font-bold';
+        }
+      } catch(e) { /* ignore if offline */ }
+    }
+  }
+  setInterval(refreshSeats, 20000);
+
+  async function toggleWatchlistDetail(movieId, btn) {
+    {% if not current_user.is_authenticated %}
+      window.location.href = "{{ url_for('auth.login') }}";
+      return;
+    {% endif %}
+
+    try {
+      const res = await fetch(`/api/watchlist/toggle/${movieId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const icon = btn.querySelector('i');
+        const label = document.getElementById('watchlist-detail-label');
+        if (data.saved) {
+          btn.classList.remove('text-slate-300');
+          btn.classList.add('text-amber-500', 'border-amber-500/30');
+          icon.classList.remove('fa-regular');
+          icon.classList.add('fa-solid');
+          if (label) label.textContent = 'Saved';
+        } else {
+          btn.classList.remove('text-amber-500', 'border-amber-500/30');
+          btn.classList.add('text-slate-300');
+          icon.classList.remove('fa-solid');
+          icon.classList.add('fa-regular');
+          if (label) label.textContent = 'Save to Watchlist';
+        }
+      }
+    } catch (e) {
+      console.error('Error toggling watchlist:', e);
+    }
+  }
+
+</script>
+{% endblock %}

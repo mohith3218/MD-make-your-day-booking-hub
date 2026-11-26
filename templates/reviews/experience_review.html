@@ -1,0 +1,27 @@
+{% extends "public_base.html" %}
+{% from "components/experience_fields.html" import movie_review_fields, theatre_review_fields %}
+{% block title %}Review your booking · CineWave{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/experience-review.css') }}">{% endblock %}
+{% block content %}
+<section class="cw-review-panel cw-review-page">
+  <a class="cw-review-link" href="{{ url_for('profile.dashboard', _anchor='pending-reviews') }}">Back to My Bookings</a>
+  <h1>{{ 'Edit theatre review' if venue_only and venue and not venue.theatre_withdrawn_at else 'Review your booking' }}</h1>
+  {% if errors.general %}<p class="cw-review-error" role="alert">{{ errors.general }}</p>{% endif %}
+  {% if movie_allowed or venue_allowed %}
+    <form method="post" class="cw-review-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% if movie_allowed %}{{ movie_review_fields(booking, values, errors) }}{% endif %}
+      {% if venue_allowed %}{{ theatre_review_fields(booking, values, errors, venue_only) }}{% endif %}
+      <button class="cw-button cw-button-primary">{{ 'Save theatre review' if venue_only else 'Submit Reviews' }}</button>
+    </form>
+    {% if venue_only and venue and not venue.theatre_withdrawn_at %}
+      <form method="post" class="cw-review-actions">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="cw-button cw-button-white" name="action" value="withdraw">Withdraw theatre review</button>
+      </form>
+    {% endif %}
+  {% else %}
+    <p>You’ve already reviewed this booking. Edit your reviews from My Bookings.</p>
+  {% endif %}
+</section>
+{% endblock %}

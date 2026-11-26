@@ -1,0 +1,86 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}Theatres & Screens · Admin{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-2xl font-black text-white">Theatres &amp; Screens</h1>
+  <div class="flex flex-wrap gap-3">
+    <a href="{{ url_for('admin.admin') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">← Admin</a>
+    <a href="{{ url_for('admin.add_theater') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">+ Theatre</a>
+    <a href="{{ url_for('admin.add_screen') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">+ Screen</a>
+    <form method="POST" action="{{ url_for('admin.seed_vizag') }}">
+      <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl transition">
+        Load Vizag theatres
+      </button>
+    </form>
+  </div>
+</div>
+
+{% for t in theaters %}
+  <section class="glass-card rounded-2xl p-6 space-y-4" id="theater-{{ t.id }}">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <div class="min-w-0">
+        <h2 class="text-lg font-bold text-white break-words">{{ t.name }}</h2>
+        <p class="text-[11px] text-slate-400">{{ t.location or '—' }}{% if t.city %} · {{ t.city }}{% endif %}</p>
+      </div>
+      <p class="text-[11px] text-slate-500">{{ t.screens|length }} screen(s) · <span class="cw-verification cw-verification-{{ t.verification_status }}">{{ t.verification_status|replace('_',' ')|title }}</span></p>
+    </div>
+
+    <details class="cw-directory-review">
+      <summary>Review theatre directory listing</summary>
+      <form method="post" action="{{ url_for('admin.verify_theater', theater_id=t.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Status <select name="verification_status" class="cw-form-control">
+          {% for status in ['unverified','needs_review','verified'] %}<option value="{{ status }}" {% if t.verification_status == status %}selected{% endif %}>{{ status|replace('_',' ')|title }}</option>{% endfor %}
+        </select></label>
+        <label>Evidence URL <input type="url" name="verification_source_url" value="{{ t.verification_source_url or '' }}" placeholder="https://…" class="cw-form-control"></label>
+        <label>What did you confirm? <textarea name="verification_notes" rows="2" maxlength="2000" class="cw-form-control" placeholder="Name, locality or contact details confirmed from this source">{{ t.verification_notes or '' }}</textarea></label>
+        <button class="cw-button cw-button-primary cw-button-small" type="submit">Save review</button>
+      </form>
+    </details>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs text-slate-300">
+        <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+          <tr>
+            <th class="p-3">Screen</th><th class="p-3">Type</th>
+            <th class="p-3">Seats</th><th class="p-3">Classes</th><th class="p-3">Directory evidence</th><th class="p-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          {% for s in t.screens %}
+            <tr id="screen-{{ s.id }}">
+              <td class="p-3 font-semibold text-white whitespace-nowrap">{{ s.name }}</td>
+              <td class="p-3 whitespace-nowrap">{{ s.screen_type }}</td>
+              <td class="p-3 font-bold text-[#C9A84C]">{{ s.total_seats }}</td>
+              <td class="p-3 text-slate-400">{{ s.classes_summary or '—' }}</td>
+              <td class="p-3"><span class="cw-verification cw-verification-{{ s.verification_status }}">{{ s.verification_status|replace('_',' ')|title }}</span>{% if s.verification_source_url %}<a class="cw-source-link" href="{{ s.verification_source_url }}" target="_blank" rel="noopener noreferrer">Evidence</a>{% endif %}</td>
+              <td class="p-3 text-right whitespace-nowrap">
+                <a href="{{ url_for('admin.edit_layout', screen_id=s.id) }}" class="text-[#C9A84C] hover:underline font-semibold">Edit layout</a>
+                <details class="cw-screen-review"><summary>Review</summary><form method="post" action="{{ url_for('admin.verify_screen', screen_id=s.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <label>Status <select name="verification_status" class="cw-form-control">{% for status in ['unverified','needs_review','verified'] %}<option value="{{ status }}" {% if s.verification_status == status %}selected{% endif %}>{{ status|replace('_',' ')|title }}</option>{% endfor %}</select></label>
+                  <label>Evidence URL <input type="url" name="verification_source_url" value="{{ s.verification_source_url or '' }}" placeholder="https://…" class="cw-form-control"></label>
+                  <label>Notes <textarea name="verification_notes" rows="2" maxlength="2000" class="cw-form-control">{{ s.verification_notes or '' }}</textarea></label>
+                  <button class="cw-button cw-button-primary cw-button-small" type="submit">Save review</button>
+                </form></details>
+              </td>
+            </tr>
+          {% else %}
+          <tr><td colspan="6" class="p-3 text-slate-500">No screens yet — add one to enable bookings.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% else %}
+  <div class="glass-card rounded-2xl p-10 text-center space-y-3">
+    <p class="text-slate-400 text-sm">No theatres yet.</p>
+    <form method="POST" action="{{ url_for('admin.seed_vizag') }}">
+      <button type="submit" class="px-6 py-2.5 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">
+        Load the Vizag theatre set
+      </button>
+    </form>
+  </div>
+{% endfor %}
+{% endblock %}

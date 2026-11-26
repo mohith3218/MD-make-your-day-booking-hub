@@ -17,6 +17,20 @@ use `.venv/bin/python` in place of `.venv\Scripts\python.exe`. The local site
 listens on http://127.0.0.1:5000. Recreate virtual environments when moving the
 project between machines.
 
+If Windows Application Control blocks the SQLAlchemy wheel, install its supported
+pure-Python build. For PostgreSQL commands on such a machine, use the Python
+Psycopg implementation and the libpq directory from the approved PostgreSQL
+installation.
+
+```powershell
+$env:DISABLE_SQLALCHEMY_CEXT = '1'
+.venv\Scripts\python.exe -m pip install --force-reinstall --no-binary SQLAlchemy 'SQLAlchemy>=2.0,<2.1'
+$env:PSYCOPG_IMPL = 'python'
+$env:Path = 'C:\Program Files\PostgreSQL\18\bin;' + $env:Path
+```
+
+Check your PostgreSQL installation path before running the last command.
+
 On a fresh local database, set `ADMIN_PASSWORD` before first startup to create the admin account. Passwords are never printed and existing credentials are preserved. Set `SECRET_KEY` to a long random value to keep sessions valid across restarts. For an HTTPS deployment, also set `SESSION_COOKIE_SECURE=1`. Flask debug mode is off by default; set `FLASK_DEBUG=1` only for local development.
 For a database already managed by Alembic, back it up and apply the versioned
 schema changes before starting the updated app:
@@ -86,10 +100,10 @@ python test_flow.py     # isolated booking, demo payment, wallet, split, refund 
 | `payments.py` | Local demo simulator, fee/GST math, private response signatures |
 | `test_flow.py` | End-to-end test of the whole booking + payment flow |
 | `templates/base.html` | Shared shell (header, wallet balance, flash messages) |
-| `templates/book.html` | New seat map |
-| `templates/checkout.html`, `pay_mock.html`, `ticket.html` | Payment flow + e-ticket |
-| `templates/wallet.html`, `admin_recharges.html`, `admin_bookings.html` | Wallet & admin |
-| `templates/screens.html`, `add_screen.html`, `edit_layout.html` | Seating arrangement admin |
+| `templates/booking/book.html` | New seat map |
+| `templates/booking/checkout.html`, `pay_mock.html`, `ticket.html` | Payment flow + e-ticket |
+| `templates/account/wallet.html`, `admin_recharges.html`, `admin_bookings.html` | Wallet & admin |
+| `templates/admin/screens.html`, `add_screen.html`, `edit_layout.html` | Seating arrangement admin |
 | `app_original_backup.py` | Your original file, untouched, just in case |
 
 New templates extend `base.html`, so the header/nav lives in one place now.

@@ -1,7 +1,9 @@
+from datetime import datetime, timezone
 from unicodedata import category
 
 from flask import request
 from sqlalchemy import func
+from ..time import CINEMA_TIMEZONE
 
 
 def completed_booking_source(booking, user_id):
@@ -9,9 +11,13 @@ def completed_booking_source(booking, user_id):
     if user_id is None or booking.user_id != user_id or booking.status != 'PAID':
         return None
     show = booking.showtime
-    if not show or not show.movie or not show.movie.duration or show.movie.duration < 1:
+    if not show or show.is_cancelled or not show.movie or not show.show_datetime:
         return None
-    if show.status != 'ended':
+    if show.actual_ended_at:
+        start_utc = show.show_datetime.replace(tzinfo=CINEMA_TIMEZONE).astimezone(timezone.utc).replace(tzinfo=None)
+        if not start_utc < show.actual_ended_at <= datetime.now(timezone.utc).replace(tzinfo=None):
+            return None
+    elif not show.movie.duration or show.movie.duration < 1 or show.status != 'ended':
         return None
     # Checkout can retain an earlier CREATED or FAILED payment when the method changes.
     if len(booking.captured_payments) != 1:

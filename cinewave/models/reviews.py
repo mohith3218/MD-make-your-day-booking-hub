@@ -16,6 +16,11 @@ class ScreenReview(db.Model):
     ac_rating = db.Column(db.Integer)
     comfort_rating = db.Column(db.Integer)
     review_text = db.Column(db.String(1000))
+    has_screen_feedback = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    theatre_rating = db.Column(db.Integer)
+    theatre_review_text = db.Column(db.String(1000))
+    theatre_updated_at = db.Column(db.DateTime)
+    theatre_withdrawn_at = db.Column(db.DateTime)
     verified = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     is_demo = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
@@ -32,6 +37,9 @@ class ScreenReview(db.Model):
         db.UniqueConstraint('booking_id', name='uq_screen_review_booking'),
         db.Index('ix_screen_review_screen_visibility', 'screen_id', 'hidden', 'withdrawn_at'),
         db.Index('ix_screen_review_theater_visibility', 'theater_id', 'hidden', 'withdrawn_at'),
+        db.Index('uq_theatre_review_user_venue', 'user_id', 'theater_id', unique=True,
+                 sqlite_where=db.text('theatre_rating IS NOT NULL'),
+                 postgresql_where=db.text('theatre_rating IS NOT NULL')),
         *(db.CheckConstraint(f'{field} BETWEEN 1 AND 5 AND {field} = CAST({field} AS INTEGER)',
                              name=f'ck_screen_review_{field}')
           for field in ('overall_rating', 'sound_rating', 'ac_rating', 'comfort_rating')),

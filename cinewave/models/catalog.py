@@ -4,6 +4,7 @@ from sqlalchemy import func as sa_func
 import seat_layout as sl
 from vizag_theaters import correct_jagadamba_levels
 from ..extensions import db
+from ..integrations.trailers import player
 from ..time import cinema_now
 from .booking import BookedSeat, SeatHold
 
@@ -39,6 +40,10 @@ class Movie(db.Model):
     cast_json = db.Column(db.Text, nullable=True, default=None)
     youtube_trailer_key = db.Column(db.String(20), nullable=True)
     trailer_video_path = db.Column(db.String(300), nullable=True)
+    trailer_source = db.Column(db.String(12))
+    automatic_youtube_key = db.Column(db.String(11))
+    cloudinary_trailer_url = db.Column(db.String(500))
+    tmdb_trailer_checked_at = db.Column(db.DateTime)
 
     @property
     def cast_info(self):
@@ -83,7 +88,16 @@ class Movie(db.Model):
 
     @property
     def trailer_video_key(self):
-        return None if self.trailer_video_path else self.youtube_trailer_key
+        if self.trailer_source in {'none', 'cloudinary'} or (
+                self.trailer_source is None and self.trailer_video_path):
+            return None
+        if self.trailer_source in {'youtube', None} and self.youtube_trailer_key:
+            return self.youtube_trailer_key
+        return self.automatic_youtube_key
+
+    @property
+    def trailer(self):
+        return player(self.trailer_source, youtube=self.trailer_video_key, cloudinary=self.cloudinary_trailer_url)
 
     @property
     def moods(self):
@@ -149,7 +163,7 @@ class MovieRating(db.Model):
         db.Index('ix_movie_rating_visibility', 'movie_id', 'hidden', 'withdrawn_at'),
         db.CheckConstraint(
             'booking_id IS NULL OR (rating BETWEEN 1 AND 5 AND rating = CAST(rating AS INTEGER)'
-            ' AND review IS NOT NULL AND length(trim(review)) > 0)',
+            ')',
             name='ck_movie_rating_booked_review'),
     )
 
@@ -260,6 +274,7 @@ class Showtime(db.Model):
     show_time = db.Column(db.String(20), nullable=False)
     price_overrides_json = db.Column(db.Text, default='{}')      # {"RECLINER": 400}
     is_cancelled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    actual_ended_at = db.Column(db.DateTime)  # UTC
 
     movie = db.relationship('Movie', backref=db.backref('showtimes', lazy=True))
     screen = db.relationship('Screen', backref=db.backref('showtimes', lazy=True))

@@ -1,0 +1,16 @@
+{% from "components/experience_fields.html" import movie_review_fields, theatre_review_fields %}
+<dialog class="cw-experience-dialog" aria-labelledby="post-show-heading" data-post-show-dialog>
+  <div class="cw-experience-header">
+    <h2 id="post-show-heading">How was your movie experience?</h2>
+    <button type="button" class="cw-button cw-button-white" data-close-review>Dismiss</button>
+  </div>
+  <form method="post" action="{{ url_for('post_show.edit', reference=item.booking.reference) }}" class="cw-review-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if item.movie %}{{ movie_review_fields(item.booking, {}, {}) }}{% endif %}
+    {% if item.theatre %}{{ theatre_review_fields(item.booking, {}, {}) }}{% endif %}
+    <div class="cw-review-actions">
+      <button class="cw-button cw-button-primary">Submit Reviews</button>
+      <button type="button" class="cw-button cw-button-white" data-close-review>Review Later</button>
+    </div>
+  </form>
+</dialog>

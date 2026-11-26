@@ -46,19 +46,19 @@ The transfer does not seed or regenerate venues or screen layouts.
 
 ```powershell
 # First back up and validate the source, without accessing a remote database.
-python migrate_sqlite_to_postgres.py
+python -m scripts.database.migrate_sqlite_to_postgres
 
 # Create the versioned schema on a fresh target using the configured DATABASE_URL.
-python run_create_db.py
+python -m scripts.database.run_create_db
 
 # Schema, version, connectivity and fresh reconnection checks.
 python database_health.py
 
 # Transfer, verify every table's count and content, and commit atomically.
-python migrate_sqlite_to_postgres.py --apply
+python -m scripts.database.migrate_sqlite_to_postgres --apply
 ```
 
-`run_create_db.py` runs `alembic upgrade head`. The baseline creates 18 tables,
+`scripts.database.run_create_db` runs `alembic upgrade head`. The baseline creates 18 tables,
 foreign keys, unique constraints and indexes. It does not drop existing tables,
 seed data, change credentials or silently adopt an existing unversioned schema.
 If application tables already exist on the target, investigate their provenance;

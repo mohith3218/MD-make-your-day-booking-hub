@@ -1,0 +1,283 @@
+{% extends "admin/admin_base.html" %}
+{% block title %}Admin Panel · MD CineWave{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-black text-white flex items-center gap-2">
+      <i class="fa-solid fa-user-shield text-amber-400"></i> Admin Panel
+    </h1>
+    <p class="text-xs text-slate-400 mt-1">Manage movies, trailers, theatres, and showtimes.</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  {% for label, value, icon in [
+      ('Paid bookings', paid_count, 'fa-ticket'),
+      ('Revenue', '₹%.0f'|format(revenue), 'fa-indian-rupee-sign'),
+      ('Screens', screens|length, 'fa-display'),
+      ('Pending recharges', pending_recharges, 'fa-wallet')] %}
+    <div class="glass-card cine-stat p-4">
+      <p class="text-[10px] uppercase tracking-wider text-slate-500">{{ label }}</p>
+      <p class="text-2xl font-black text-white mt-1">{{ value }}</p>
+      <i class="fa-solid {{ icon }} text-[#C9A84C] text-xs mt-2"></i>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="cw-admin-quick-actions" aria-label="Quick actions">
+  <a href="{{ url_for('admin.add_movie') }}" class="px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">+ Add Movie</a>
+  <a href="{{ url_for('admin.import_movie') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition"><i class="fa-solid fa-magnifying-glass mr-1"></i>TMDb Import</a>
+  <a href="{{ url_for('admin.add_showtime') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Showtime</a>
+  <a href="{{ url_for('admin.add_theater') }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition">+ Add Theatre</a>
+</div>
+
+<section id="movie-sync" class="glass-card rounded-2xl p-6 space-y-4" aria-labelledby="movie-sync-title">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div><h2 id="movie-sync-title" class="text-lg font-bold text-white">TMDB synchronization</h2><p class="text-xs text-slate-400">{{ sync_status }}</p></div>
+    <form method="post" action="{{ url_for('admin.queue_movie_sync') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="cw-button cw-button-primary cw-button-small disabled:opacity-50" type="submit" {% if not sync_configured %}disabled{% endif %}>Sync Movies Now</button>
+    </form>
+  </div>
+  <dl class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300">
+    {% for label, value in [('Last attempted', sync_state.last_attempt_at if sync_state else none),
+                           ('Last successful', sync_state.last_success_at if sync_state else none),
+                           ('Next scheduled', sync_state.next_run_at if sync_state else none)] %}
+      <div><dt class="text-slate-400">{{ label }}</dt><dd>{{ value.strftime('%d %b %Y, %H:%M UTC') if value else '—' }}</dd></div>
+    {% endfor %}
+  </dl>
+  {% if sync_state and sync_state.counts %}
+    <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-300">
+      {% for label, key in [('Imported', 'imported'), ('Updated', 'updated'), ('Skipped', 'skipped'), ('Failed', 'failed')] %}
+        <div><dt class="text-slate-400">{{ label }}</dt><dd>{{ sync_state.counts[key] }}</dd></div>
+      {% endfor %}
+    </dl>
+  {% endif %}
+  {% if sync_state and sync_state.error %}<p class="text-xs text-amber-400" role="status">{{ sync_state.error }}</p>{% endif %}
+</section>
+
+<section id="theatres" class="glass-card rounded-2xl p-6 space-y-4 min-w-0">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-bold text-white">Theatres <span class="text-sm text-slate-500">({{ theaters|length }})</span></h2>
+      <p class="text-[11px] text-slate-500 mt-0.5">Browse locations and screen capacity.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3 min-w-0">
+      <input type="search" data-table-filter="theaters-table" aria-label="Search theatres" placeholder="Search theatres" class="w-44 max-w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400">
+      <a href="{{ url_for('admin.screens') }}" class="text-xs text-[#C9A84C] hover:underline whitespace-nowrap">Manage seating</a>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">ID</th><th class="p-3">Name</th><th class="p-3">Location</th><th class="p-3">Screens</th><th class="p-3">Seats</th></tr>
+      </thead>
+      <tbody id="theaters-table" class="divide-y divide-slate-800">
+        {% for t in theaters %}
+          <tr data-admin-row>
+            <td class="p-3">{{ t.id }}</td>
+            <td class="p-3 font-semibold text-white">{{ t.name }}</td>
+            <td class="p-3">{{ t.location or '—' }}</td>
+            <td class="p-3">{{ t.screens|length }}</td>
+            <td class="p-3">{{ t.screens|sum(attribute='total_seats') }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="p-3 text-slate-500">No theatres registered yet.</td></tr>
+        {% endfor %}
+        <tr data-filter-empty class="hidden"><td colspan="5" class="p-3 text-slate-500">No theatres match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="movies" class="glass-card rounded-2xl p-6 space-y-4 min-w-0">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-bold text-white">Movies <span class="text-sm text-slate-500">({{ movie_page.total }})</span></h2>
+      <p class="text-[11px] text-slate-500 mt-0.5">Update listing status, feature order, cast, and trailer sources. Choose up to five active films for the homepage.</p>
+    </div>
+    <form method="get" action="{{ url_for('admin.admin', _anchor='movies') }}" class="flex flex-wrap items-center gap-2 min-w-0">
+      <label class="sr-only" for="admin-movie-query">Search all movies, including archived</label>
+      <input id="admin-movie-query" type="search" name="q" value="{{ movie_search }}" placeholder="Search movies" class="cw-form-control max-w-full px-2">
+      <select name="visibility" aria-label="Movie listing status" class="cw-form-control">
+        <option value="active" {% if movie_visibility == 'active' %}selected{% endif %}>Active</option>
+        <option value="archived" {% if movie_visibility == 'archived' %}selected{% endif %}>Archived</option>
+        <option value="all" {% if movie_visibility == 'all' %}selected{% endif %}>All movies</option>
+      </select>
+      <select name="language" aria-label="Movie language" class="cw-form-control">
+        <option value="">All languages</option>
+        {% for item in movie_languages %}<option value="{{ item }}" {% if movie_filters.language == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+      </select>
+      <select name="schedule" aria-label="Screening schedule" class="cw-form-control">
+        <option value="">Any schedule</option>
+        <option value="scheduled" {% if movie_filters.schedule == 'scheduled' %}selected{% endif %}>Scheduled</option>
+        <option value="unscheduled" {% if movie_filters.schedule == 'unscheduled' %}selected{% endif %}>No screenings scheduled</option>
+      </select>
+      <select name="source" aria-label="Movie source" class="cw-form-control">
+        <option value="">All sources</option>
+        <option value="tmdb" {% if movie_filters.source == 'tmdb' %}selected{% endif %}>TMDB</option>
+        <option value="manual" {% if movie_filters.source == 'manual' %}selected{% endif %}>Manual</option>
+      </select>
+      <label class="text-xs text-slate-400">Release from <input type="date" name="released_from" value="{{ movie_filters.released_from or '' }}" class="cw-form-control"></label>
+      <label class="text-xs text-slate-400">Release to <input type="date" name="released_to" value="{{ movie_filters.released_to or '' }}" class="cw-form-control"></label>
+      <button class="cw-button cw-button-primary cw-button-small" type="submit">Apply filters</button>
+    </form>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">ID</th><th class="p-3">Title</th><th class="p-3">Lang</th><th class="p-3">Duration</th><th class="p-3">Category</th><th class="p-3">Release Type</th><th class="p-3">Actions</th></tr>
+      </thead>
+      <tbody id="movies-table" class="divide-y divide-slate-800">
+        {% for m in movies %}
+          <tr data-admin-row>
+            <td class="p-3">{{ m.id }}</td>
+            <td class="p-3">
+              <div class="flex gap-3 items-start min-w-[180px]">
+                {% if m.poster %}<img src="{{ m.poster }}" alt="" width="42" height="63" class="rounded object-cover" loading="lazy">{% endif %}
+                <div><p class="font-semibold text-white">{{ m.title }}{% if m.is_archived %}<span class="cw-badge cw-archive-badge">Archived</span>{% endif %}</p>
+                  <p class="mt-1 text-slate-400">{{ 'TMDB' if m.tmdb_id else 'Manual' }}{% if m.release_date %} · {{ m.release_date.strftime('%d %b %Y') }}{% endif %}</p>
+                  {% if m.description %}<details class="mt-1 max-w-sm"><summary>Synopsis</summary><p class="mt-1 break-words">{{ m.description }}</p></details>{% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="p-3">{{ m.language or '—' }}</td>
+            <td class="p-3">{{ (m.duration ~ ' min') if m.duration else '—' }}</td>
+            <td class="p-3">
+              {% if m.is_upcoming %}
+                <span class="inline-flex min-w-max items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">🗓️ Coming Soon</span>
+              {% else %}
+                <span class="text-slate-300">Catalogue</span>
+              {% endif %}
+              <p class="mt-1 text-slate-400">{{ 'Screening scheduled' if m.id in scheduled_ids else 'No screenings scheduled yet.' }}</p>
+            </td>
+            <td class="p-3">
+              {% if m.is_rerelease %}
+                <span class="inline-flex min-w-max items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[10px] font-bold">🔁 Re-Release</span>
+              {% else %}
+                <span class="inline-flex min-w-max items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 text-[10px] font-bold">✨ Fresh Release</span>
+              {% endif %}
+            </td>
+            <td class="p-3">
+              <div class="flex min-w-[210px] flex-wrap items-center gap-1.5">
+                <a class="cw-button cw-button-white cw-button-small" href="{{ url_for('admin.edit_movie', movie_id=m.id) }}">Edit details</a>
+                {% if not m.is_archived %}<a class="cw-button cw-button-white cw-button-small" href="{{ url_for('admin.add_showtime', movie_id=m.id) }}">Add showtime</a>{% endif %}
+                {% if m.is_archived %}<span class="basis-full text-[10px] text-slate-500">Archived movies are not featured.</span>{% else %}
+                <form method="POST" action="{{ url_for('admin.set_movie_featured_order', movie_id=m.id, q=movie_search, visibility=movie_visibility) }}" class="basis-full flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-2">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <label class="text-[10px] text-slate-400">Homepage feature order
+                    <select name="featured_order" aria-label="Featured order for {{ m.title }}" class="ml-1 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[10px] text-white">
+                      <option value="" {% if not m.featured_order %}selected{% endif %}>Not featured</option>
+                      {% for rank in range(1, 6) %}<option value="{{ rank }}" {% if m.featured_order == rank %}selected{% endif %}>{{ rank }}{% if rank == 1 %}st{% elif rank == 2 %}nd{% elif rank == 3 %}rd{% else %}th{% endif %}</option>{% endfor %}
+                    </select>
+                  </label>
+                  <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-[10px] font-semibold text-amber-200 hover:bg-amber-600 hover:text-white">Save feature</button>
+                </form>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('admin.toggle_movie_status', movie_id=m.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium rounded-lg transition">
+                    {% if m.is_upcoming %}Move to catalogue{% else %}Mark upcoming{% endif %}
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.toggle_rerelease', movie_id=m.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-300 text-[10px] font-medium rounded-lg transition">
+                    {% if m.is_rerelease %}→ Fresh{% else %}→ Re-Release{% endif %}
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.archive_movie', movie_id=m.id, q=movie_search) }}" class="cw-archive-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-medium rounded-lg transition">
+                    {% if m.is_archived %}Restore to catalogue{% else %}Archive{% endif %}
+                  </button>
+                </form>
+                {% if m.tmdb_id %}<form method="POST" action="{{ url_for('admin.fetch_cast', movie_id=m.id) }}"
+                      onsubmit="this.querySelector('button').textContent = 'Fetching…'">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-sky-300 text-[10px] font-medium rounded-lg transition"
+                          title="Pull cast & director from TMDb">
+                    Update cast
+                  </button>
+                </form>{% endif %}
+                <form method="POST" action="{{ url_for('admin.delete_movie', movie_id=m.id) }}"
+                      data-confirm-delete="Delete {{ m.title }} and its showtimes, reviews, watchlist entries and inactive party rooms? Movies with bookings, active seat holds or active parties cannot be deleted."
+                      onsubmit="return confirm(this.dataset.confirmDelete)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-medium rounded-lg transition">
+                    🗑 Delete
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="p-3 text-slate-500">No movies added yet.</td></tr>
+        {% endfor %}
+        <tr data-filter-empty class="hidden"><td colspan="7" class="p-3 text-slate-500">No movies match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% if movie_page.pages > 1 %}
+    <nav class="flex flex-wrap items-center gap-3 text-xs" aria-label="Movie pages">
+      {% if movie_page.has_prev %}<a class="cw-button cw-button-white cw-button-small" href="{{ url_for('admin.admin', page=movie_page.prev_num, _anchor='movies', **movie_filters) }}">Previous</a>{% endif %}
+      <span>Page {{ movie_page.page }} of {{ movie_page.pages }}</span>
+      {% if movie_page.has_next %}<a class="cw-button cw-button-white cw-button-small" href="{{ url_for('admin.admin', page=movie_page.next_num, _anchor='movies', **movie_filters) }}">Next</a>{% endif %}
+    </nav>
+  {% endif %}
+</section>
+
+<section class="glass-card rounded-2xl p-6 space-y-4 min-w-0">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-bold text-white">Showtimes <span class="text-sm text-slate-500">({{ showtimes|length }})</span></h2>
+      <p class="text-[11px] text-slate-500 mt-0.5">Check scheduled screenings and remaining seats.</p>
+    </div>
+    <input type="search" data-table-filter="showtimes-table" aria-label="Search showtimes" placeholder="Search showtimes" class="w-52 max-w-full bg-slate-900 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400">
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-xs text-slate-300">
+      <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
+        <tr><th class="p-3">ID</th><th class="p-3">Movie</th><th class="p-3">Theatre</th><th class="p-3">Screen</th><th class="p-3">Date</th><th class="p-3">Time</th><th class="p-3">Left</th></tr>
+      </thead>
+      <tbody id="showtimes-table" class="divide-y divide-slate-800">
+        {% for s in showtimes %}
+          <tr data-admin-row>
+            <td class="p-3">{{ s.id }}</td>
+            <td class="p-3 font-semibold text-white">{{ s.movie.title }}</td>
+            <td class="p-3">{{ s.theater }}</td>
+            <td class="p-3">{{ s.screen_label }}</td>
+            <td class="p-3 whitespace-nowrap">{{ s.show_date.strftime('%d %b %Y') }}</td>
+            <td class="p-3 whitespace-nowrap">{{ s.show_time }}</td>
+            <td class="p-3">{{ 'Cancelled' if s.is_cancelled else s.seats_left }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="p-3 text-slate-500">No showtimes configured yet.</td></tr>
+        {% endfor %}
+        <tr data-filter-empty class="hidden"><td colspan="7" class="p-3 text-slate-500">No showtimes match your search.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+<script>
+  document.querySelectorAll('[data-table-filter]').forEach((input) => {
+    const tableBody = document.getElementById(input.dataset.tableFilter);
+    if (!tableBody) return;
+    const rows = Array.from(tableBody.querySelectorAll('[data-admin-row]'));
+    const emptyRow = tableBody.querySelector('[data-filter-empty]');
+
+    input.addEventListener('input', () => {
+      const query = input.value.trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      rows.forEach((row) => {
+        const matches = row.textContent.toLocaleLowerCase().includes(query);
+        row.classList.toggle('hidden', !matches);
+        if (matches) visibleCount += 1;
+      });
+      if (emptyRow) emptyRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
+    });
+  });
+</script>
+{% endblock %}

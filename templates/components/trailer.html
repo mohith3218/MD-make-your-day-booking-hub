@@ -1,0 +1,20 @@
+{% macro trailer_button(trailer, text='Watch Trailer', classes='cw-button cw-button-white') %}
+  {% if trailer %}
+    <a class="{{ classes }}" href="{{ trailer.external }}" target="_blank" rel="noopener noreferrer"
+       data-trailer-provider="{{ trailer.provider }}" data-trailer-url="{{ trailer.url }}">
+      <i class="fa-solid fa-play" aria-hidden="true"></i> {{ text }}
+    </a>
+  {% endif %}
+{% endmacro %}
+
+{% macro trailer_modal() %}
+  <dialog class="cw-trailer-dialog" id="trailer-modal" aria-labelledby="trailer-title">
+    <div class="cw-trailer-header">
+      <h2 id="trailer-title">Trailer</h2>
+      <form method="dialog"><button class="cw-button cw-button-white" autofocus aria-label="Close trailer">Close</button></form>
+    </div>
+    <div class="cw-trailer-player" data-trailer-player></div>
+    <p class="cw-trailer-error" data-trailer-error role="status" hidden></p>
+    <a class="cw-review-link" data-trailer-external target="_blank" rel="noopener noreferrer">Open original video</a>
+  </dialog>
+{% endmacro %}

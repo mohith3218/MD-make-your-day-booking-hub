@@ -1,0 +1,218 @@
+from datetime import datetime, timedelta, timezone
+import unittest
+from unittest.mock import patch
+
+from sqlalchemy.exc import IntegrityError
+
+from cinewave.extensions import db
+from cinewave.factory import create_app
+from cinewave.integrations.tmdb import TMDBClient, TMDBError, best_trailer
+from cinewave.models import Booking, Movie, MovieRating, Payment, Screen, ScreenReview, SeatHold, Showtime, Theater, User
+from cinewave.services.reviews import completed_booking_source
+from cinewave.services.theatre_reviews import venue_review_data
+from cinewave.time import cinema_now
+from cinewave.workers import movie_sync
+
+
+def clip(key, *, language='en', official=True, kind='Trailer'):
+    return {'key': key, 'site': 'YouTube', 'iso_639_1': language, 'official': official, 'type': kind}
+
+
+class ExperienceTests(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app({
+            'TESTING': True, 'SESSION_PROTECTION': None, 'SECRET_KEY': 'isolated-experience-tests',
+            'SQLALCHEMY_DATABASE_URI': 'sqlite://', 'SQLALCHEMY_ENGINE_OPTIONS': {},
+            'TMDB_API_KEY': 'fixture-key', 'TMDB_READ_TOKEN': '',
+        })
+        context = self.app.app_context()
+        context.push()
+        self.addCleanup(context.pop)
+        db.create_all()
+        self.user = User(username='viewer', password_hash='test')
+        self.other = User(username='other', password_hash='test')
+        self.staff = User(username='staff', is_admin=True, password_hash='test')
+        self.movie = Movie(title='Evening Show', description='Fixture film', duration=100, tmdb_id=77)
+        self.venue = Theater(name='Coastal theatre')
+        self.screen = Screen(name='Screen One', theater=self.venue)
+        self.screen.layout = {'classes': [{'code': 'STD', 'name': 'Standard', 'price': 100,
+                                            'rows': [{'label': 'A', 'count': 3}]}]}
+        db.session.add_all([self.user, self.other, self.staff, self.movie, self.screen])
+        db.session.commit()
+        self.client = self.login(self.user)
+        self.admin = self.login(self.staff)
+
+    def login(self, user):
+        client = self.app.test_client()
+        with client.session_transaction() as session:
+            session['_user_id'] = user.alternative_id
+            session['_fresh'] = True
+            session['_csrf_token'] = 'experience-token'
+        return client
+
+    def screening(self, offset, **values):
+        show = Showtime(movie=self.movie, screen=self.screen, theater=self.venue.name,
+                        show_date=cinema_now().date() + timedelta(days=offset), show_time='16:00', **values)
+        db.session.add(show)
+        db.session.commit()
+        return show
+
+    def paid(self, show, user=None, status='PAID'):
+        booking = Booking(user=user or self.user, showtime=show, seats='A1', total_amount=150,
+                          status=status, paid_at=datetime.now(timezone.utc).replace(tzinfo=None))
+        db.session.add(booking)
+        db.session.flush()
+        db.session.add(Payment(booking_id=booking.id, gateway='historical-provider', status='CAPTURED'))
+        db.session.commit()
+        return booking
+
+    def test_trailer_priority_and_resilient_movie_details(self):
+        matching = clip('Matching_01', language='te')
+        english = clip('English__01')
+        fallback = clip('Fallback_01', language='te', official=False)
+        teaser = clip('Teaser___01', language='te', kind='Teaser')
+        self.assertEqual(best_trailer([teaser, fallback, english, matching], 'te'), matching['key'])
+        self.assertEqual(best_trailer([teaser, fallback, english], 'te'), english['key'])
+        self.assertEqual(best_trailer([teaser, fallback], 'te'), fallback['key'])
+        self.assertEqual(best_trailer([teaser], 'te'), teaser['key'])
+        self.assertIsNone(best_trailer([clip('invalid!'), clip('Teaser___01', official=False, kind='Teaser')], 'te'))
+        details = {'id': 77, 'title': 'Evening Show', 'overview': 'A meaningful overview.',
+                   'poster_path': '/poster.jpg', 'original_language': 'te'}
+        with TMDBClient() as client, patch.object(client, 'get', side_effect=[
+                details, TMDBError('Temporarily unavailable', status=503)]) as get:
+            response = client.details(77)
+        self.assertEqual(get.call_args.args, ('/movie/77/videos',))
+        self.assertEqual(get.call_args.kwargs, {'language': 'te'})
+        self.assertEqual(response['title'], 'Evening Show')
+        self.assertIn('trailer_lookup_error', response)
+
+    def test_backfill_and_manual_trailer_precedence(self):
+        url = f'/admin/movie/{self.movie.id}/trailer'
+        manual = 'https://res.cloudinary.com/demo/video/upload/q_auto/dog.mp4'
+        form = {'csrf_token': 'experience-token', 'trailer_source': 'cloudinary', 'cloudinary_trailer': manual}
+        self.assertEqual(self.admin.post(url, data={**form, 'cloudinary_trailer': manual.replace(
+            'res.cloudinary.com', 'res.cloudinary.com.example.test')}).status_code, 303)
+        self.assertIsNone(self.movie.trailer)
+        self.assertEqual(self.admin.post(url, data=form).status_code, 303)
+        self.movie.tmdb_last_checked_at = movie_sync.utc_now()
+        db.session.commit()
+        details = {'id': 77, 'title': self.movie.title, 'overview': self.movie.description,
+                   'poster_path': '/poster.jpg', 'videos': {'results': [clip('Matching_01')]}}
+        with patch.object(movie_sync, 'discover', return_value={}), patch.object(
+                TMDBClient, 'details', return_value=details) as fetch:
+            _, error = movie_sync.run_sync()
+        self.assertIsNone(error)
+        fetch.assert_called_once_with(77)
+        self.assertEqual(self.movie.trailer['url'], manual)
+        self.assertEqual(self.movie.automatic_youtube_key, 'Matching_01')
+        self.admin.post(url, data={**form, 'trailer_action': 'none'})
+        self.assertIsNone(self.movie.trailer)
+        self.admin.post(url, data={**form, 'trailer_action': 'auto'})
+        self.assertEqual(self.movie.trailer['url'], 'https://www.youtube-nocookie.com/embed/Matching_01')
+
+    def test_auditorium_receives_only_the_selected_validated_trailer(self):
+        show = self.screening(1)
+        path = f'/book/{show.id}/vr-preview?embed=1'
+        edit_path = f'/admin/movie/{self.movie.id}/trailer'
+        source = 'https://res.cloudinary.com/demo/video/upload/v42/trailers/film.mp4'
+        self.admin.post(edit_path, data={'csrf_token': 'experience-token',
+                                        'trailer_source': 'cloudinary', 'cloudinary_trailer': source})
+        preview = self.client.get(path).get_data(as_text=True)
+        self.assertIn(f'data-src="{source}"', preview)
+        self.assertIn('/upload/c_limit,h_480,w_960/q_auto/v42/trailers/film.mp4', preview)
+        self.assertNotIn('TearsOfSteel', preview)
+        self.assertNotIn('id="trailer-modal"', preview)
+
+        self.movie.cloudinary_trailer_url = 'https://example.invalid/film.mp4'
+        db.session.commit()
+        preview = self.client.get(path).get_data(as_text=True)
+        self.assertNotIn('example.invalid/film.mp4', preview)
+        self.assertNotIn('id="projection-video"', preview)
+
+        self.admin.post(edit_path, data={'csrf_token': 'experience-token',
+                                        'trailer_source': 'youtube', 'youtube_trailer': 'Matching_01'})
+        preview = self.client.get(path).get_data(as_text=True)
+        self.assertIn('https://www.youtube-nocookie.com/embed/Matching_01', preview)
+        self.assertIn('id="trailer-modal"', preview)
+        self.assertNotIn('id="projection-video"', preview)
+
+    def test_review_prompt_booking_eligibility_and_venue_edit(self):
+        completed = self.paid(self.screening(-2))
+        upcoming = self.paid(self.screening(1))
+        cancelled = self.paid(self.screening(-2, is_cancelled=True))
+        other = self.paid(self.screening(-3), self.other)
+        refunded = self.paid(self.screening(-2), status='CANCELLED')
+        for booking, code in ((upcoming, 403), (cancelled, 403), (other, 404), (refunded, 403)):
+            response = self.client.get(f'/booking/{booking.reference}/experience-review')
+            self.assertEqual(response.status_code, code)
+        prompt = self.client.get('/reviews/pending')
+        self.assertIn(b'name="rating"', prompt.data)
+        self.assertIn(b'name="theatre_rating"', prompt.data)
+        self.assertIn('private', prompt.headers['Cache-Control'])
+        path = f'/booking/{completed.reference}/experience-review'
+        self.assertEqual(self.client.post(path, data={'rating': 4}).status_code, 400)
+        self.assertEqual(self.client.post(path, data={'rating': 4, 'csrf_token': 'experience-token'}).status_code, 303)
+        movie_review = MovieRating.query.one()
+        self.assertIsNone(movie_review.review)
+        self.assertEqual(movie_review.booking_id, completed.id)
+        prompt = self.client.get('/reviews/pending').data
+        self.assertNotIn(b'name="rating"', prompt)
+        self.assertIn(b'name="theatre_rating"', prompt)
+
+        second = self.paid(self.screening(-1))
+        venue_path = f'/booking/{second.reference}/theatre-review'
+        self.assertEqual(self.client.post(venue_path, data={
+            'theatre_rating': '5', 'theatre_review': '<b>Great venue</b>', 'csrf_token': 'experience-token',
+        }).status_code, 303)
+        review = ScreenReview.query.one()
+        self.assertFalse(review.has_screen_feedback)
+        self.assertEqual(review.booking_id, second.id)
+        self.assertEqual(self.client.get('/reviews/pending').status_code, 204)
+        listing = self.app.test_client().get(f'/theatres/{self.venue.id}').data
+        self.assertIn(b'&lt;b&gt;Great venue&lt;/b&gt;', listing)
+        self.assertNotIn(b'<b>Great venue</b>', listing)
+        self.assertIn(b'Verified Booking', listing)
+        self.assertNotIn(b'Great venue', self.app.test_client().get(
+            f'/theatres/{self.venue.id}/screens/{self.screen.id}/reviews').data)
+        self.assertIn(b'Edit Theatre Review', self.client.get('/dashboard').data)
+
+        self.client.post(f'/booking/{completed.reference}/theatre-review', data={
+            'theatre_rating': '3', 'theatre_review': 'Changed', 'csrf_token': 'experience-token',
+        })
+        venue = venue_review_data(self.venue.id, 'highest', 1)
+        self.assertEqual((venue['score'].count, venue['score'].overall_rating), (1, 3))
+        self.assertEqual(venue['distribution'][3], 1)
+        db.session.add(ScreenReview(booking=completed, user_id=self.user.id, screen_id=self.screen.id,
+                                    theater_id=self.venue.id, overall_rating=3, theatre_rating=3))
+        with self.assertRaises(IntegrityError):
+            db.session.commit()
+        db.session.rollback()
+        self.client.post(venue_path, data={'action': 'withdraw', 'csrf_token': 'experience-token'})
+        self.assertIsNone(venue_review_data(self.venue.id, 'recent', 1)['score'])
+
+    def test_actual_end_is_required_when_runtime_missing(self):
+        self.movie.duration = 0
+        show = self.screening(-1)
+        booking = self.paid(show)
+        self.assertIsNone(completed_booking_source(booking, self.user.id))
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        show.actual_ended_at = now + timedelta(hours=1)
+        self.assertIsNone(completed_booking_source(booking, self.user.id))
+        show.actual_ended_at = now - timedelta(hours=1)
+        self.assertEqual(completed_booking_source(booking, self.user.id), 'verified')
+
+    def test_edit_seats_reuses_hold_preserves_reference_and_blocks_other_user(self):
+        show = self.screening(2)
+        response = self.client.post(f'/book/{show.id}', data={'selected_seats': 'A1'})
+        self.assertIn('/checkout/', response.headers['Location'])
+        booking = Booking.query.one()
+        expires_at = booking.expires_at
+        url = f'/book/{show.id}?reservation={booking.reference}'
+        self.assertEqual(self.login(self.other).get(url).status_code, 404)
+        self.assertEqual(self.client.post(url, data={'selected_seats': 'A2'}).status_code, 400)
+        self.assertIn(b'"reservedSeats": ["A1"]', self.client.get(url).data)
+        response = self.client.post(url, data={'selected_seats': 'A2', 'csrf_token': 'experience-token'})
+        self.assertTrue(response.headers['Location'].endswith(booking.reference))
+        self.assertEqual(booking.expires_at, expires_at)
+        self.assertEqual(Booking.query.one().seat_list, ['A2'])
+        self.assertEqual(SeatHold.query.one().seat_id, 'A2')

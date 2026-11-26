@@ -41,6 +41,8 @@ def auto_migrate():
                   ('tmdb_id', 'INTEGER'), ('cast_json', 'TEXT'),
                   ('youtube_trailer_key', 'VARCHAR(20)'),
                   ('trailer_video_path', 'VARCHAR(300)'),
+                  ('trailer_source', 'VARCHAR(12)'), ('automatic_youtube_key', 'VARCHAR(11)'),
+                  ('cloudinary_trailer_url', 'VARCHAR(500)'), ('tmdb_trailer_checked_at', 'DATETIME'),
                   ('tmdb_legacy_id', 'INTEGER'), ('tmdb_metadata', 'JSON'),
                   ('tmdb_snapshot', 'JSON'), ('tmdb_overrides', 'JSON'),
                   ('tmdb_managed', 'BOOLEAN NOT NULL DEFAULT 0'),
@@ -54,7 +56,7 @@ def auto_migrate():
                    ('verification_source_url', 'VARCHAR(500)'), ('verification_notes', 'TEXT'),
                    ('verification_reviewed_at', 'DATETIME'), ('verification_reviewed_by_id', 'INTEGER')],
         'showtime': [('screen_id', 'INTEGER'), ('price_overrides_json', 'TEXT'),
-                     ('is_cancelled', 'BOOLEAN NOT NULL DEFAULT 0')],
+                     ('is_cancelled', 'BOOLEAN NOT NULL DEFAULT 0'), ('actual_ended_at', 'DATETIME')],
         'booking': [('reference', 'VARCHAR(20)'), ('seat_meta_json', 'TEXT'),
                     ('ticket_amount', 'FLOAT'), ('convenience_fee', 'FLOAT'),
                     ('gst', 'FLOAT'), ('status', "VARCHAR(20)"),
@@ -63,9 +65,17 @@ def auto_migrate():
                     ('ticket_email_error', 'VARCHAR(300)'),
                     ('expires_at', 'DATETIME'), ('is_split_pay', 'BOOLEAN DEFAULT 0'),
                     ('split_token', 'VARCHAR(64)'),
-                    ('snacks_json', 'TEXT'), ('points_redeemed', 'INTEGER DEFAULT 0')],
+                    ('snacks_json', 'TEXT'), ('points_redeemed', 'INTEGER DEFAULT 0'),
+                    ('screen_review_dismissed_at', 'DATETIME')],
+        'screen_review': [('is_demo', 'BOOLEAN NOT NULL DEFAULT 0'),
+                          ('has_screen_feedback', 'BOOLEAN NOT NULL DEFAULT 1'),
+                          ('theatre_rating', 'INTEGER'), ('theatre_review_text', 'VARCHAR(1000)'),
+                          ('theatre_updated_at', 'DATETIME'), ('theatre_withdrawn_at', 'DATETIME')],
         'booked_seat': [('booking_id', 'INTEGER')],
-        'movie_rating': [('has_spoiler', 'BOOLEAN DEFAULT 0')],
+        'movie_rating': [('has_spoiler', 'BOOLEAN DEFAULT 0'), ('booking_id', 'INTEGER REFERENCES booking(id)'),
+                         ('title', 'VARCHAR(120)'), ('verified', 'BOOLEAN NOT NULL DEFAULT 0'),
+                         ('is_demo', 'BOOLEAN NOT NULL DEFAULT 0'), ('hidden', 'BOOLEAN NOT NULL DEFAULT 0'),
+                         ('withdrawn_at', 'DATETIME'), ('updated_at', 'DATETIME')],
     }
     for table, cols in wanted.items():
         if table not in insp.get_table_names():
@@ -88,6 +98,9 @@ def auto_migrate():
         db.session.execute(text('CREATE UNIQUE INDEX ix_movie_tmdb_id ON movie (tmdb_id)'))
     db.session.execute(text(
         'CREATE INDEX IF NOT EXISTS ix_movie_tmdb_refresh ON movie (tmdb_last_checked_at)'))
+    db.session.execute(text(
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_theatre_review_user_venue '
+        'ON screen_review (user_id, theater_id) WHERE theatre_rating IS NOT NULL'))
     for account in User.query.filter((User.alternative_id.is_(None)) | (User.alternative_id == '')).all():
         account.alternative_id = secrets.token_urlsafe(32)
     db.session.commit()
@@ -257,8 +270,16 @@ def init_db(application):
                     'use python database_health.py for diagnostics.'
                 )
             return
-        db.create_all()
-        auto_migrate()
+        with db.engine.connect() as connection:
+            versioned = inspect(connection).has_table('alembic_version') and connection.scalar(
+                text('SELECT version_num FROM alembic_version LIMIT 1'))
+        if versioned:
+            from database_health import SCHEMA_HEAD
+            if versioned != SCHEMA_HEAD:
+                raise RuntimeError('Run python -m alembic upgrade head for this versioned development database.')
+        else:
+            db.create_all()
+            auto_migrate()
         seed_vizag_theaters(db, Theater, Screen)
         seed_sample_movies()
 

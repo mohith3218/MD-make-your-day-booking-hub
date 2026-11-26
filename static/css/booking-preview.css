@@ -1,0 +1,42 @@
+#seat-map-mode-controls > div:first-child { flex-wrap:wrap; min-width:0; max-width:100%; }
+  .immersive-booking-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,360px); gap:0; margin:18px 0 26px; min-height:600px; border:1px solid rgba(255,255,255,.1); border-radius:20px; overflow:hidden; background:#090a0f; box-shadow:0 24px 70px rgba(0,0,0,.38); }
+  .immersive-booking-layout.hidden { display:none; }
+  .immersive-booking-layout.preview-fullscreen { position:fixed; inset:0; z-index:100; margin:0; border-radius:0; overflow:auto; }
+  .immersive-viewer-column { position:relative; min-width:0; min-height:600px; background:#050609; }
+  .immersive-viewer-column #ar-preview-panel { display:block; height:100%; padding:0; border:0; border-radius:0; background:#050609; box-shadow:none; }
+  .immersive-viewer-column #ar-preview-panel > .flex:first-child { position:absolute; z-index:3; margin:14px; padding:0; }
+  .immersive-viewer-column #ar-preview-panel > .flex:first-child > div:first-child,
+  .immersive-viewer-column #ar-preview-panel > .flex:first-child > div:last-child > span { display:none; }
+  .immersive-viewer-column #ar-theater-wrapper { height:100%; min-height:600px; border:0; border-radius:0; }
+  .immersive-viewer-column #inline-camera-controls { top:14px; left:50%; }
+  .immersive-seat-sidebar { position:relative; display:flex; flex-direction:column; padding:25px 20px 18px; min-height:600px; border-left:1px solid rgba(255,255,255,.1); background:#0c0d13; }
+  .immersive-eyebrow { display:flex; align-items:center; justify-content:space-between; margin:0 0 12px; color:#8790a5; font-size:10px; font-weight:800; letter-spacing:.28em; }
+  .immersive-class-card { display:flex; align-items:center; gap:12px; min-height:63px; padding:10px 12px; border:1px solid rgba(255,255,255,.11); border-radius:15px; background:linear-gradient(110deg,rgba(255,255,255,.045),rgba(255,255,255,.012)); }
+  .immersive-class-card strong { display:block; color:#f4f5f8; font-size:13px; line-height:1.2; }
+  .immersive-class-card small { display:block; margin-top:4px; color:#8991a3; font-size:10px; line-height:1.25; }
+  .immersive-class-card b { display:block; color:#f4f5f8; font-size:14px; white-space:nowrap; }
+  .immersive-class-card > div:last-child small { color:#24d6a2; text-align:right; }
+  .immersive-class-swatch { width:5px; height:34px; flex:none; border-radius:8px; background:var(--class-color); box-shadow:0 0 14px color-mix(in srgb,var(--class-color),transparent 65%); }
+  .immersive-legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:13px; color:#9299a9; font-size:10px; }
+  .immersive-legend span { display:flex; align-items:center; gap:6px; }
+  .immersive-legend i { width:9px; height:9px; border-radius:50%; background:#30333e; }
+  .immersive-legend .legend-picked { background:#1ed6ae; }
+  .immersive-size-select { width:100px; border:1px solid rgba(255,255,255,.12); border-radius:24px; padding:9px 11px; background:#12141b; color:#fff; font-size:12px; }
+  .immersive-best-button { flex:1; border:0; border-radius:24px; padding:10px; background:#f7f7f8; color:#111; font-weight:800; font-size:12px; }
+  .immersive-selected-seats { min-height:50px; padding:14px; border:1px dashed rgba(255,255,255,.14); border-radius:14px; color:#9ca5b8; font-size:11px; }
+  .immersive-checkout-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin: auto -20px -18px; padding:18px 20px; border-top:1px solid rgba(255,255,255,.1); }
+  .immersive-checkout-row small { display:block; color:#8991a3; font-size:10px; }
+  .immersive-checkout-row strong { display:block; margin-top:2px; color:#fff; font-size:24px; }
+  .immersive-checkout-row button { border:0; border-radius:13px; padding:12px 20px; background:#f2b936; color:#17120a; font-weight:900; font-size:12px; text-transform:uppercase; letter-spacing:.1em; }
+  .immersive-checkout-row button:disabled { opacity:.4; cursor:not-allowed; }
+  @media (max-width: 900px) { .immersive-booking-layout { grid-template-columns:1fr; } .immersive-viewer-column { min-height:55vh; } .immersive-viewer-column #ar-theater-wrapper { min-height:55vh; } .immersive-seat-sidebar { min-height:0; border-left:0; border-top:1px solid rgba(255,255,255,.1); } .immersive-checkout-row { margin-top:22px; } }
+  @media (max-width: 520px) { .immersive-viewer-column { min-height:390px; } .immersive-viewer-column #ar-theater-wrapper { min-height:390px; } .immersive-seat-sidebar { padding:19px 15px 15px; } .immersive-checkout-row { margin:20px -15px -15px; padding:15px; } }
+  @media (max-width: 520px) {
+    .immersive-viewer-column #inline-camera-controls { top:54px; width:max-content; max-width:calc(100% - 24px); }
+  }
+  #ar-theater-wrapper.theater-expanded { height: 520px; }
+  @media (min-width: 640px) { #ar-theater-wrapper.theater-expanded { height: 680px; } }
+  #ar-canvas-container:fullscreen { width: 100vw; height: 100vh; max-height: none; border: 0; border-radius: 0; }
+  #ar-canvas-container:fullscreen #arCanvas,
+  #ar-canvas-container.vr-immersive #arCanvas { width: 100%; height: 100%; }
+  #ar-canvas-container.vr-immersive { position: fixed; inset: 0; z-index: 100; width: 100vw; height: 100vh; max-height: none; border: 0; border-radius: 0; }

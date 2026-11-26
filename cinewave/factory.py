@@ -16,12 +16,12 @@ def create_app(config=None):
     login_manager.session_protection = 'strong'
     register_hooks(application)
     from types import SimpleNamespace
-    from theatre_discovery import create_theatre_blueprint
+    from cinewave.routes.theatre_discovery import create_theatre_blueprint
     from .models import Theater, Screen, Showtime, Movie
     application.register_blueprint(create_theatre_blueprint(db, SimpleNamespace(
         Theater=Theater, Screen=Screen, Showtime=Showtime, Movie=Movie)))
     from .routes import register_blueprints
     register_blueprints(application)
-    from .services.movie_sync import register_sync_command
+    from .workers.movie_sync import register_sync_command
     register_sync_command(application)
     return application

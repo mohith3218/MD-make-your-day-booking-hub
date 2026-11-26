@@ -1,0 +1,8 @@
+<header class="cw-booking-header">
+  <div class="cw-container cw-booking-header-inner">
+    <a href="{{ url_for('main.home') }}" class="cw-brand" aria-label="CineWave home"><span class="cw-logo"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i></span><span>CineWave</span></a>
+    <p class="cw-booking-context"><i class="fa-solid fa-ticket" aria-hidden="true"></i> Booking terminal <span>·</span> Demo payment flow</p>
+    {% include "components/theme_menu.html" %}
+    <a class="cw-booking-exit" href="{{ url_for('profile.dashboard') }}">My bookings</a>
+  </div>
+</header>

@@ -1,0 +1,28 @@
+{% extends "auth/auth_base.html" %}
+{% block title %}Create your account · CineWave{% endblock %}
+{% block content %}
+<section class="cw-auth" aria-labelledby="auth-title">
+  <div class="cw-auth-layout">
+    <aside class="cw-auth-story" aria-label="About CineWave">
+      <p class="cw-overline">A better movie day starts here</p>
+      <h2>Find your seat<br>in the story.</h2>
+      <p>Discover films across Visakhapatnam, choose the screen that feels right, and keep your plans together in one place.</p>
+      <ul><li><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Theatres across Vizag</li><li><i class="fa-solid fa-ticket" aria-hidden="true"></i> A simpler way to plan screenings</li><li><i class="fa-solid fa-users" aria-hidden="true"></i> Shared plans with your movie crew</li></ul>
+      <span class="cw-auth-story-mark" aria-hidden="true"><i class="fa-solid fa-clapperboard"></i></span>
+    </aside>
+
+    <div class="cw-auth-card">
+      <header class="cw-auth-heading"><p class="cw-overline">Join the CineWave community</p><h1 id="auth-title">Create your account</h1><p>Your next movie day is a few details away.</p></header>
+      <form method="POST" action="{{ url_for('auth.register') }}" class="cw-auth-form" data-auth-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="cw-auth-field"><label for="register-username">Username</label><input id="register-username" type="text" name="username" minlength="3" maxlength="30" pattern="[A-Za-z0-9_.\-]+" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="username-help"><small id="username-help">3–30 characters: letters, numbers, dots, underscores or hyphens.</small></div>
+        <div class="cw-auth-field"><label for="register-email">Email address</label><input id="register-email" type="email" name="email" autocomplete="email" maxlength="120" autocapitalize="none" required></div>
+        <div class="cw-auth-field"><label for="register-phone">Mobile number <span>(optional)</span></label><input id="register-phone" type="tel" name="phone" inputmode="numeric" autocomplete="tel-national" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit number" aria-describedby="phone-help"><small id="phone-help">Use 10 digits, or leave this field blank.</small></div>
+        <div class="cw-auth-field"><label for="register-password">Password</label><div class="cw-auth-password"><input id="register-password" type="password" name="password" minlength="6" maxlength="256" autocomplete="new-password" required aria-describedby="password-help"><button type="button" class="cw-password-toggle" data-password-toggle aria-controls="register-password" aria-pressed="false">Show</button></div><small id="password-help">Use 6–256 characters. Avoid reusing a password from another site.</small></div>
+        <button type="submit" class="cw-button cw-button-primary cw-auth-submit"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Create account</button>
+      </form>
+      <p class="cw-auth-switch">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+    </div>
+  </div>
+</section>
+{% endblock %}

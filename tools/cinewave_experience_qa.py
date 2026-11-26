@@ -20,8 +20,8 @@ from werkzeug.serving import make_server
 from flask import abort
 from app import app, db
 from cinewave.models import Booking, Movie, Payment, Screen, Showtime, Theater, User
-from cinewave.services import movie_sync
-from cinewave.services.movies import TMDBClient
+from cinewave.workers import movie_sync
+from cinewave.integrations.tmdb import TMDBClient
 from cinewave.time import cinema_now
 
 with app.app_context():
@@ -39,18 +39,23 @@ with app.app_context():
     }
     extra_screen = Screen(theater=theater, name='Studio Hall', screen_type='3D')
     film = Movie(title='A Night by the Coast', description='An evening screening in the CineWave test catalogue.',
-                 duration=120, poster='/static/images/cinewave-hero.jpg', backdrop='/static/images/cinewave-hero.jpg')
+                 duration=120, poster='/static/images/cinewave-hero.jpg', backdrop='/static/images/cinewave-hero.jpg',
+                 trailer_source='cloudinary',
+                 cloudinary_trailer_url='https://res.cloudinary.com/demo/video/upload/dog.mp4')
     demo_film = Movie(title='The Bay at Dawn', description='A demo screening for the review booking journey.',
                       duration=95, poster='/static/images/cinewave-hero.jpg')
     upcoming = Movie(title='The Next Wave', description='An upcoming release in the CineWave test catalogue.',
                      duration=100, is_upcoming=True, poster='/static/images/cinewave-hero.jpg',
-                     backdrop='/static/images/cinewave-hero.jpg', featured_order=1)
+                     backdrop='/static/images/cinewave-hero.jpg', featured_order=1,
+                     automatic_youtube_key='M7lc1UVf-VE')
     now = cinema_now()
     shows = [Showtime(movie=demo_film if offset == 1 else film, screen=screen, theater=theater.name,
                       show_date=(now + timedelta(days=offset)).date(), show_time='18:30')
              for offset in (-2, -1, 1, 2)]
+    youtube_show = Showtime(movie=upcoming, screen=screen, theater=theater.name,
+                            show_date=(now + timedelta(days=3)).date(), show_time='18:30')
     references = ('QA-REVIEW-ONE', 'QA-REVIEW-TWO')
-    db.session.add_all([upcoming, extra_screen, *shows])
+    db.session.add_all([youtube_show, extra_screen, *shows])
     for reference, show in zip(references, shows):
         db.session.add(Booking(reference=reference, user=user, showtime=show, seats='A1',
                                status='PAID', total_amount=160,
@@ -71,8 +76,9 @@ with app.app_context():
     server = make_server('127.0.0.1', 0, app)
     print(json.dumps({'port': server.server_port, 'theater': theater.id,
                       'screen': screen.id, 'screenWithoutReviews': extra_screen.id,
-                      'movie': upcoming.id, 'show': shows[-1].id, 'references': references,
-                      'reviewMovie': demo_film.id, 'demoShow': demo_show_id,
+                      'movie': upcoming.id, 'show': shows[-1].id, 'youtubeShow': youtube_show.id,
+                      'references': references,
+                      'reviewMovie': demo_film.id, 'demoShow': demo_show_id, 'trailerMovie': film.id,
                       'importedMovie': imported.id, 'importedTitle': title}), flush=True)
 
 
@@ -91,6 +97,7 @@ with patch('cinewave.routes.auth.password_recovery_is_configured', return_value=
         patch('cinewave.routes.auth.send_password_recovery_email', return_value=False), \
         patch('cinewave.services.seat.dispatch_ticket_delivery', return_value=False), \
         patch('cinewave.models.catalog.cinema_now', side_effect=lambda: now), \
+        patch('cinewave.routes.post_show.cinema_now', side_effect=lambda: now), \
         patch('cinewave.services.movie_reviews.cinema_now', side_effect=lambda: now), \
-        patch('theatre_discovery.cinema_now', side_effect=lambda: now):
+        patch('cinewave.routes.theatre_discovery.cinema_now', side_effect=lambda: now):
     server.serve_forever()

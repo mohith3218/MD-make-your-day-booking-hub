@@ -1,0 +1,78 @@
+{% extends "public_base.html" %}
+{% block title %}My Bookings · MD CineWave{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between gap-3">
+  <div><h1 class="text-2xl font-black text-white">My Bookings</h1><p class="text-xs text-slate-400 mt-1">Your tickets and pending reservations in one place.</p></div>
+  <a href="{{ url_for('wallet.wallet_page') }}" class="text-xs text-slate-400 hover:text-white">Wallet ₹{{ '%.0f'|format(wallet_balance or 0) }}</a>
+</div>
+
+<section id="pending-reviews" class="cw-review-panel" aria-labelledby="pending-reviews-title">
+  <h2 id="pending-reviews-title" class="text-lg font-bold">Pending reviews</h2>
+  {% for item in pending_reviews %}
+    <div class="cw-review-actions">
+      <strong>{{ item.booking.showtime.movie.title }} · {{ item.booking.showtime.theater }}</strong>
+      {% if item.movie %}<a class="cw-review-link" href="{{ url_for('movie_reviews.edit', reference=item.booking.reference) }}">Rate Movie</a>{% endif %}
+      {% if item.theatre %}<a class="cw-review-link" href="{{ url_for('post_show.edit_theatre', reference=item.booking.reference) }}">Rate Theatre</a>{% endif %}
+    </div>
+  {% else %}
+    <p class="cw-muted">You’re up to date.</p>
+  {% endfor %}
+</section>
+
+{% if bookings %}
+  <div class="space-y-4">
+    {% for b in bookings %}
+      {% set colour = {'PAID':'emerald','PENDING':'amber','FAILED':'rose','CANCELLED':'slate','EXPIRED':'slate'}.get(b.status,'slate') %}
+      <div class="glass-card rounded-2xl p-5 border-l-4 border-l-{{ colour }}-500 flex flex-col md:flex-row justify-between gap-4">
+        <div class="space-y-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="text-lg font-bold text-white break-words">{{ b.showtime.movie.title }}</h3>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ colour }}-500/10 text-{{ colour }}-400 border border-{{ colour }}-500/20 uppercase tracking-wider">{{ b.status }}</span>
+          </div>
+          <p class="text-[11px] text-slate-400"><i class="fa-solid fa-building-columns mr-1"></i>{{ b.showtime.theater }} · {{ b.showtime.screen_label }}</p>
+          <p class="text-[11px] text-slate-400"><i class="fa-regular fa-calendar-check mr-1"></i>{{ b.showtime.show_date.strftime('%d %b %Y') }} at {{ b.showtime.show_time }}</p>
+          <p class="text-[11px] text-slate-300 mt-2">Seats: <span class="text-[#C9A84C] font-bold">{{ b.seats }}</span></p>
+          <p class="text-[10px] text-slate-500 font-mono">{{ b.reference }}</p>
+        </div>
+
+        <div class="text-left md:text-right space-y-2 shrink-0">
+          <div>
+            <p class="text-[11px] text-slate-400">{{ 'Demo amount' if b.payment and b.payment.is_demo else 'Recorded amount' }}</p>
+            <p class="text-xl font-black text-white">₹{{ '%.2f'|format(b.total_amount) }}</p>
+            <p class="text-[10px] text-slate-500">{{ b.booked_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+          </div>
+          {% if b.status == 'PAID' %}
+            <a href="{{ url_for('booking.ticket', reference=b.reference) }}" class="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl transition">View ticket</a>
+            {% if review_states[b.id] in ('invite', 'edit') %}
+              <a class="cw-review-link" href="{{ url_for('screen_reviews.edit', reference=b.reference) }}">{{ 'Edit Screen Review' if review_states[b.id] == 'edit' else 'Review This Screen' }}</a>
+            {% endif %}
+            {% if b.id in movie_review_states %}
+              {% if movie_review_states[b.id] == 'edit' %}<span class="cw-review-badge">Movie reviewed</span>{% endif %}
+              {% with booking=b, movie_review_state=movie_review_states[b.id] %}
+                {% include "components/movie_review_actions.html" %}
+              {% endwith %}
+            {% endif %}
+            {% set review = experience_states.get(b.id, {}) %}
+            {% if review.theatre %}
+              {% if review.theatre == 'edit' %}<span class="cw-review-badge">Theatre reviewed</span>{% endif %}
+              <a class="cw-review-link" href="{{ url_for('post_show.edit_theatre', reference=b.reference) }}">{{ 'Edit Theatre Review' if review.theatre == 'edit' else 'Rate Theatre' }}</a>
+            {% endif %}
+          {% elif b.status == 'PENDING' and b.seconds_left > 0 %}
+            <a href="{{ url_for('booking.checkout', reference=b.reference) }}" class="inline-block px-4 py-2 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">
+              Pay now · {{ b.seconds_left // 60 }}m left
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="glass-card cine-empty space-y-4">
+    <span class="cine-empty-icon" aria-hidden="true"><i class="fa-solid fa-ticket text-xl"></i></span>
+    <h2 class="text-xl text-white">Your next movie awaits</h2>
+    <p class="text-sm text-slate-400">Your tickets will appear here after you reserve seats.</p>
+    <a href="{{ url_for('main.home') }}" class="inline-block px-6 py-2.5 bg-[#C9A84C] hover:bg-amber-600 text-white text-xs font-semibold rounded-xl transition">Browse movies</a>
+  </div>
+{% endif %}
+{% endblock %}

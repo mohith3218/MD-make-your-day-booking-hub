@@ -1016,7 +1016,10 @@ body#app-body #seating-viewport.is-3d .seat-btn:hover { z-index:2;transform:tran
   color:var(--cw-primary-dark);background:var(--cw-soft);
   font:700 9px 'Manrope',sans-serif;letter-spacing:.1em;
 }
-.cw-admin-nav { flex:1;align-items:center;justify-content:center;gap:clamp(8px,1vw,16px);font-size:11px; }
+.cw-admin-header .cw-admin-nav {
+  flex:1;min-width:0;align-items:center;justify-content:center;flex-wrap:wrap;
+}
+body#app-body .cw-admin-nav { gap:4px clamp(5px,0.8vw,12px);font-size:11px; }
 .cw-admin-nav a { white-space:nowrap;padding:8px 6px;border-radius:8px; }
 .cw-admin-nav a:hover,.cw-admin-nav a[aria-current] { color:var(--cw-primary-dark);background:var(--cw-soft); }
 .cw-admin-actions { display:flex;align-items:center;gap:11px;white-space:nowrap; }

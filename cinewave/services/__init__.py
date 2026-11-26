@@ -1,4 +1,4 @@
-from .security import load_user, is_valid_email, safe_local_redirect, admin_required, parse_youtube_video_key
+from ..security import load_user, is_valid_email, safe_local_redirect, admin_required, parse_youtube_video_key
 from .wallet import create_wallet, get_wallet
 from .email import smtp_is_configured, send_email, password_recovery_is_configured, send_password_recovery_email, password_reset_throttled, _otp_digest, send_registration_otp, dispatch_ticket_delivery
 from .seat import purge_expired_holds, show_seat_prices, price_seats, release_booking, commit_seats, finalise_paid_booking
