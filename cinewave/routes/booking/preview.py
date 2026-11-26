@@ -1,4 +1,5 @@
 import seat_layout as sl
+from cinewave.integrations.trailers import optimized_projection_url
 from cinewave.models import Screen, Showtime
 from cinewave.services import admin_required, purge_expired_holds
 from datetime import date
@@ -22,7 +23,7 @@ def vr_seat_preview(showtime_id):
         showtime = SimpleNamespace(
             screen=screen_for_preview, layout=screen_for_preview.layout or {},
             theater=screen_for_preview.theater.name,
-            movie=SimpleNamespace(title='Auditorium profile comparison'),
+            movie=SimpleNamespace(title='Auditorium profile comparison', trailer=None),
             show_date=date.today(), show_time='Admin preview',
             price_overrides={}, dynamic_pricing_info={'factor': 1},
             booked_seat_ids=lambda: set(), held_seat_ids=lambda: set(),
@@ -136,7 +137,11 @@ def vr_seat_preview(showtime_id):
         'prices': {'standard': min(prices or [0]), 'vip': max(prices or [0]), 'recliner': max(prices or [0])},
         'defaultSeat': default_seat,
     }
+    trailer = showtime.movie.trailer
+    optimized_url = (optimized_projection_url(trailer['url'])
+                     if trailer and trailer['provider'] == 'cloudinary' else None)
     return render_template('booking/vr_seat_preview.html', showtime=showtime,
                            screen_type=showtime.screen.screen_type or 'Cinema screen',
-                           movie=showtime.movie, preview=preview,
+                           movie=showtime.movie, preview=preview, trailer=trailer,
+                           optimized_trailer_url=optimized_url,
                            embedded=request.args.get('embed') == '1')

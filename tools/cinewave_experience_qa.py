@@ -52,8 +52,10 @@ with app.app_context():
     shows = [Showtime(movie=demo_film if offset == 1 else film, screen=screen, theater=theater.name,
                       show_date=(now + timedelta(days=offset)).date(), show_time='18:30')
              for offset in (-2, -1, 1, 2)]
+    youtube_show = Showtime(movie=upcoming, screen=screen, theater=theater.name,
+                            show_date=(now + timedelta(days=3)).date(), show_time='18:30')
     references = ('QA-REVIEW-ONE', 'QA-REVIEW-TWO')
-    db.session.add_all([upcoming, extra_screen, *shows])
+    db.session.add_all([youtube_show, extra_screen, *shows])
     for reference, show in zip(references, shows):
         db.session.add(Booking(reference=reference, user=user, showtime=show, seats='A1',
                                status='PAID', total_amount=160,
@@ -74,7 +76,8 @@ with app.app_context():
     server = make_server('127.0.0.1', 0, app)
     print(json.dumps({'port': server.server_port, 'theater': theater.id,
                       'screen': screen.id, 'screenWithoutReviews': extra_screen.id,
-                      'movie': upcoming.id, 'show': shows[-1].id, 'references': references,
+                      'movie': upcoming.id, 'show': shows[-1].id, 'youtubeShow': youtube_show.id,
+                      'references': references,
                       'reviewMovie': demo_film.id, 'demoShow': demo_show_id, 'trailerMovie': film.id,
                       'importedMovie': imported.id, 'importedTitle': title}), flush=True)
 

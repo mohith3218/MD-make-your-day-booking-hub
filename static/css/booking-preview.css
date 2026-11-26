@@ -31,6 +31,9 @@
   .immersive-checkout-row button:disabled { opacity:.4; cursor:not-allowed; }
   @media (max-width: 900px) { .immersive-booking-layout { grid-template-columns:1fr; } .immersive-viewer-column { min-height:55vh; } .immersive-viewer-column #ar-theater-wrapper { min-height:55vh; } .immersive-seat-sidebar { min-height:0; border-left:0; border-top:1px solid rgba(255,255,255,.1); } .immersive-checkout-row { margin-top:22px; } }
   @media (max-width: 520px) { .immersive-viewer-column { min-height:390px; } .immersive-viewer-column #ar-theater-wrapper { min-height:390px; } .immersive-seat-sidebar { padding:19px 15px 15px; } .immersive-checkout-row { margin:20px -15px -15px; padding:15px; } }
+  @media (max-width: 520px) {
+    .immersive-viewer-column #inline-camera-controls { top:54px; width:max-content; max-width:calc(100% - 24px); }
+  }
   #ar-theater-wrapper.theater-expanded { height: 520px; }
   @media (min-width: 640px) { #ar-theater-wrapper.theater-expanded { height: 680px; } }
   #ar-canvas-container:fullscreen { width: 100vw; height: 100vh; max-height: none; border: 0; border-radius: 0; }

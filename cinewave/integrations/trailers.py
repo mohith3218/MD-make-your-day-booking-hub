@@ -50,6 +50,17 @@ def cloudinary_video_url(value):
     return None
 
 
+def optimized_projection_url(url):
+    """Size plain Cloudinary uploads for projection, preserving authored transformations."""
+    url = cloudinary_video_url(url)
+    if not url:
+        return None
+    base, separator, asset = url.partition('/video/upload/')
+    if separator and ('/' not in asset or re.match(r'v[0-9]+/', asset)):
+        return f'{base}/video/upload/c_limit,h_480,w_960/q_auto/{asset}'
+    return None
+
+
 def player(source, *, youtube=None, cloudinary=None):
     if source == 'cloudinary':
         url = cloudinary_video_url(cloudinary)

@@ -5,7 +5,7 @@ const reservedSeats = bookingContext.reservedSeats;
 const draftKey = bookingContext.draftKey;
 const selected = new Map();
 let activePovSeat = null;
-let arTrailerMode = false;
+let pendingPreviewTrailer = false;
 let showExitPathHighlight = false;
 const povView = { yaw: 0, pitch: 0, format: 'wide', crowd: true, dim: true, recline: 0, dragging: false, x: 0, y: 0 };
 const input = document.getElementById('selected_seats_input');
@@ -1080,23 +1080,11 @@ function handleGyroEvent(e) {
   refreshPovViews();
 }
 
-function toggleVrTrailer() {
-  open3dArModal(!arTrailerMode);
-}
-
 function attachPovDrag(canvas) {
   if (!canvas) return;
   if (canvas.dataset.povDragReady === 'true') return;
   canvas.dataset.povDragReady = 'true';
   canvas.style.touchAction = 'none';
-
-  canvas.addEventListener('click', event => {
-    const rect = canvas.getBoundingClientRect();
-    const clickY = event.clientY - rect.top;
-    if (clickY > rect.height * 0.35 && clickY < rect.height * 0.65) {
-      if (!arTrailerMode) openTrailerWithSeatPOV();
-    }
-  });
 
   canvas.addEventListener('pointerdown', event => {
     if (event.target !== canvas) return;
@@ -1327,7 +1315,7 @@ function toggleTheaterView(mode) {
     document.getElementById('immersive-booking-layout')?.classList.remove('hidden');
     ensureInlinePreview();
     postVRPreviewState();
-    document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:resume' }, window.location.origin);
+    syncVRPreviewActivity();
   } else {
     btn2d.className = "px-3 py-1 rounded-lg text-xs font-bold transition bg-[#C9A84C] text-white shadow";
     btn3d.className = "px-3 py-1 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
@@ -1339,7 +1327,7 @@ function toggleTheaterView(mode) {
     theaterWrapper.classList.remove('theater-expanded');
     btn3d.setAttribute('aria-pressed', 'false');
     btn2d.setAttribute('aria-pressed', 'true');
-    document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:pause' }, window.location.origin);
+    syncVRPreviewActivity();
   }
 }
 
@@ -1435,36 +1423,38 @@ function suggestSmartSeats() {
   }
 }
 
-const trailerKey = bookingContext.movie.trailerKey;
-const uploadedTrailerUrl = bookingContext.movie.videoUrl;
-
-function openTrailerWithSeatPOV() {
-  open3dArModal(true);
-}
-
-function closeTrailerModal() {
-  const modal = document.getElementById('trailerModal');
-  const iframe = document.getElementById('trailer-iframe');
-  const video = document.getElementById('trailer-video');
-  iframe.src = '';
-  if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
-  modal.classList.add('hidden');
-}
-
 function open3dArModal(showTrailer = false) {
   toggleTheaterView('3d');
-  arTrailerMode = showTrailer;
+  pendingPreviewTrailer = showTrailer;
   activePovSeat ||= document.querySelector('.seat-btn.seat-sel[data-seat]') || document.querySelector('.seat-btn.seat-avail[data-seat]');
   document.getElementById('immersive-booking-layout').classList.add('preview-fullscreen');
   document.getElementById('close-full-preview').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  syncVRPreviewActivity();
 }
 
 function close3dArModal() {
-  document.getElementById('immersive-booking-layout')?.classList.remove('preview-fullscreen');
+  const layout = document.getElementById('immersive-booking-layout');
+  if (layout?.classList.contains('preview-fullscreen')) {
+    document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:pause-trailer' }, location.origin);
+    layout.classList.remove('preview-fullscreen');
+  }
   document.getElementById('close-full-preview')?.classList.add('hidden');
   document.body.style.overflow = '';
-  arTrailerMode = false;
+  pendingPreviewTrailer = false;
+}
+
+function syncVRPreviewActivity() {
+  const frame = document.getElementById('vr-inline-frame');
+  if (!frame?.dataset.loaded || !frame.contentWindow) return;
+  const bounds = frame.getBoundingClientRect();
+  const active = document.getElementById('btn-view-3d').getAttribute('aria-pressed') === 'true'
+    && !document.hidden && bounds.height > 0 && bounds.bottom > 0 && bounds.top < window.innerHeight;
+  frame.contentWindow.postMessage({ type: active ? 'cinewave:resume' : 'cinewave:pause' }, location.origin);
+  if (active && frame.dataset.ready && pendingPreviewTrailer) {
+    pendingPreviewTrailer = false;
+    frame.contentWindow.postMessage({ type: 'cinewave:show-trailer' }, location.origin);
+  }
 }
 
 function postVRPreviewState(isInitial = false, onlyFrame = null, cameraRequest = false) {
@@ -1490,9 +1480,10 @@ window.addEventListener('message', event => {
   const fromPreview = frames.some(frame => frame && event.source === frame.contentWindow);
   if (!fromPreview || event.origin !== window.location.origin) return;
   if (event.data?.type === 'cinewave:ready') {
-    postVRPreviewState(false, document.getElementById('vr-inline-frame'));
-    const active = document.getElementById('btn-view-3d').getAttribute('aria-pressed') === 'true';
-    event.source.postMessage({type:active ? 'cinewave:resume' : 'cinewave:pause'}, location.origin);
+    const frame = frames[0];
+    frame.dataset.ready = 'true';
+    postVRPreviewState(false, frame);
+    syncVRPreviewActivity();
     return;
   }
   if (event.data?.type === 'cinewave:fallback-close') {
@@ -1703,6 +1694,9 @@ window.addEventListener('resize', () => {
 });
 
 const inlineVrFrame = document.getElementById('vr-inline-frame');
+if (inlineVrFrame && 'IntersectionObserver' in window) new IntersectionObserver(syncVRPreviewActivity).observe(inlineVrFrame);
+document.addEventListener('visibilitychange', syncVRPreviewActivity);
+window.addEventListener('pageshow', syncVRPreviewActivity);
 const immersiveSection = document.createElement('section');
 immersiveSection.id = 'immersive-booking-layout';
 immersiveSection.className = 'immersive-booking-layout hidden';
@@ -1740,8 +1734,7 @@ function ensureInlinePreview() {
     if (!inlineVrFrame.getAttribute('src')) return;
     inlineVrFrame.dataset.loaded = 'true';
     postVRPreviewState(true, inlineVrFrame);
-    const active = document.getElementById('btn-view-3d').getAttribute('aria-pressed') === 'true';
-    inlineVrFrame.contentWindow.postMessage({type: active ? 'cinewave:resume' : 'cinewave:pause'}, location.origin);
+    syncVRPreviewActivity();
   };
   inlineVrFrame.src = inlineVrFrame.dataset.src;
 }

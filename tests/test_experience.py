@@ -110,6 +110,32 @@ class ExperienceTests(unittest.TestCase):
         self.admin.post(url, data={**form, 'trailer_action': 'auto'})
         self.assertEqual(self.movie.trailer['url'], 'https://www.youtube-nocookie.com/embed/Matching_01')
 
+    def test_auditorium_receives_only_the_selected_validated_trailer(self):
+        show = self.screening(1)
+        path = f'/book/{show.id}/vr-preview?embed=1'
+        edit_path = f'/admin/movie/{self.movie.id}/trailer'
+        source = 'https://res.cloudinary.com/demo/video/upload/v42/trailers/film.mp4'
+        self.admin.post(edit_path, data={'csrf_token': 'experience-token',
+                                        'trailer_source': 'cloudinary', 'cloudinary_trailer': source})
+        preview = self.client.get(path).get_data(as_text=True)
+        self.assertIn(f'data-src="{source}"', preview)
+        self.assertIn('/upload/c_limit,h_480,w_960/q_auto/v42/trailers/film.mp4', preview)
+        self.assertNotIn('TearsOfSteel', preview)
+        self.assertNotIn('id="trailer-modal"', preview)
+
+        self.movie.cloudinary_trailer_url = 'https://example.invalid/film.mp4'
+        db.session.commit()
+        preview = self.client.get(path).get_data(as_text=True)
+        self.assertNotIn('example.invalid/film.mp4', preview)
+        self.assertNotIn('id="projection-video"', preview)
+
+        self.admin.post(edit_path, data={'csrf_token': 'experience-token',
+                                        'trailer_source': 'youtube', 'youtube_trailer': 'Matching_01'})
+        preview = self.client.get(path).get_data(as_text=True)
+        self.assertIn('https://www.youtube-nocookie.com/embed/Matching_01', preview)
+        self.assertIn('id="trailer-modal"', preview)
+        self.assertNotIn('id="projection-video"', preview)
+
     def test_review_prompt_booking_eligibility_and_venue_edit(self):
         completed = self.paid(self.screening(-2))
         upcoming = self.paid(self.screening(1))

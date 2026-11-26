@@ -29,6 +29,7 @@ class Element {
     setAttribute(k,v) { this.attrs[k]=v; }
     getAttribute(k) { return this.attrs[k] ?? null; }
     hasAttribute(k) { return k in this.attrs; }
+    getBoundingClientRect() { return { top: 20, bottom: 420, height: 400 }; }
     set src(value) { this.loads++; this.attrs.src=value; }
     replaceChildren(...children) { this.children=children; }
     appendChild(child) { this.children.push(child); }
@@ -51,7 +52,7 @@ function booking() {
                 || selector.includes('seat-held') && s.classes.has('seat-held')
                 || selector.includes('data-party-owner') && s.dataset.partyOwner);
         }};
-    const ctx=vm.createContext({bookingContext, document:doc, window:{location:{origin:'http://localhost'},addEventListener:(type,fn)=>listeners[type]=fn},
+    const ctx=vm.createContext({bookingContext, document:doc, window:{innerHeight:768,location:{origin:'http://localhost'},addEventListener:(type,fn)=>listeners[type]=fn},
         location:{origin:'http://localhost',href:'http://localhost/book/1'}, history:{replaceState(){}}, URL,
         navigator:{clipboard:{writeText:async()=>{}}},
         setInterval:fn=>{timers.add(fn);return fn;},clearInterval:fn=>timers.delete(fn),
@@ -59,7 +60,7 @@ function booking() {
         input:{value:''},display:{},priceOut:{},btn:{},classLine:{},
         updateInspector(){},showSeatARPreview(){},renderVRCinemaSeatMap(){},draw3dArScreen(){},updateImmersiveBookingPanel(){},alert(){},
     });
-    vm.runInContext(`const selected=new Map(), reservedSeats=[], draftKey='test'; let activePovSeat=null,arTrailerMode=false,activePartyCode=''; const partyCSRF='fixture', MAX_SEATS=2;let inlineTourTimer=null; const inlineVrFrame=document.getElementById('vr-inline-frame');function toggleInlineTour(){inlineTourTimer=null;}`
+    vm.runInContext(`const selected=new Map(), reservedSeats=[], draftKey='test'; let activePovSeat=null,pendingPreviewTrailer=false,activePartyCode=''; const partyCSRF='fixture', MAX_SEATS=2;let inlineTourTimer=null; const inlineVrFrame=document.getElementById('vr-inline-frame');function toggleInlineTour(){inlineTourTimer=null;}`
         + slice('  function paint(', '  // Build the booking view')
         + slice('  function toggleSeatSelection(', "  document.querySelectorAll('.seat-btn').forEach(b => {")
         + slice('  // ---- WATCH TOGETHER:', '  let availabilityPollRunning')
@@ -99,6 +100,19 @@ test('an iframe finishing load after return to 2D stays paused',()=>{
     const p=booking(); p.run("toggleTheaterView('3d');toggleTheaterView('2d')");
     p.elements['vr-inline-frame'].onload();
     assert.equal(p.messages.at(-1).type,'cinewave:pause');
+});
+
+test('the trailer shortcut waits for the same-origin preview and sends one play request',()=>{
+    const p=booking(), frame=p.elements['vr-inline-frame'];
+    p.run('open3dArModal(true)');
+    frame.onload();
+    assert.equal(p.messages.some(message => message.type === 'cinewave:show-trailer'), false);
+    const ready = {source: frame.contentWindow, data: {type: 'cinewave:ready'}};
+    p.listeners.message({...ready, origin: 'https://other.invalid'});
+    assert.equal(p.messages.some(message => message.type === 'cinewave:show-trailer'), false);
+    p.listeners.message({...ready, origin: 'http://localhost'});
+    p.run('syncVRPreviewActivity()');
+    assert.equal(p.messages.filter(message => message.type === 'cinewave:show-trailer').length, 1);
 });
 
 test('2D picks, prices and classes reach 3D; 3D picks update the same booking input',()=>{

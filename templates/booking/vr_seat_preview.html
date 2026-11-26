@@ -1,3 +1,4 @@
+{% from "components/trailer.html" import trailer_button, trailer_modal %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -10,6 +11,12 @@
     <script src="{{ url_for('static', filename='js/three-r128.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/seat-preview-state.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cinema-seat-geometry.js') }}"></script>
+    {% if trailer and trailer.provider == 'cloudinary' %}
+    <script src="{{ url_for('static', filename='js/seat-preview-trailer.js') }}"></script>
+    {% elif trailer %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/trailer.css') }}">
+    <script defer src="{{ url_for('static', filename='js/trailer.js') }}"></script>
+    {% endif %}
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -200,6 +207,31 @@
         #metrics-panel > div:first-child span:first-child { color: #d4bd83; }
         #metric-seat-title { font-size: 20px; letter-spacing: -.02em; }
         #screen-content-select { max-width: 225px; }
+        #projection-toolbar {
+            position: fixed; z-index: 24; right: 12px; bottom: 74px;
+            max-width: calc(100% - 24px); padding: 5px; border-radius: 12px;
+            color: #f1f5f9; background: #0c1119f2; border: 1px solid #72757c;
+            font-size: 12px;
+        }
+        .preview-embedded #projection-toolbar { bottom: 52px; }
+        .webgl-fallback #projection-toolbar[data-native-projection] { display: none; }
+        #projection-video { display: none; }
+        #projection-toolbar :is(button, a) {
+            display: inline-flex; align-items: center; min-height: 38px; padding: 5px 9px;
+            border-radius: 7px; color: inherit; white-space: nowrap;
+        }
+        #projection-toolbar :is(button, a):focus-visible { outline: 2px solid #ffe8a6; }
+        #projection-toolbar [aria-pressed="true"] { background: #49391c; color: #ffe8a6; }
+        #projection-toolbar [data-projection-controls]:not([hidden]) { display: inline-flex; flex-wrap: wrap; align-items: center; }
+        #projection-toolbar [hidden], #projection-toolbar p:empty { display: none; }
+        #projection-toolbar p { margin: 4px 9px; }
+        #projection-toolbar [data-projection-external] { text-decoration: underline; }
+        @media (max-width: 760px) {
+            #projection-toolbar :is(button, a) { min-height: 42px; }
+        }
+        .cw-trailer-dialog { --cw-ink: #f1f5f9; --cw-surface: #121722; --cw-line: #72757c; margin: auto; }
+        .cw-trailer-dialog button { padding: 8px 12px; border: 1px solid var(--cw-line); border-radius: 7px; }
+        .cw-trailer-dialog a { display: inline-block; text-decoration: underline; }
         #minimap-drawer .fa-compass { color: #d4bd83; }
         button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--cine-gold); outline-offset: 3px; }
         #preview-loading { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; pointer-events: none; background: #080a10; transition: opacity .25s ease; }
@@ -422,15 +454,15 @@
 
             <div class="h-5 w-[1px] bg-white/10 mx-0.5 hidden md:block"></div>
 
-            <!-- Live Movie Trailer Switcher -->
+            <!-- Procedural screen modes for sightline and lighting previews. -->
             <div class="flex items-center gap-1.5 neo-inset px-2.5 py-1 rounded-xl">
                 <i class="fa-solid fa-circle-play text-amber-400 text-xs"></i>
-                <select id="screen-content-select" onchange="switchScreenContent(this.value)" class="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer">
-                    <option value="blockbuster" class="bg-slate-900 text-white">Now Playing: {{ movie.title }}</option>
+                <select id="screen-content-select" aria-label="Cinema screen content" onchange="switchScreenContent(this.value)" class="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer">
+                    <option value="title" class="bg-slate-900 text-white">Movie title card</option>
+                    {% if trailer and trailer.provider == 'cloudinary' %}<option value="trailer" class="bg-slate-900 text-white">Trailer</option>{% endif %}
                     <option value="scifi" class="bg-slate-900 text-white">Sci-Fi screen demo</option>
                     <option value="atmos" class="bg-slate-900 text-white">Audio field visualization (simulated)</option>
                     <option value="calibration" class="bg-slate-900 text-white">Sightline calibration grid (demo)</option>
-                    <option value="custom" class="bg-slate-900 text-white">Load Custom MP4 Trailer Stream...</option>
                 </select>
             </div>
         </div>
@@ -684,32 +716,6 @@
         </div>
     </aside>
 
-    <!-- Custom Video URL Modal -->
-    <div id="custom-video-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-md p-4">
-        <div class="neo-panel max-w-md w-full rounded-3xl p-6 border border-cyan-500/30">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-display font-bold text-lg text-white flex items-center gap-2">
-                    <i class="fa-solid fa-film text-cyan-400"></i> Project Custom Movie Stream
-                </h3>
-                <button onclick="closeCustomVideoModal()" class="text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-            <p class="text-xs text-slate-400 mb-3">
-                Paste a direct MP4/WebM video stream URL to project onto the curved 3D screen with real-time dynamic floor & wall light bounce.
-            </p>
-            <input id="custom-video-input" type="url"
-                value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
-                class="w-full neo-inset px-3.5 py-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-cyan-400 mb-4">
-            <div class="flex justify-end gap-2">
-                <button onclick="closeCustomVideoModal()" class="neo-btn px-4 py-2 rounded-xl text-xs font-medium text-slate-300">Cancel</button>
-                <button onclick="applyCustomVideoUrl()" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-[#C9A84C] to-amber-400 text-slate-950">
-                    Project on 3D Screen
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- DIGITAL E-TICKET & QR PASS CHECKOUT MODAL -->
     <div id="booking-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-md p-4">
         <div class="neo-panel max-w-md w-full rounded-3xl p-6 border border-[#C9A84C]/40 relative overflow-hidden">
@@ -765,8 +771,24 @@
         <span id="toast-text">Seat confirmed!</span>
     </div>
 
-    <!-- Hidden Video Element for Custom Video URL Projection -->
-    <video id="custom-video-el" crossorigin="anonymous" playsinline loop muted class="hidden"></video>
+    {% if trailer and trailer.provider == 'cloudinary' %}
+    <div id="projection-toolbar" role="group" aria-label="Cinema screen trailer" data-native-projection>
+        <button type="button" data-projection-toggle aria-pressed="false">Trailer</button>
+        <div data-projection-controls hidden>
+            <button type="button" data-projection-play>Play</button>
+            <button type="button" data-projection-restart>Restart</button>
+            <button type="button" data-projection-sound>Unmute</button>
+        </div>
+        <p data-projection-status role="status"></p>
+        <a data-projection-external href="{{ trailer.external }}" target="_blank" rel="noopener noreferrer" hidden>Open original trailer</a>
+    </div>
+    <video id="projection-video" data-src="{{ trailer.url }}"
+           {% if optimized_trailer_url %}data-optimized-src="{{ optimized_trailer_url }}"{% endif %}
+           crossorigin="anonymous" preload="none" playsinline loop muted hidden></video>
+    {% elif trailer %}
+    <div id="projection-toolbar">{{ trailer_button(trailer, 'Watch Trailer', 'neo-btn') }}</div>
+    {{ trailer_modal() }}
+    {% endif %}
 
     <script>
         // Make renderer failures visible on the preview itself instead of leaving a black canvas.
@@ -777,6 +799,7 @@
             const message = String(error && (error.message || error.reason || error) || 'Unknown rendering error');
             const detail = document.getElementById('fallback-explanation');
             if (detail) detail.textContent = `3D preview unavailable (${message}). Use this seat map or return to the booking page.`;
+            document.getElementById('projection-video')?.pause();
         }
         window.addEventListener('error', event => showPreviewRuntimeError(event.message || event.error));
         window.addEventListener('unhandledrejection', event => showPreviewRuntimeError(event.reason));
@@ -868,7 +891,7 @@
         let cameraMode = 'overview'; // Start from the back of the auditorium, facing the screen.
         let isVRStereo = false;
         let lightingMode = 'movie'; // 'movie' | 'preshow' | 'house'
-        let screenChannel = 'blockbuster';
+        let screenChannel = 'title';
         let reclineLevel = 0; // 0 = 0°, 1 = 25°, 2 = 45°
 
         // 3D Exit Doors & Floor Egress Path State
@@ -932,13 +955,17 @@
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             animationFrameId = 0;
         }
+        function pausePreviewPlayback() {
+            projectionTrailer?.pause();
+            const dialog = document.getElementById('trailer-modal');
+            if (dialog?.open) dialog.close();
+        }
         function destroyPreview() {
             if (animationDestroyed) return;
             animationDestroyed = true;
             pauseAnimationLoop();
-            customVideoEl.pause();
-            customVideoEl.removeAttribute('src');
-            customVideoEl.load();
+            pausePreviewPlayback();
+            projectionTrailer?.release();
             const geometries = new Set(), materials = new Set(), textures = new Set([screenTexture, seatFabricTexture]);
             scene.traverse(object => {
                 if (object.geometry) geometries.add(object.geometry);
@@ -959,13 +986,33 @@
             pauseAnimationLoop();
             showPreviewRuntimeError('Graphics memory was exhausted. Use the seat map or reload the preview.');
         });
-        document.addEventListener('visibilitychange', () => document.hidden ? pauseAnimationLoop() : startAnimationLoop());
-        window.addEventListener('pagehide', destroyPreview, { once: true });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                pausePreviewPlayback();
+                pauseAnimationLoop();
+            } else {
+                startAnimationLoop();
+            }
+        });
+        window.addEventListener('pagehide', event => {
+            if (!event.persisted) {
+                destroyPreview();
+                return;
+            }
+            pauseAnimationLoop();
+            pausePreviewPlayback();
+            projectionTrailer?.release();
+            if (screenChannel === 'trailer') switchScreenContent('title');
+        });
+        window.addEventListener('pageshow', event => {
+            if (event.persisted) startAnimationLoop();
+        });
         window.addEventListener('message', event => {
             if (event.origin !== location.origin || event.source !== window.parent) return;
             // Tab visibility must not override a pause requested by the booking page.
             if (event.data?.type === 'cinewave:pause') {
                 previewPausedByParent = true;
+                pausePreviewPlayback();
                 pauseAnimationLoop();
             }
             if (event.data?.type === 'cinewave:resume') {
@@ -973,6 +1020,8 @@
                 resizePreview();
                 startAnimationLoop();
             }
+            if (event.data?.type === 'cinewave:pause-trailer') pausePreviewPlayback();
+            if (event.data?.type === 'cinewave:show-trailer' && !previewPausedByParent) switchScreenContent('trailer');
         });
 
         // Ambient & House Lights
@@ -1030,6 +1079,19 @@
         screenTexture.encoding = THREE.sRGBEncoding;
         screenTexture.minFilter = THREE.LinearFilter;
         screenTexture.magFilter = THREE.LinearFilter;
+        let screenSurfaceAspect = screenCanvas.width / screenCanvas.height;
+        const projectionVideo = document.getElementById('projection-video');
+        const projectionToolbar = document.getElementById('projection-toolbar');
+        const projectionTrailer = projectionVideo && createSeatPreviewTrailer(projectionVideo, projectionToolbar,
+            () => !previewPausedByParent && !document.hidden && !animationDestroyed && !document.body.classList.contains('webgl-fallback'));
+        projectionToolbar?.querySelector('[data-projection-toggle]')?.addEventListener('click', () => {
+            switchScreenContent(screenChannel === 'trailer' ? 'title' : 'trailer');
+        });
+        const projectionLights = [screenLightLeft, screenLightCenter, screenLightRight];
+        const projectionLightColor = new THREE.Color();
+        function setProjectionLight(zone, r, g, b) {
+            projectionLights[zone].color.lerp(projectionLightColor.setRGB(r, g, b), 0.45);
+        }
 
         const stars = Array.from({ length: 150 }, () => ({
             x: Math.random() * 1024,
@@ -1046,8 +1108,6 @@
             r: 1.5 + Math.random() * 3.5,
             alpha: 0.4 + Math.random() * 0.6
         }));
-
-        const customVideoEl = document.getElementById('custom-video-el');
 
         function drawScreenMovieTitle(ctx, title, width, height, color, glowColor, baseSize = 64) {
             const maxWidth = width * 0.84;
@@ -1092,15 +1152,14 @@
             const w = screenCanvas.width;
             const h = screenCanvas.height;
 
-            if (screenChannel === 'custom' && customVideoEl.readyState >= 2) {
-                sCtx.drawImage(customVideoEl, 0, 0, w, h);
-                screenLightCenter.color.setHSL((time * 0.07) % 1, 0.75, 0.55);
-                screenTexture.needsUpdate = true;
+            if (screenChannel === 'trailer') {
+                if (projectionTrailer.draw(sCtx, w, h, screenSurfaceAspect, performance.now(), setProjectionLight)) {
+                    screenTexture.needsUpdate = true;
+                }
                 return;
             }
 
-            if (screenChannel === 'blockbuster') {
-                // High-Octane Indian Blockbuster Trailer ("PUSHPA 2 / DEVARA 4K ATMOS")
+            if (screenChannel === 'title') {
                 const pulse = Math.sin(time * 2.1) * 0.5 + 0.5;
                 const bgGrad = sCtx.createRadialGradient(w * 0.5, h * 0.58, 30, w * 0.5, h * 0.5, w * 0.65);
                 bgGrad.addColorStop(0, `hsl(${28 + pulse * 14}, 95%, 26%)`);
@@ -1155,7 +1214,7 @@
                 sCtx.font = '600 15px "Inter", sans-serif';
                 sCtx.textAlign = 'center';
                 sCtx.fillStyle = '#fde68a';
-                sCtx.fillText(`REAL-TIME 3D SEAT POV: ${activePOVSeatId}  •  DOLBY ATMOS 64-CH`, w / 2, h * 0.64, w * 0.84);
+                sCtx.fillText(`SEAT PREVIEW · ${activePOVSeatId}`, w / 2, h * 0.64, w * 0.84);
                 sCtx.restore();
 
                 // Sync Ambilight bounce to warm gold/crimson
@@ -1552,6 +1611,7 @@
             const screenGeo = thetaLength
                 ? new THREE.CylinderGeometry(radius, radius, screenHeightM, 64, 1, true, thetaStart, thetaLength)
                 : new THREE.PlaneGeometry(screenWidthM, screenHeightM);
+            screenSurfaceAspect = (thetaLength ? radius * thetaLength : screenWidthM) / screenHeightM;
             if (thetaLength) {
                 screenGeo.scale(-1, 1, 1);
                 const uvAttr = screenGeo.attributes.uv;
@@ -3410,29 +3470,11 @@
         }
 
         function switchScreenContent(channel) {
-            if (channel === 'custom') {
-                document.getElementById('custom-video-modal').classList.remove('hidden');
-                document.getElementById('custom-video-modal').classList.add('flex');
-                return;
-            }
+            if (channel === 'trailer' && !projectionTrailer) return;
             screenChannel = channel;
+            document.getElementById('screen-content-select').value = channel;
             lastScreenUpdateAt = -Infinity;
-            customVideoEl.pause();
-        }
-
-        function closeCustomVideoModal() {
-            document.getElementById('custom-video-modal').classList.add('hidden');
-            document.getElementById('custom-video-modal').classList.remove('flex');
-        }
-
-        function applyCustomVideoUrl() {
-            const url = document.getElementById('custom-video-input').value.trim();
-            if (url) {
-                customVideoEl.src = url;
-                customVideoEl.play().catch(() => {});
-                screenChannel = 'custom';
-            }
-            closeCustomVideoModal();
+            projectionTrailer?.select(channel === 'trailer');
         }
 
         let seatDetailsCollapsed = false;
@@ -3526,13 +3568,13 @@
             const cameraBlend = 1 - Math.exp(-6 * delta);
             const rotationBlend = 1 - Math.exp(-8 * delta);
 
-            // 1. Update Live Blockbuster Movie Screen Canvas & Ambilight
+            // 1. Update the cinema screen texture and its room lighting.
             // Canvas painting and texture uploads need not match camera FPS.
-            // Keep custom video responsive and restrain decorative motion when requested.
+            // Keep the trailer responsive and restrain decorative motion when requested.
             const screenFps = renderQuality === 'low' ? 12 : (renderQuality === 'balanced' ? 20 : 30);
-            const screenInterval = reducedMotion && screenChannel !== 'custom' ? 500 : 1000 / screenFps;
+            const screenInterval = reducedMotion && screenChannel !== 'trailer' ? 500 : 1000 / screenFps;
             if (now - lastScreenUpdateAt >= screenInterval) {
-                renderDynamicScreenCanvas(reducedMotion && screenChannel !== 'custom' ? 0 : elapsed);
+                renderDynamicScreenCanvas(reducedMotion && screenChannel !== 'trailer' ? 0 : elapsed);
                 lastScreenUpdateAt = now;
             }
 
