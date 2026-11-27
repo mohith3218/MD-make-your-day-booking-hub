@@ -1,7 +1,11 @@
 from cinewave.config import PARTY_LIFETIME
 from cinewave.integrations.tmdb import TMDBClient
 from cinewave.integrations.tmdb import TMDBError
+from cinewave.integrations.tmdb import LANGUAGES
+from cinewave.integrations.tmdb import authorized_poster_url
+from cinewave.integrations.tmdb import clean_text
 from cinewave.integrations.tmdb import image_url
+from cinewave.integrations.tmdb import meaningful_overview
 from cinewave.integrations.tmdb import minimum_metadata
 from cinewave.integrations.tmdb import movie_metadata
 from cinewave.integrations.tmdb import parse_release_date
@@ -14,7 +18,7 @@ from cinewave.models import PartySession
 from cinewave.models import SeatHold
 from cinewave.models import SeatLock
 from cinewave.models import Showtime
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from flask import abort
 from cinewave.time import cinema_now
 from flask import current_app as app
@@ -29,7 +33,6 @@ from flask import url_for
 from cinewave.services import admin_required
 from cinewave.workers.movie_sync import apply_metadata
 from cinewave.workers.movie_sync import create_movie
-from cinewave.workers.movie_sync import credentials_configured
 from cinewave.workers.movie_sync import matching_local_movie
 from cinewave.workers.movie_sync import request_movie_sync
 from cinewave.workers.movie_sync import utc_now
@@ -76,10 +79,13 @@ def queue_movie_sync():
     guard = admin_required()
     if guard:
         return guard
-    if not credentials_configured():
-        abort(400, description='Configure TMDB credentials first.')
-    request_movie_sync()
-    flash('TMDB synchronization queued for the next worker check-in.')
+    try:
+        request_movie_sync()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash('CineWave could not queue synchronization. Check the database and Alembic revision.')
+    else:
+        flash('TMDB synchronization queued for the next external worker check-in.')
     return redirect(url_for('admin.admin', _anchor='movie-sync'), code=303)
 
 
@@ -196,27 +202,52 @@ def import_movie():
     if guard:
         return guard
     results, query = [], request.args.get('query', '').strip()[:120]
+    page = min(500, max(1, request.args.get('page', 1, type=int)))
+    total_pages, search_error = 0, None
     if query:
         try:
-            with TMDBClient(attempts=1) as client:
-                items = client.search(query).get('results')
-            if not isinstance(items, list):
+            with TMDBClient(attempts=2) as client:
+                if re.fullmatch(r'[0-9]{1,10}', query) and 0 < int(query) <= 2_147_483_647:
+                    item = client.get(f'/movie/{int(query)}', append_to_response='release_dates')
+                    if item.get('id') != int(query):
+                        raise TMDBError('TMDB returned details for an unexpected movie.')
+                    regional = movie_metadata(item, client.region)['release_date']
+                    if regional:
+                        item['release_date'] = regional.isoformat()
+                    items, total_pages, page = [item], 1, 1
+                else:
+                    payload = client.search(query, page=page)
+                    items, total_pages = payload.get('results'), payload.get('total_pages')
+            if not isinstance(items, list) or type(total_pages) is not int:
                 raise TMDBError('TMDB returned invalid search results.')
-            for item in items[:8]:
-                if (not isinstance(item, dict) or type(item.get('id')) is not int
-                        or item['id'] <= 0 or not item.get('title') or item.get('adult')):
-                    continue
-                release = parse_release_date(item.get('release_date'))
-                results.append({
-                    'tmdb_id': item['id'], 'title': item['title'], 'overview': item.get('overview'),
-                    'poster_url': image_url(item.get('poster_path')),
-                    'release_date': release.isoformat() if release else '',
-                    'year': release.year if release else '',
-                    'suggested_category': 'upcoming' if release and release > cinema_now().date() else 'showing',
-                })
+            results = [import_result(item) for item in items if isinstance(item, dict)
+                       and type(item.get('id')) is int and 0 < item['id'] <= 2_147_483_647
+                       and clean_text(item.get('title') or item.get('original_title')) and not item.get('adult')]
+            ids = [item['tmdb_id'] for item in results]
+            imported = {movie.tmdb_id: movie for movie in Movie.query.filter(Movie.tmdb_id.in_(ids))} if ids else {}
+            for movie in results:
+                movie['existing'] = imported.get(movie['tmdb_id'])
         except TMDBError as failure:
-            flash(str(failure))
-    return render_template('admin/import_movie.html', results=results, query=query)
+            search_error = str(failure)
+        except SQLAlchemyError:
+            db.session.rollback()
+            results = []
+            search_error = 'CineWave could not check imported movies. Check database connectivity and Alembic revision.'
+    return render_template('admin/import_movie.html', results=results, query=query, page=page,
+                           total_pages=min(total_pages or 0, 500) if type(total_pages) is int else 0,
+                           search_error=search_error)
+
+
+def import_result(item, fields=None):
+    release = fields['release_date'] if fields else parse_release_date(item.get('release_date'))
+    language = clean_text(item.get('original_language'), 12)
+    return {
+        'tmdb_id': item['id'], 'title': clean_text(item.get('title')) or clean_text(item.get('original_title')),
+        'overview': fields['description'] if fields else meaningful_overview(item.get('overview')),
+        'poster_url': fields['poster'] if fields else image_url(item.get('poster_path')),
+        'release_date': release.isoformat() if release else '', 'year': release.year if release else '',
+        'language': LANGUAGES.get(language, language),
+    }
 
 
 @bp.route('/admin/import_movie/add/<int:tmdb_id>', methods=['POST'])
@@ -225,7 +256,9 @@ def import_movie_add(tmdb_id):
     guard = admin_required()
     if guard:
         return guard
-    search_url = url_for('admin.import_movie', query=request.form.get('query', ''))
+    query = request.form.get('query', '')[:120]
+    page = min(500, max(1, request.form.get('page', 1, type=int)))
+    search_url = url_for('admin.import_movie', query=query, page=page)
     if not 0 < tmdb_id <= 2_147_483_647:
         abort(400)
     try:
@@ -237,9 +270,21 @@ def import_movie_add(tmdb_id):
         with TMDBClient(attempts=1) as client:
             detail = client.details(tmdb_id)
             fields = movie_metadata(detail, client.region)
-        if detail.get('adult') or not minimum_metadata(fields):
-            flash('TMDB records need a title, description, and poster before import.')
+        if detail.get('adult') or not fields['title']:
+            flash('This TMDB record cannot be imported. It needs an eligible movie title.')
             return redirect(search_url, code=303)
+        supplied = {
+            'description': meaningful_overview(request.form.get('description', '')[:4000]),
+            'poster': authorized_poster_url(request.form.get('poster_url')),
+        }
+        overrides = [field for field, value in supplied.items() if value and not fields[field]]
+        for field in overrides:
+            fields[field] = supplied[field]
+        if not minimum_metadata(fields):
+            db.session.rollback()
+            return render_template('admin/import_movie.html', results=[import_result(detail, fields)],
+                                   query=query, page=page, total_pages=0, completion=request.form,
+                                   missing_description=not fields['description'], missing_poster=not fields['poster']), 422
         trailer_source, trailer_key, cloudinary_url = trailer_selection(request.form)
         movie = matching_local_movie(fields)
         if movie is None:
@@ -248,6 +293,7 @@ def import_movie_add(tmdb_id):
         else:
             movie.tmdb_id = tmdb_id
             apply_metadata(movie, fields)
+        movie.lock_tmdb_fields(*overrides)
         movie.tmdb_last_checked_at = utc_now()
         category = request.form.get('category')
         if category in {'showing', 'upcoming'}:
@@ -255,8 +301,10 @@ def import_movie_add(tmdb_id):
             movie.lock_tmdb_fields('is_upcoming')
         movie.is_rerelease = request.form.get('release_type') == 'rerelease'
         release = parse_release_date(request.form.get('release_date'))
-        if release and release != fields['tmdb_original_release_date']:
+        if release and release != fields['release_date']:
             movie.release_date = release
+            if category not in {'showing', 'upcoming'}:
+                movie.is_upcoming = release > cinema_now().date()
             movie.lock_tmdb_fields('release_date')
         if trailer_source != 'auto' or not movie.trailer_source:
             movie.trailer_source = trailer_source
@@ -268,16 +316,27 @@ def import_movie_add(tmdb_id):
         db.session.commit()
         flash(f'Saved “{movie.title}” in the CineWave catalogue.')
         return redirect(url_for('movies.movie_detail', movie_id=movie.id), code=303)
+    except UnicodeError:
+        db.session.rollback()
+        flash('CineWave could not store the imported text. Check that the database uses UTF-8.')
     except (TMDBError, ValueError) as failure:
         db.session.rollback()
         flash(str(failure))
     except IntegrityError:
         db.session.rollback()
-        existing = Movie.query.filter_by(tmdb_id=tmdb_id).first()
+        try:
+            existing = Movie.query.filter_by(tmdb_id=tmdb_id).first()
+        except SQLAlchemyError:
+            db.session.rollback()
+            existing = None
         if existing:
             flash(f'“{existing.title}” is already stored in CineWave.')
             return redirect(url_for('movies.movie_detail', movie_id=existing.id), code=303)
         flash('The import conflicted with another update. Search again and retry.')
+    except SQLAlchemyError:
+        db.session.rollback()
+        app.logger.warning('tmdb_manual_import_database_failure tmdb_id=%d', tmdb_id)
+        flash('CineWave could not save this movie. Check database connectivity and the Alembic revision, then retry.')
     return redirect(search_url, code=303)
 
 

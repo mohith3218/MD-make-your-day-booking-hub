@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '17,47 * * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: Run before the next scheduled sync when there is no active lease or cooldown
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -26,32 +31,48 @@ jobs:
       TMDB_SYNC_MAX_PAGES: ${{ vars.TMDB_SYNC_MAX_PAGES || '25' }}
     steps:
       - name: Check configuration
-        id: configured
         shell: bash
         env:
           DATABASE_URL: ${{ secrets.CINEWAVE_SYNC_DATABASE_URL }}
           TMDB_API_KEY: ${{ secrets.CINEWAVE_SYNC_TMDB_API_KEY }}
           TMDB_READ_TOKEN: ${{ secrets.CINEWAVE_SYNC_TMDB_READ_TOKEN }}
         run: |
-          if [[ -n "$DATABASE_URL" && ( -n "$TMDB_READ_TOKEN" || -n "$TMDB_API_KEY" ) ]]; then
-            echo 'ready=true' >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Configure the CineWave sync database and TMDB secrets to enable this job."
+          missing=()
+          [[ "$DATABASE_URL" =~ [^[:space:]] ]] || missing+=(CINEWAVE_SYNC_DATABASE_URL)
+          if ! [[ "$TMDB_READ_TOKEN" =~ [^[:space:]] || "$TMDB_API_KEY" =~ [^[:space:]] ]]; then
+            missing+=("CINEWAVE_SYNC_TMDB_READ_TOKEN or CINEWAVE_SYNC_TMDB_API_KEY")
           fi
-      - if: steps.configured.outputs.ready == 'true'
-        uses: actions/checkout@v6
+          if (( ${#missing[@]} )); then
+            echo '## TMDB sync' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Configuration failure. The worker did not execute.' >> "$GITHUB_STEP_SUMMARY"
+            for requirement in "${missing[@]}"; do
+              printf '::error::Missing repository secret %s\n' "$requirement"
+              printf '\n- Missing `%s`\n' "$requirement" >> "$GITHUB_STEP_SUMMARY"
+            done
+            exit 1
+          fi
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - if: steps.configured.outputs.ready == 'true'
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
-      - if: steps.configured.outputs.ready == 'true'
+      - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
-      - if: steps.configured.outputs.ready == 'true'
+      - name: Execute the TMDB worker
+        shell: bash
         env:
           DATABASE_URL: ${{ secrets.CINEWAVE_SYNC_DATABASE_URL }}
           TMDB_API_KEY: ${{ secrets.CINEWAVE_SYNC_TMDB_API_KEY }}
           TMDB_READ_TOKEN: ${{ secrets.CINEWAVE_SYNC_TMDB_READ_TOKEN }}
-        run: python -m flask --app app sync-movies
+          FORCE_SYNC: ${{ inputs.force && 'true' || 'false' }}
+        run: |
+          args=()
+          [[ "$FORCE_SYNC" == true ]] && args+=(--force)
+          if ! python -m flask --app app sync-movies "${args[@]}"; then
+            if ! grep -q '^## TMDB sync' "$GITHUB_STEP_SUMMARY"; then
+              printf '## TMDB sync\nWorker startup failed. Inspect the sanitized configuration error in the job log.\n' >> "$GITHUB_STEP_SUMMARY"
+            fi
+            exit 1
+          fi

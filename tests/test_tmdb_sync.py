@@ -6,6 +6,8 @@ from threading import Event
 import unittest
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -58,6 +60,10 @@ class MovieSyncTests(unittest.TestCase):
                 return {'total_pages': 1, 'results': []}
             if path.endswith('/videos'):
                 return {'results': []}
+            if path.endswith('/translations'):
+                return {'translations': []}
+            if path.endswith('/images'):
+                return {'posters': []}
             return movies[int(path.rsplit('/', 1)[1])]
         with patch.object(TMDBClient, 'get', get):
             return movie_sync.run_sync(force=force)
@@ -73,7 +79,9 @@ class MovieSyncTests(unittest.TestCase):
         }
         counts, error = self.mocked_run(movies)
         self.assertIsNone(error)
-        self.assertEqual(counts, {'imported': 1, 'skipped': 3, 'updated': 0, 'failed': 0})
+        self.assertEqual(counts, {'discovered': 4, 'imported': 1, 'skipped': 3, 'updated': 0, 'failed': 0})
+        self.assertEqual(db.session.get(MovieSyncState, 1).counts['reasons'],
+                         {'invalid_metadata': 1, 'missing_description': 1, 'missing_poster': 1})
         self.assertEqual(MovieSyncCandidate.query.count(), 3)
         movie = Movie.query.filter_by(tmdb_id=1).one()
         self.assertEqual(movie.duration, 0)
@@ -184,6 +192,33 @@ class MovieSyncTests(unittest.TestCase):
         self.assertTrue(all(params['with_release_type'] == '3|2'
                             for path, params in calls if path == '/discover/movie'))
 
+    def test_batches_resume_saved_candidates_and_discovery_cursor(self):
+        requests = []
+
+        def get(client, path, **params):
+            requests.append((path, params.get('page')))
+            if path == '/movie/now_playing':
+                start = params['page'] * 2
+                return {'total_pages': 2, 'results': [{'id': start}, {'id': start + 1}]}
+            return {'total_pages': 1, 'results': []}
+
+        def details(client, movie_id):
+            return detail(movie_id, videos={'results': [{'official': True, 'type': 'Trailer',
+                        'site': 'YouTube', 'iso_639_1': 'en', 'key': 'Trailers_01'}]})
+
+        with patch.object(movie_sync, 'BATCH_SIZE', 2), patch.object(movie_sync, 'DISCOVERY_CHUNK', 2), \
+                patch.object(TMDBClient, 'get', get), patch.object(TMDBClient, 'details', details):
+            self.assertEqual(movie_sync.run_sync()[0]['imported'], 2)
+            self.assertEqual(MovieSyncCandidate.query.count(), 2)
+            state = db.session.get(MovieSyncState, 1)
+            self.assertEqual(state.counts['_discovery']['pending'][0]['path'], '/movie/upcoming')
+            state.next_run_at = movie_sync.utc_now() - timedelta(seconds=1)
+            db.session.commit()
+            self.assertEqual(movie_sync.run_sync()[0]['imported'], 2)
+            self.assertEqual(MovieSyncCandidate.query.count(), 0)
+        self.assertEqual(requests.count(('/movie/now_playing', 1)), 1)
+        self.assertEqual(Movie.query.filter(Movie.tmdb_id.is_not(None)).count(), 4)
+
     def test_rate_limit_honors_retry_after_and_never_exposes_credentials(self):
         response = MagicMock(status_code=429, headers={'Retry-After': '4'})
         response.__enter__.return_value = response
@@ -202,6 +237,44 @@ class MovieSyncTests(unittest.TestCase):
             self.assertNotIn('test-key', str(caught.exception))
             get.assert_called_once()
 
+    def test_rejected_token_falls_back_once_and_caches_working_api_key(self):
+        self.app.config['TMDB_READ_TOKEN'] = ' Bearer bearer fixture-read-token '
+        rejected = MagicMock(status_code=401, headers={})
+        rejected.__enter__.return_value = rejected
+        success = MagicMock(status_code=200, headers={})
+        success.__enter__.return_value = success
+        success.json.return_value = {'id': 550}
+        with TMDBClient() as client, patch.object(client.session, 'get', side_effect=[rejected, success, success]) as get:
+            client.get('/movie/550')
+            client.search('original script', page=2)
+            self.assertEqual(client.auth_method, 'api_key')
+        first, second, third = get.call_args_list
+        self.assertEqual(first.kwargs['headers']['Authorization'], 'Bearer fixture-read-token')
+        self.assertNotIn('Authorization', second.kwargs['headers'])
+        self.assertEqual(third.kwargs['params'], {'query': 'original script', 'region': 'IN',
+                                                 'include_adult': 'false', 'page': 2, 'api_key': 'test-key'})
+
+    def test_missing_and_invalid_credentials_and_timeout_have_distinct_errors(self):
+        with TMDBClient(attempts=1) as client, patch.object(client.session, 'get', side_effect=requests.Timeout('secret')):
+            with self.assertRaises(TMDBError) as failure:
+                client.get('/movie/550')
+            self.assertEqual(failure.exception.category, 'timeout')
+            self.assertNotIn('secret', str(failure.exception))
+        self.app.config['TMDB_API_KEY'] = ''
+        with TMDBClient() as client:
+            with self.assertRaises(TMDBError) as failure:
+                client.get('/movie/550')
+            self.assertEqual(failure.exception.category, 'missing_credentials')
+        self.app.config['TMDB_API_KEY'] = 'invalid-key'
+        rejected = MagicMock(status_code=401, headers={})
+        rejected.__enter__.return_value = rejected
+        with TMDBClient() as client, patch.object(client.session, 'get', return_value=rejected) as get:
+            for _ in range(2):
+                with self.assertRaises(TMDBError) as failure:
+                    client.get('/movie/550')
+                self.assertEqual(failure.exception.category, 'invalid_credentials')
+            get.assert_called_once()
+
     def test_rate_limited_worker_cannot_be_forced_until_retry(self):
         with patch.object(TMDBClient, 'get', side_effect=TMDBError(
                 'TMDB returned HTTP 429.', status=429, retry_after=1200)):
@@ -212,6 +285,27 @@ class MovieSyncTests(unittest.TestCase):
         movie_sync.request_movie_sync()
         self.assertIsNone(movie_sync.run_sync(force=True))
         self.assertIsNotNone(state.requested_at)
+
+    def test_force_overrides_normal_retry_but_preserves_active_worker(self):
+        now = movie_sync.utc_now()
+        db.session.add(MovieSyncState(id=1, next_run_at=now + timedelta(minutes=15), error='Previous HTTP 401'))
+        db.session.commit()
+        runner = self.app.test_cli_runner()
+        self.assertIn('Outcome: not due', runner.invoke(args=['sync-movies']).output)
+        with patch.object(movie_sync, 'discover', return_value={}) as discovery:
+            self.assertEqual(runner.invoke(args=['sync-movies', '--force']).exit_code, 0)
+            discovery.assert_called_once()
+        self.assertIsNotNone(movie_sync.claim(force=True))
+        self.assertIn('Outcome: running', runner.invoke(args=['sync-movies', '--force']).output)
+
+    def test_doctor_fails_on_an_unversioned_database_without_writing(self):
+        with patch.object(TMDBClient, 'get', return_value={'id': 550, 'results': [{'id': 550}]}):
+            result = self.app.test_cli_runner().invoke(args=['tmdb-doctor'])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn('Alembic: unversioned', result.output)
+        self.assertIn('Working authentication: api_key', result.output)
+        self.assertEqual(Movie.query.count(), 0)
+        self.assertEqual(MovieSyncState.query.count(), 0)
 
     def test_outages_preserve_catalogue_and_a_restarted_worker_recovers(self):
         self.mocked_run({1: detail(1)})

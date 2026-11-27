@@ -11,7 +11,7 @@ from flask_login import login_required
 from flask import render_template
 from flask import request
 from cinewave.services import admin_required
-from cinewave.workers.movie_sync import STATE_ID
+from cinewave.workers.movie_sync import STATE_ID, pending_count, utc_now
 from cinewave.workers.movie_sync import credentials_configured
 from cinewave.workers.movie_sync import sync_status
 from sqlalchemy.orm import joinedload
@@ -76,5 +76,7 @@ def admin():
                            movie_page=movie_page, movie_filters=filters, movie_languages=languages,
                            scheduled_ids=scheduled_ids, sync_state=state, sync_status=sync_status(state),
                            sync_configured=credentials_configured(),
+                           sync_pending_candidates=pending_count(utc_now()),
+                           sync_total_movies=Movie.query.filter(Movie.tmdb_id.is_not(None)).count(),
                            pending_recharges=pending_recharges, revenue=revenue,
                            paid_count=Booking.query.filter_by(status='PAID').count())

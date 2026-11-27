@@ -82,9 +82,60 @@ class ExperienceTests(unittest.TestCase):
                 details, TMDBError('Temporarily unavailable', status=503)]) as get:
             response = client.details(77)
         self.assertEqual(get.call_args.args, ('/movie/77/videos',))
-        self.assertEqual(get.call_args.kwargs, {'language': 'te'})
+        self.assertEqual(get.call_args.kwargs, {'attempts': 1, 'language': 'te'})
         self.assertEqual(response['title'], 'Evening Show')
         self.assertIn('trailer_lookup_error', response)
+
+    def test_manual_search_errors_id_and_pagination(self):
+        url = '/admin/import_movie'
+        item = {'id': 77, 'title': self.movie.title, 'original_language': 'te', 'poster_path': '/valid.jpg'}
+        with patch.object(TMDBClient, 'search', return_value={'results': [item], 'total_pages': 3}) as search:
+            response = self.admin.get(url, query_string={'query': 'తెలుగు', 'page': 2})
+        search.assert_called_once_with('తెలుగు', page=2)
+        self.assertIn('Page 2 of 3', response.get_data(as_text=True))
+        self.assertIn('Already imported', response.get_data(as_text=True))
+        with patch.object(TMDBClient, 'get', return_value=item) as get:
+            self.assertIn('Telugu', self.admin.get(url, query_string={'query': '77'}).get_data(as_text=True))
+        get.assert_called_once_with('/movie/77', append_to_response='release_dates')
+        with patch.object(TMDBClient, 'search', side_effect=TMDBError('TMDB is unavailable.', status=503)):
+            response = self.admin.get(url, query_string={'query': 'film'}).get_data(as_text=True)
+        self.assertIn('TMDb search could not finish', response)
+        self.assertNotIn('No results found', response)
+
+    def test_manual_import_accepts_missing_metadata_and_rejects_duplicates(self):
+        endpoint = '/admin/import_movie/add/88'
+        detail = {'id': 88, 'title': 'Regional film', 'original_language': 'ml'}
+        token = {'csrf_token': 'experience-token', 'query': '88'}
+        self.assertEqual(self.client.post(endpoint, data=token).status_code, 302)
+        self.assertEqual(self.admin.post(endpoint).status_code, 400)
+        with patch.object(TMDBClient, 'details', return_value=detail) as details:
+            response = self.admin.post(endpoint, data=token)
+            self.assertEqual(response.status_code, 422)
+            self.assertIn('Authorised HTTPS poster URL', response.get_data(as_text=True))
+            self.assertEqual(self.admin.post(endpoint, data={**token, 'description': 'A family takes a trip.',
+                                                            'poster_url': 'javascript:alert(1)'}).status_code, 422)
+            response = self.admin.post(endpoint, data={**token, 'description': 'A family takes a trip.',
+                                                      'poster_url': 'https://images.example.test/poster.jpg'})
+            self.assertEqual(response.status_code, 303)
+            self.assertEqual(self.admin.post(endpoint, data=token).headers['Location'], response.headers['Location'])
+            self.assertEqual(details.call_count, 3)
+        stored = Movie.query.filter_by(tmdb_id=88).one()
+        self.assertEqual(set(stored.tmdb_overrides), {'description', 'poster'})
+        self.assertEqual(stored.language, 'Malayalam')
+        self.assertIn('No screenings scheduled yet.', self.client.get(response.headers['Location']).get_data(as_text=True))
+
+    def test_movie_details_find_translated_synopsis_and_poster(self):
+        with TMDBClient() as client, patch.object(client, 'get', side_effect=[
+            {'id': 900, 'title': 'Film', 'original_language': 'ta'},
+            TMDBError('Original language details temporarily unavailable', status=503),
+            {'translations': [{'iso_639_1': 'ta', 'data': {'overview': 'A translated description.'}}]},
+            {'posters': [{'file_path': '/real-poster.jpg'}]},
+            TMDBError('Videos temporarily unavailable', status=503),
+        ]):
+            result = client.details(900)
+        self.assertEqual(result['overview'], 'A translated description.')
+        self.assertEqual(result['images']['posters'][0]['file_path'], '/real-poster.jpg')
+        self.assertIn('trailer_lookup_error', result)
 
     def test_backfill_and_manual_trailer_precedence(self):
         url = f'/admin/movie/{self.movie.id}/trailer'

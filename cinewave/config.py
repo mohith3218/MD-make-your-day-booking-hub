@@ -56,6 +56,8 @@ def configure_app(application, overrides=None):
     if environment == "production" and not env.get("DATABASE_URL"):
         raise RuntimeError("Production requires DATABASE_URL pointing to Supabase PostgreSQL.")
     database_url, engine_options = database_settings(env)
+    if environment == 'production' and database_url.get_backend_name() != 'postgresql':
+        raise RuntimeError('Production requires a PostgreSQL DATABASE_URL.')
     application.config["SQLALCHEMY_DATABASE_URI"] = database_url
     application.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
     application.config["REMEMBER_COOKIE_SECURE"] = application.config["SESSION_COOKIE_SECURE"]
