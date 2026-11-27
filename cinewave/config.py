@@ -31,6 +31,7 @@ def configure_app(application, overrides=None):
         REMEMBER_COOKIE_HTTPONLY=True,
         REMEMBER_COOKIE_SAMESITE="Lax",
         MAX_CONTENT_LENGTH=50 * 1024 * 1024,
+        TRAILER_UPLOAD_DIR=os.environ.get('TRAILER_UPLOAD_DIR') or None,
         STARTUP_ID=secrets.token_urlsafe(10),
         SMTP_HOST=os.environ.get("SMTP_HOST", "").strip(),
         SMTP_PORT=int(os.environ.get("SMTP_PORT", "587")),

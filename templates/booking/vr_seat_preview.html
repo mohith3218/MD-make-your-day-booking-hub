@@ -1,4 +1,12 @@
 {% from "components/trailer.html" import trailer_button, trailer_modal %}
+{% macro now_playing() %}
+<div class="flex items-center gap-1.5 neo-inset px-2.5 py-1 rounded-xl">
+    <i class="fa-solid fa-circle-play text-amber-400 text-xs" aria-hidden="true"></i>
+    <select id="screen-content-select" aria-label="Cinema screen content" class="bg-transparent text-xs font-semibold text-slate-200 cursor-pointer">
+        <option value="now-playing" class="bg-slate-900 text-white">Now Playing</option>
+    </select>
+</div>
+{% endmacro %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -11,7 +19,7 @@
     <script src="{{ url_for('static', filename='js/three-r128.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/seat-preview-state.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cinema-seat-geometry.js') }}"></script>
-    {% if trailer and trailer.provider == 'cloudinary' %}
+    {% if projection_trailer %}
     <script src="{{ url_for('static', filename='js/seat-preview-trailer.js') }}"></script>
     {% elif trailer %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/trailer.css') }}">
@@ -209,6 +217,7 @@
         #screen-content-select { max-width: 225px; }
         #projection-toolbar {
             position: fixed; z-index: 24; right: 12px; bottom: 74px;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
             max-width: calc(100% - 24px); padding: 5px; border-radius: 12px;
             color: #f1f5f9; background: #0c1119f2; border: 1px solid #72757c;
             font-size: 12px;
@@ -221,13 +230,13 @@
             border-radius: 7px; color: inherit; white-space: nowrap;
         }
         #projection-toolbar :is(button, a):focus-visible { outline: 2px solid #ffe8a6; }
-        #projection-toolbar [aria-pressed="true"] { background: #49391c; color: #ffe8a6; }
         #projection-toolbar [data-projection-controls]:not([hidden]) { display: inline-flex; flex-wrap: wrap; align-items: center; }
         #projection-toolbar [hidden], #projection-toolbar p:empty { display: none; }
         #projection-toolbar p { margin: 4px 9px; }
         #projection-toolbar [data-projection-external] { text-decoration: underline; }
         @media (max-width: 760px) {
             #projection-toolbar :is(button, a) { min-height: 42px; }
+            .preview-embedded #projection-toolbar { bottom: 72px; }
         }
         .cw-trailer-dialog { --cw-ink: #f1f5f9; --cw-surface: #121722; --cw-line: #72757c; margin: auto; }
         .cw-trailer-dialog button { padding: 8px 12px; border: 1px solid var(--cw-line); border-radius: 7px; }
@@ -454,17 +463,7 @@
 
             <div class="h-5 w-[1px] bg-white/10 mx-0.5 hidden md:block"></div>
 
-            <!-- Procedural screen modes for sightline and lighting previews. -->
-            <div class="flex items-center gap-1.5 neo-inset px-2.5 py-1 rounded-xl">
-                <i class="fa-solid fa-circle-play text-amber-400 text-xs"></i>
-                <select id="screen-content-select" aria-label="Cinema screen content" onchange="switchScreenContent(this.value)" class="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer">
-                    <option value="title" class="bg-slate-900 text-white">Movie title card</option>
-                    {% if trailer and trailer.provider == 'cloudinary' %}<option value="trailer" class="bg-slate-900 text-white">Trailer</option>{% endif %}
-                    <option value="scifi" class="bg-slate-900 text-white">Sci-Fi screen demo</option>
-                    <option value="atmos" class="bg-slate-900 text-white">Audio field visualization (simulated)</option>
-                    <option value="calibration" class="bg-slate-900 text-white">Sightline calibration grid (demo)</option>
-                </select>
-            </div>
+            {% if not embedded %}{{ now_playing() }}{% endif %}
         </div>
 
         <!-- Right Optics: FOV, Lighting & VR Stereo -->
@@ -771,22 +770,27 @@
         <span id="toast-text">Seat confirmed!</span>
     </div>
 
-    {% if trailer and trailer.provider == 'cloudinary' %}
-    <div id="projection-toolbar" role="group" aria-label="Cinema screen trailer" data-native-projection>
-        <button type="button" data-projection-toggle aria-pressed="false">Trailer</button>
+    <div id="projection-toolbar" role="group" aria-label="Cinema screen trailer"{% if projection_trailer %} data-native-projection{% endif %}>
+        {% if embedded %}{{ now_playing() }}{% endif %}
+        {% if projection_trailer %}
         <div data-projection-controls hidden>
             <button type="button" data-projection-play>Play</button>
             <button type="button" data-projection-restart>Restart</button>
             <button type="button" data-projection-sound>Unmute</button>
         </div>
         <p data-projection-status role="status"></p>
-        <a data-projection-external href="{{ trailer.external }}" target="_blank" rel="noopener noreferrer" hidden>Open original trailer</a>
+        <a data-projection-external href="{{ projection_trailer.external }}" target="_blank" rel="noopener noreferrer" hidden>Open original trailer</a>
+        {% elif trailer %}
+        {{ trailer_button(trailer, 'Watch Trailer', 'neo-btn') }}<p>{{ projection_message }}</p>
+        {% else %}
+        <p role="status">{{ projection_message }}</p>
+        {% endif %}
     </div>
-    <video id="projection-video" data-src="{{ trailer.url }}"
+    {% if projection_trailer %}
+    <video id="projection-video" data-src="{{ projection_trailer.url }}"
            {% if optimized_trailer_url %}data-optimized-src="{{ optimized_trailer_url }}"{% endif %}
            crossorigin="anonymous" preload="none" playsinline loop muted hidden></video>
     {% elif trailer %}
-    <div id="projection-toolbar">{{ trailer_button(trailer, 'Watch Trailer', 'neo-btn') }}</div>
     {{ trailer_modal() }}
     {% endif %}
 
@@ -891,7 +895,6 @@
         let cameraMode = 'overview'; // Start from the back of the auditorium, facing the screen.
         let isVRStereo = false;
         let lightingMode = 'movie'; // 'movie' | 'preshow' | 'house'
-        let screenChannel = 'title';
         let reclineLevel = 0; // 0 = 0°, 1 = 25°, 2 = 45°
 
         // 3D Exit Doors & Floor Egress Path State
@@ -939,6 +942,7 @@
         let lastFrameAt = 0;
         let animationDestroyed = false;
         let previewPausedByParent = false;
+        let projectionVisible = !document.body.classList.contains('preview-embedded');
         let lastScreenUpdateAt = -Infinity;
         let auditoriumBuildDurationMs = 0;
         let previewUsableAt = 0;
@@ -947,7 +951,9 @@
         let measuredFps = 0;
         const previewStartedAt = performance.now();
         function startAnimationLoop() {
-            if (animationDestroyed || previewPausedByParent || document.hidden || !container.isConnected || animationFrameId || window.innerWidth <= 0 || window.innerHeight <= 0) return;
+            if (animationDestroyed || previewPausedByParent || document.hidden || !container.isConnected || window.innerWidth <= 0 || window.innerHeight <= 0) return;
+            projectionTrailer?.start();
+            if (animationFrameId) return;
             clock.start();
             animationFrameId = requestAnimationFrame(animate);
         }
@@ -984,6 +990,7 @@
         renderer.domElement.addEventListener('webglcontextlost', event => {
             event.preventDefault();
             pauseAnimationLoop();
+            projectionTrailer?.release();
             showPreviewRuntimeError('Graphics memory was exhausted. Use the seat map or reload the preview.');
         });
         document.addEventListener('visibilitychange', () => {
@@ -1002,7 +1009,6 @@
             pauseAnimationLoop();
             pausePreviewPlayback();
             projectionTrailer?.release();
-            if (screenChannel === 'trailer') switchScreenContent('title');
         });
         window.addEventListener('pageshow', event => {
             if (event.persisted) startAnimationLoop();
@@ -1012,16 +1018,19 @@
             // Tab visibility must not override a pause requested by the booking page.
             if (event.data?.type === 'cinewave:pause') {
                 previewPausedByParent = true;
+                projectionVisible = false;
                 pausePreviewPlayback();
                 pauseAnimationLoop();
             }
             if (event.data?.type === 'cinewave:resume') {
                 previewPausedByParent = false;
+                projectionVisible = true;
                 resizePreview();
                 startAnimationLoop();
             }
             if (event.data?.type === 'cinewave:pause-trailer') pausePreviewPlayback();
-            if (event.data?.type === 'cinewave:show-trailer' && !previewPausedByParent) switchScreenContent('trailer');
+            if (event.data?.type === 'cinewave:release-trailer') projectionTrailer?.release();
+            if (event.data?.type === 'cinewave:show-trailer') projectionTrailer?.play();
         });
 
         // Ambient & House Lights
@@ -1068,7 +1077,7 @@
         createProjectorDust();
 
         /********************************************************************
-         * 3. REAL-TIME PROCEDURAL BLOCKBUSTER MOVIE SCREEN CANVAS
+         * 3. NOW PLAYING SCREEN CANVAS
          ********************************************************************/
         const screenCanvas = document.createElement('canvas');
         screenCanvas.width = 1024;
@@ -1083,22 +1092,13 @@
         const projectionVideo = document.getElementById('projection-video');
         const projectionToolbar = document.getElementById('projection-toolbar');
         const projectionTrailer = projectionVideo && createSeatPreviewTrailer(projectionVideo, projectionToolbar,
-            () => !previewPausedByParent && !document.hidden && !animationDestroyed && !document.body.classList.contains('webgl-fallback'));
-        projectionToolbar?.querySelector('[data-projection-toggle]')?.addEventListener('click', () => {
-            switchScreenContent(screenChannel === 'trailer' ? 'title' : 'trailer');
-        });
+            () => projectionVisible && !previewPausedByParent && !document.hidden &&
+                !animationDestroyed && !document.body.classList.contains('webgl-fallback'));
         const projectionLights = [screenLightLeft, screenLightCenter, screenLightRight];
         const projectionLightColor = new THREE.Color();
         function setProjectionLight(zone, r, g, b) {
             projectionLights[zone].color.lerp(projectionLightColor.setRGB(r, g, b), 0.45);
         }
-
-        const stars = Array.from({ length: 150 }, () => ({
-            x: Math.random() * 1024,
-            y: Math.random() * 440,
-            z: Math.random() * 1024,
-            hue: Math.random() > 0.5 ? 35 : 195
-        }));
 
         const emberParticles = Array.from({ length: 75 }, () => ({
             x: Math.random() * 1024,
@@ -1152,147 +1152,75 @@
             const w = screenCanvas.width;
             const h = screenCanvas.height;
 
-            if (screenChannel === 'trailer') {
+            if (projectionTrailer?.hasFrame()) {
                 if (projectionTrailer.draw(sCtx, w, h, screenSurfaceAspect, performance.now(), setProjectionLight)) {
                     screenTexture.needsUpdate = true;
                 }
                 return;
             }
 
-            if (screenChannel === 'title') {
-                const pulse = Math.sin(time * 2.1) * 0.5 + 0.5;
-                const bgGrad = sCtx.createRadialGradient(w * 0.5, h * 0.58, 30, w * 0.5, h * 0.5, w * 0.65);
-                bgGrad.addColorStop(0, `hsl(${28 + pulse * 14}, 95%, 26%)`);
-                bgGrad.addColorStop(0.55, `hsl(${12 + pulse * 10}, 85%, 11%)`);
-                bgGrad.addColorStop(1, '#040509');
-                sCtx.fillStyle = bgGrad;
-                sCtx.fillRect(0, 0, w, h);
+            const pulse = Math.sin(time * 2.1) * 0.5 + 0.5;
+            const bgGrad = sCtx.createRadialGradient(w * 0.5, h * 0.58, 30, w * 0.5, h * 0.5, w * 0.65);
+            bgGrad.addColorStop(0, `hsl(${28 + pulse * 14}, 95%, 26%)`);
+            bgGrad.addColorStop(0.55, `hsl(${12 + pulse * 10}, 85%, 11%)`);
+            bgGrad.addColorStop(1, '#040509');
+            sCtx.fillStyle = bgGrad;
+            sCtx.fillRect(0, 0, w, h);
 
-                // Dramatic Ocean / Fire Horizon Glow
-                const horizonY = h * 0.72;
-                const flare = sCtx.createLinearGradient(0, horizonY - 25, 0, h);
-                flare.addColorStop(0, `rgba(255, 140, 30, ${0.4 + pulse * 0.25})`);
-                flare.addColorStop(0.3, 'rgba(180, 35, 10, 0.35)');
-                flare.addColorStop(1, '#030408');
-                sCtx.fillStyle = flare;
-                sCtx.fillRect(0, horizonY - 25, w, h - horizonY + 25);
+            // Dramatic Ocean / Fire Horizon Glow
+            const horizonY = h * 0.72;
+            const flare = sCtx.createLinearGradient(0, horizonY - 25, 0, h);
+            flare.addColorStop(0, `rgba(255, 140, 30, ${0.4 + pulse * 0.25})`);
+            flare.addColorStop(0.3, 'rgba(180, 35, 10, 0.35)');
+            flare.addColorStop(1, '#030408');
+            sCtx.fillStyle = flare;
+            sCtx.fillRect(0, horizonY - 25, w, h - horizonY + 25);
 
-                // Rising Fire Embers
-                for (let em of emberParticles) {
-                    em.x += em.vx;
-                    em.y += em.vy;
-                    if (em.y < 0) { em.y = h; em.x = Math.random() * w; }
-                    if (em.x > w) em.x = 0;
-                    if (em.x < 0) em.x = w;
+            // Rising Fire Embers
+            for (let em of emberParticles) {
+                em.x += em.vx;
+                em.y += em.vy;
+                if (em.y < 0) { em.y = h; em.x = Math.random() * w; }
+                if (em.x > w) em.x = 0;
+                if (em.x < 0) em.x = w;
 
-                    sCtx.fillStyle = `rgba(255, ${150 + Math.floor(pulse * 80)}, 40, ${em.alpha})`;
-                    sCtx.beginPath();
-                    sCtx.arc(em.x, em.y, em.r, 0, Math.PI * 2);
-                    sCtx.fill();
-                }
-
-                // Anamorphic Gold Streak
-                const streakY = h * 0.48 + Math.sin(time * 1.5) * 8;
-                const sGrad = sCtx.createLinearGradient(0, streakY, w, streakY);
-                sGrad.addColorStop(0, 'rgba(201, 168, 76, 0)');
-                sGrad.addColorStop(0.5, `rgba(255, 215, 110, ${0.45 + pulse * 0.3})`);
-                sGrad.addColorStop(1, 'rgba(201, 168, 76, 0)');
-                sCtx.fillStyle = sGrad;
-                sCtx.fillRect(0, streakY - 2, w, 4);
-
-                // Blockbuster Title Typography
-                sCtx.save();
-                sCtx.textAlign = 'center';
-                sCtx.fillStyle = '#fbbf24';
-                sCtx.font = '700 14px "Space Grotesk", sans-serif';
-                sCtx.fillText(`MD CINEWAVE • ${currentAudi.name.toUpperCase()}`, w / 2, h * 0.24, w * 0.84);
-
-                const activeTitle = currentAudi.movieTitle || 'NOW SHOWING';
-                drawScreenMovieTitle(sCtx, activeTitle, w, h, '#ffffff', '#f59e0b', 64);
-
-                sCtx.save();
-                sCtx.font = '600 15px "Inter", sans-serif';
-                sCtx.textAlign = 'center';
-                sCtx.fillStyle = '#fde68a';
-                sCtx.fillText(`SEAT PREVIEW · ${activePOVSeatId}`, w / 2, h * 0.64, w * 0.84);
-                sCtx.restore();
-
-                // Sync Ambilight bounce to warm gold/crimson
-                screenLightCenter.color.setHSL(0.08 + pulse * 0.03, 0.95, 0.55);
-                screenLightLeft.color.setHSL(0.04, 0.9, 0.48);
-                screenLightRight.color.setHSL(0.11, 0.9, 0.50);
-                sCtx.restore();
-
-            } else if (screenChannel === 'scifi') {
-                const pulse = Math.sin(time * 1.4) * 0.5 + 0.5;
-                const grad = sCtx.createRadialGradient(w * 0.5, h * 0.5, 20, w * 0.5, h * 0.5, w * 0.65);
-                grad.addColorStop(0, `hsl(${192 + pulse * 25}, 90%, 24%)`);
-                grad.addColorStop(0.5, `hsl(${265 - pulse * 20}, 82%, 10%)`);
-                grad.addColorStop(1, '#03050a');
-                sCtx.fillStyle = grad;
-                sCtx.fillRect(0, 0, w, h);
-
-                const cx = w * 0.5, cy = h * 0.48;
-                for (let s of stars) {
-                    s.z -= 8.0;
-                    if (s.z <= 1) { s.z = 1024; s.x = Math.random() * w; s.y = Math.random() * h; }
-                    const k = 260 / s.z;
-                    const px = cx + (s.x - cx) * k;
-                    const py = cy + (s.y - cy) * k;
-                    if (px >= 0 && px <= w && py >= 0 && py <= h) {
-                        const size = (1 - s.z / 1024) * 3.8;
-                        sCtx.fillStyle = `hsla(${s.hue}, 100%, 80%, ${1 - s.z / 1024})`;
-                        sCtx.beginPath();
-                        sCtx.arc(px, py, size, 0, Math.PI * 2);
-                        sCtx.fill();
-                    }
-                }
-
-                drawScreenMovieTitle(sCtx, currentAudi.movieTitle || 'NOW SHOWING', w, h, '#ffffff', '#00f0ff', 60);
-                sCtx.save();
-                sCtx.textAlign = 'center';
-                sCtx.fillStyle = '#cbd5e1';
-                sCtx.font = '500 15px "Inter", sans-serif';
-                sCtx.fillText(`NOW SHOWING  •  LIVE SIGHTLINE SIMULATION  •  ACTIVE SEAT: ${activePOVSeatId}`, cx, h * 0.64, w * 0.84);
-                sCtx.restore();
-
-                screenLightCenter.color.setHSL(0.52 + pulse * 0.05, 0.95, 0.55);
-                screenLightLeft.color.setHSL(0.76, 0.85, 0.5);
-                screenLightRight.color.setHSL(0.50, 0.85, 0.5);
-
-            } else if (screenChannel === 'atmos') {
-                sCtx.fillStyle = '#050811';
-                sCtx.fillRect(0, 0, w, h);
-                const bars = 44;
-                const bw = (w - 160) / bars;
-                for (let i = 0; i < bars; i++) {
-                    const amp = (Math.sin(time * 3.2 + i * 0.3) * 0.5 + 0.5) * (Math.cos(time * 1.7 - i * 0.15) * 0.4 + 0.6);
-                    const bh = Math.max(18, amp * (h * 0.62));
-                    const hue = 185 + (i / bars) * 90;
-                    sCtx.fillStyle = `hsl(${hue}, 95%, 58%)`;
-                    sCtx.fillRect(80 + i * bw, (h - bh) / 2, bw - 4, bh);
-                }
-                sCtx.fillStyle = '#ffffff';
-                sCtx.textAlign = 'center';
-                sCtx.font = '700 32px "Space Grotesk", sans-serif';
-                sCtx.fillText(`DOLBY ATMOS 64-CHANNEL ACOUSTIC FIELD • SEAT ${activePOVSeatId}`, w / 2, 54);
-                screenLightCenter.color.setHSL((time * 0.15) % 1, 0.9, 0.55);
-
-            } else if (screenChannel === 'calibration') {
-                sCtx.fillStyle = '#070b12';
-                sCtx.fillRect(0, 0, w, h);
-                sCtx.strokeStyle = 'rgba(0, 240, 255, 0.28)';
-                sCtx.lineWidth = 1.5;
-                for (let x = 0; x <= w; x += 64) { sCtx.beginPath(); sCtx.moveTo(x, 0); sCtx.lineTo(x, h); sCtx.stroke(); }
-                for (let y = 0; y <= h; y += 64) { sCtx.beginPath(); sCtx.moveTo(0, y); sCtx.lineTo(w, y); sCtx.stroke(); }
-                sCtx.strokeStyle = '#C9A84C';
-                sCtx.lineWidth = 3;
-                sCtx.beginPath(); sCtx.arc(w / 2, h / 2, 135, 0, Math.PI * 2); sCtx.stroke();
-                sCtx.fillStyle = '#ffffff';
-                sCtx.textAlign = 'center';
-                sCtx.font = '700 34px "Space Grotesk", sans-serif';
-                sCtx.fillText(`THX / IMAX SIGHTLINE CALIBRATION • SEAT ${activePOVSeatId}`, w / 2, h * 0.46);
+                sCtx.fillStyle = `rgba(255, ${150 + Math.floor(pulse * 80)}, 40, ${em.alpha})`;
+                sCtx.beginPath();
+                sCtx.arc(em.x, em.y, em.r, 0, Math.PI * 2);
+                sCtx.fill();
             }
+
+            // Anamorphic Gold Streak
+            const streakY = h * 0.48 + Math.sin(time * 1.5) * 8;
+            const sGrad = sCtx.createLinearGradient(0, streakY, w, streakY);
+            sGrad.addColorStop(0, 'rgba(201, 168, 76, 0)');
+            sGrad.addColorStop(0.5, `rgba(255, 215, 110, ${0.45 + pulse * 0.3})`);
+            sGrad.addColorStop(1, 'rgba(201, 168, 76, 0)');
+            sCtx.fillStyle = sGrad;
+            sCtx.fillRect(0, streakY - 2, w, 4);
+
+            // Blockbuster Title Typography
+            sCtx.save();
+            sCtx.textAlign = 'center';
+            sCtx.fillStyle = '#fbbf24';
+            sCtx.font = '700 14px "Space Grotesk", sans-serif';
+            sCtx.fillText(`MD CINEWAVE • ${currentAudi.name.toUpperCase()}`, w / 2, h * 0.24, w * 0.84);
+
+            const activeTitle = currentAudi.movieTitle || 'No movie is playing';
+            drawScreenMovieTitle(sCtx, activeTitle, w, h, '#ffffff', '#f59e0b', 64);
+
+            sCtx.save();
+            sCtx.font = '600 15px "Inter", sans-serif';
+            sCtx.textAlign = 'center';
+            sCtx.fillStyle = '#fde68a';
+            sCtx.fillText(currentAudi.projectionMessage || `SEAT PREVIEW · ${activePOVSeatId}`, w / 2, h * 0.64, w * 0.84);
+            sCtx.restore();
+
+            // Sync Ambilight bounce to warm gold/crimson
+            screenLightCenter.color.setHSL(0.08 + pulse * 0.03, 0.95, 0.55);
+            screenLightLeft.color.setHSL(0.04, 0.9, 0.48);
+            screenLightRight.color.setHSL(0.11, 0.9, 0.50);
+            sCtx.restore();
 
             screenTexture.needsUpdate = true;
         }
@@ -3469,14 +3397,6 @@
             if (labelEl) labelEl.textContent = lightingMode === 'movie' ? 'Showtime' : (lightingMode === 'preshow' ? 'Preshow' : 'House On');
         }
 
-        function switchScreenContent(channel) {
-            if (channel === 'trailer' && !projectionTrailer) return;
-            screenChannel = channel;
-            document.getElementById('screen-content-select').value = channel;
-            lastScreenUpdateAt = -Infinity;
-            projectionTrailer?.select(channel === 'trailer');
-        }
-
         let seatDetailsCollapsed = false;
         function toggleSeatDetailsCollapse() {
             if(innerWidth<=760 && seatDetailsCollapsed && !minimapCollapsed)toggleMinimapCollapse();
@@ -3572,9 +3492,10 @@
             // Canvas painting and texture uploads need not match camera FPS.
             // Keep the trailer responsive and restrain decorative motion when requested.
             const screenFps = renderQuality === 'low' ? 12 : (renderQuality === 'balanced' ? 20 : 30);
-            const screenInterval = reducedMotion && screenChannel !== 'trailer' ? 500 : 1000 / screenFps;
+            const animatedProjection = projectionTrailer?.hasFrame();
+            const screenInterval = reducedMotion && !animatedProjection ? 500 : 1000 / screenFps;
             if (now - lastScreenUpdateAt >= screenInterval) {
-                renderDynamicScreenCanvas(reducedMotion && screenChannel !== 'trailer' ? 0 : elapsed);
+                renderDynamicScreenCanvas(reducedMotion && !animatedProjection ? 0 : elapsed);
                 lastScreenUpdateAt = now;
             }
 

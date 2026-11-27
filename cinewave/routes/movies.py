@@ -1,7 +1,9 @@
-from flask import Blueprint
+from flask import Blueprint, send_from_directory
+from pathlib import Path
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from ._support import *
+from ..integrations.trailers import trailer_upload_directory, uploaded_trailer_name
 from .movie_reviews import own_rating, review_values, save_review
 from ..services.movie_reviews import ACCESS_MESSAGE, eligible_booking, published_movie_reviews
 from sqlalchemy.orm import joinedload
@@ -9,6 +11,24 @@ from ..services.reviews import completed_booking_source
 from ..services.seat import screening_availability
 
 bp = Blueprint("movies", __name__)
+
+
+@bp.get('/movies/<int:movie_id>/trailer-file/<filename>')
+@login_required
+def trailer_file(movie_id, filename):
+    movie = db.get_or_404(Movie, movie_id)
+    if (movie.is_archived and not current_user.is_admin
+            or movie.trailer_source not in (None, 'upload')
+            or uploaded_trailer_name(movie.trailer_video_path) != filename):
+        abort(404)
+    directory = trailer_upload_directory()
+    legacy = Path(app.static_folder) / 'uploads' / 'trailers'
+    if directory != legacy and not (directory / filename).is_file():
+        directory = legacy
+    media_type = 'video/mp4' if filename.endswith('.mp4') else 'video/webm'
+    response = send_from_directory(directory, filename, mimetype=media_type, conditional=True)
+    response.cache_control.private = True
+    return response
 
 
 @bp.route('/cine-match', methods=['GET', 'POST'])

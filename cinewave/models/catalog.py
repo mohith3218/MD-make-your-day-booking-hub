@@ -88,7 +88,7 @@ class Movie(db.Model):
 
     @property
     def trailer_video_key(self):
-        if self.trailer_source in {'none', 'cloudinary'} or (
+        if self.trailer_source in {'none', 'cloudinary', 'upload'} or (
                 self.trailer_source is None and self.trailer_video_path):
             return None
         if self.trailer_source in {'youtube', None} and self.youtube_trailer_key:
@@ -97,7 +97,8 @@ class Movie(db.Model):
 
     @property
     def trailer(self):
-        return player(self.trailer_source, youtube=self.trailer_video_key, cloudinary=self.cloudinary_trailer_url)
+        return player(self.trailer_source, youtube=self.trailer_video_key, cloudinary=self.cloudinary_trailer_url,
+                      uploaded=self.trailer_video_path, movie_id=self.id)
 
     @property
     def moods(self):

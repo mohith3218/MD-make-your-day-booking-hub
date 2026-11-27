@@ -11,7 +11,8 @@ database_url = f'sqlite:///{database.as_posix()}'
 os.environ.update(APP_ENV='testing', DATABASE_URL=database_url, TEST_DATABASE_URL=database_url,
                   SESSION_COOKIE_SECURE='0', SECRET_KEY='local-browser-fixture',
                   SMTP_HOST='qa-mail.example.invalid', SMTP_FROM_EMAIL='qa@example.invalid',
-                  TMDB_API_KEY='isolated-browser-fixture', TMDB_READ_TOKEN='', DEMO_PAYMENTS_ENABLED='true')
+                  TMDB_API_KEY='isolated-browser-fixture', TMDB_READ_TOKEN='', DEMO_PAYMENTS_ENABLED='true',
+                  TRAILER_UPLOAD_DIR=str(database.parent / 'trailers'))
 
 from alembic import command
 from alembic.config import Config
@@ -54,8 +55,14 @@ with app.app_context():
              for offset in (-2, -1, 1, 2)]
     youtube_show = Showtime(movie=upcoming, screen=screen, theater=theater.name,
                             show_date=(now + timedelta(days=3)).date(), show_time='18:30')
+    upload_theater = Theater(name='Harbour Cinema')
+    upload_screen = Screen(theater=upload_theater, name='Harbour Hall', screen_type='2D')
+    upload_screen.layout = screen.layout
+    upload_film = Movie(title='Harbour Lights', description='An uploaded trailer fixture.', duration=95)
+    upload_show = Showtime(movie=upload_film, screen=upload_screen, theater=upload_theater.name,
+                           show_date=(now + timedelta(days=2)).date(), show_time='18:30')
     references = ('QA-REVIEW-ONE', 'QA-REVIEW-TWO')
-    db.session.add_all([youtube_show, extra_screen, *shows])
+    db.session.add_all([youtube_show, upload_show, extra_screen, *shows])
     for reference, show in zip(references, shows):
         db.session.add(Booking(reference=reference, user=user, showtime=show, seats='A1',
                                status='PAID', total_amount=160,
@@ -77,6 +84,7 @@ with app.app_context():
     print(json.dumps({'port': server.server_port, 'theater': theater.id,
                       'screen': screen.id, 'screenWithoutReviews': extra_screen.id,
                       'movie': upcoming.id, 'show': shows[-1].id, 'youtubeShow': youtube_show.id,
+                      'uploadMovie': upload_film.id, 'uploadShow': upload_show.id,
                       'references': references,
                       'reviewMovie': demo_film.id, 'demoShow': demo_show_id, 'trailerMovie': film.id,
                       'importedMovie': imported.id, 'importedTitle': title}), flush=True)

@@ -93,7 +93,8 @@ test('2D default initializes no iframe; repeated 3D and fullscreen switches reus
     assert.equal(p.run("selected.get('A1').price"),190);
     assert.equal(p.elements['btn-view-2d'].getAttribute('aria-pressed'),'true');
     assert.equal(p.elements['immersive-booking-layout'].classes.has('hidden'),true);
-    assert.equal(p.messages.at(-1).type,'cinewave:pause');
+    assert.deepEqual(p.messages.slice(-2).map(message => message.type),
+        ['cinewave:pause', 'cinewave:release-trailer']);
 });
 
 test('an iframe finishing load after return to 2D stays paused',()=>{

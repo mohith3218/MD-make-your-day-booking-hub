@@ -1328,6 +1328,10 @@ function toggleTheaterView(mode) {
     btn3d.setAttribute('aria-pressed', 'false');
     btn2d.setAttribute('aria-pressed', 'true');
     syncVRPreviewActivity();
+    const frame = document.getElementById('vr-inline-frame');
+    if (frame?.dataset.loaded) {
+      frame.contentWindow?.postMessage({ type: 'cinewave:release-trailer' }, location.origin);
+    }
   }
 }
 

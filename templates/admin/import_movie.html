@@ -1,4 +1,5 @@
 {% extends "admin/admin_base.html" %}
+{% from "components/trailer.html" import trailer_upload %}
 {% block title %}Import movies · CineWave Admin{% endblock %}
 {% block content %}
 <section class="space-y-6 max-w-5xl mx-auto" aria-labelledby="tmdb-title">
@@ -19,7 +20,7 @@
       <p class="mt-3 font-semibold">Already imported{% if movie.existing.is_archived %} · Archived{% endif %}</p>
       <a class="cw-button cw-button-white mt-2" href="{{ url_for('admin.edit_movie', movie_id=movie.existing.id) }}">View stored record</a>
       {% else %}
-      <form method="post" action="{{ url_for('admin.import_movie_add', tmdb_id=movie.tmdb_id) }}" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('admin.import_movie_add', tmdb_id=movie.tmdb_id) }}" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
         {% set form = completion or {} %}
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="query" value="{{ query }}"><input type="hidden" name="page" value="{{ page }}">
         <label class="text-xs text-slate-700">Customer catalog status<select name="category" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="auto">Use regional release information</option><option value="showing" {% if form.get('category') == 'showing' %}selected{% endif %}>Released</option><option value="upcoming" {% if form.get('category') == 'upcoming' %}selected{% endif %}>Upcoming</option></select></label>
@@ -27,6 +28,7 @@
         <label class="text-xs text-slate-700">Release date override (optional)<input type="date" name="release_date" value="{{ form.get('release_date', '') }}" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"></label>
         <label class="text-xs text-slate-700">Homepage feature order<select name="featured_order" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"><option value="">Do not feature</option>{% for rank in range(1, 6) %}<option value="{{ rank }}" {% if form.get('featured_order')|int == rank %}selected{% endif %}>{{ rank }}</option>{% endfor %}</select></label>
         <label class="text-xs text-slate-700">YouTube trailer (optional)<input type="text" name="youtube_trailer" maxlength="200" value="{{ form.get('youtube_trailer', '') }}" placeholder="Link or video ID" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"></label>
+        {{ trailer_upload() }}
         {% if completion %}
           {% if missing_description %}<label class="text-xs text-slate-700 sm:col-span-2">Description<textarea name="description" required maxlength="4000" rows="4" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900">{{ form.get('description', '') }}</textarea></label>
           {% elif form.get('description') %}<input type="hidden" name="description" value="{{ form.get('description') }}">{% endif %}
