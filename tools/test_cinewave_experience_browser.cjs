@@ -10,7 +10,8 @@ const ChromeQA = require('./phase_2_1_3_chrome.cjs');
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, 'instance', 'cinewave-visual-qa');
 const projectionOnly = process.argv.includes('--projection-only');
-const selectedPages = process.argv.slice(2).filter(arg => arg !== '--projection-only');
+const auditoriumOnly = process.argv.includes('--auditorium-only');
+const selectedPages = process.argv.slice(2).filter(arg => !['--projection-only', '--auditorium-only'].includes(arg));
 const chrome = process.env.CINEWAVE_QA_CHROME || (process.platform === 'win32'
     ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : 'google-chrome');
 const python = process.env.CINEWAVE_QA_PYTHON || path.join(root, '.venv',
@@ -297,14 +298,178 @@ async function verify(browser, info) {
         console.log('The 3D preview opens the standard YouTube fallback for YouTube-only movies.');
     }
 
-    if (projectionOnly) {
+    async function verifyAuditorium() {
+        const frame = expression => evaluate(
+            `document.querySelector('#vr-inline-frame').contentWindow.eval(${JSON.stringify(expression)})`);
+        const snapshot = `JSON.stringify({
+            ambient: ambientLight.intensity, house: houseLight.intensity,
+            projection: projectionLights.map(light => [light.intensity, light.distance, light.position.toArray()]),
+            accents: architecturalAccentMaterials.map(material => [
+                material.emissiveIntensity, material.color.getHex(), material.opacity, material.roughness
+            ]),
+            exits: exitSpillLights.map(({ light }) => light.intensity)
+        })`;
+        const lighting = mode => `document.querySelector('#lighting-controls summary').click();
+            document.querySelector('[data-lighting-mode="${mode}"]').click()`;
+        const ready = `document.querySelector('body.preview-ready #canvas-container canvas') !== null`;
+        const renderLevels = `(() => {
+            renderDynamicScreenCanvas(0);
+            renderer.render(scene, camera);
+            const gl = renderer.getContext();
+            const pixel = new Uint8Array(4);
+            const sample = (x, y) => {
+                gl.readPixels(Math.floor(x * gl.drawingBufferWidth), Math.floor(y * gl.drawingBufferHeight),
+                    1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                return (pixel[0] * .2126 + pixel[1] * .7152 + pixel[2] * .0722);
+            };
+            const aim = screenCenterTarget.clone().project(camera);
+            const room = [.12, .3, .7, .88].flatMap(x => [.18, .42, .75, .9].map(y => sample(x, y)));
+            const screen = [-.02, -.01, 0, .01, .02].flatMap(x => [-.008, 0, .008, .016]
+                .map(y => sample(.5 + aim.x * .5 + x, .5 + aim.y * .5 + y)));
+            return { screen: Math.max(...screen),
+                room: room.reduce((sum, value) => sum + value, 0) / room.length };
+        })()`;
+        const capture = async (name) => {
+            const { data } = await browser.call('Page.captureScreenshot', { format: 'png', fromSurface: true });
+            await fs.writeFile(path.join(output, name + '.png'), Buffer.from(data, 'base64'));
+        };
+        const checkLighting = async (run, label, screenshot) => {
+            const original = await run(snapshot);
+            const normal = await run(renderLevels);
+            await run(lighting('showtime'));
+            assert(await run(`lightingMode === 'showtime' &&
+                document.querySelector('[data-lighting-mode=showtime]').getAttribute('aria-pressed') === 'true'`));
+            await until(() => run('!lightingTransition && lightingBlend === 1'), 'Showtime did not finish dimming.');
+            assert(await run(`houseLight.intensity === 0 && ambientLight.intensity > 0 &&
+                projectionLights.every(light => light.intensity > 0 && light.position.z > screenCenterTarget.z) &&
+                auditoriumGroup.children.some(mesh => mesh.material?.map === screenTexture && !mesh.material.toneMapped)`));
+            if (screenshot) await capture(screenshot);
+            const showtime = await run(renderLevels);
+            assert(showtime.room < normal.room, `${label} did not get darker: ${JSON.stringify({ normal, showtime })}`);
+            assert(showtime.screen > showtime.room * 1.8 && showtime.screen > 75,
+                `${label} lost projection brightness: ${JSON.stringify({ normal, showtime })}`);
+            await run(lighting('normal'));
+            await until(() => run('!lightingTransition && lightingBlend === 0'), 'Normal mode did not finish restoring.');
+            assert.equal(await run(snapshot), original);
+            assert(await run(`(() => {
+                ${lighting('showtime')};
+                updateLightingTransition(lightingTransition.started + 500);
+                return lightingBlend > 0 && lightingBlend < 1 && houseLight.intensity > 0;
+            })()`), 'Showtime should transition through intermediate light levels.');
+            await run(lighting('restore'));
+            assert(await run('!lightingTransition && lightingMode === "normal" && lightingBlend === 0'));
+            assert.equal(await run(snapshot), original);
+            console.log(`${label}: room brightness ${normal.room.toFixed(1)} to ${showtime.room.toFixed(1)}, screen ${showtime.screen.toFixed(1)}, and original settings restored.`);
+        };
+        const geometry = `(() => {
+            const bounds = document.querySelector('#vr-inline-frame').getBoundingClientRect();
+            return { bounds: [bounds.x, bounds.y, bounds.width, bounds.height], viewport: [innerWidth, innerHeight],
+                hidden: ['#immersive-seat-sidebar', '#ar-preview-heading', '#inline-view-caption', '#ar-info-strip']
+                    .map(selector => getComputedStyle(document.querySelector(selector)).display === 'none') };
+        })()`;
+
+        for (const width of [1366, 390]) {
+            await setViewport(width);
+            await browser.call('Emulation.setTouchEmulationEnabled', { enabled: width < 768 });
+            await go('/book/' + info.demoShow, '#btn-view-3d');
+            const initialSeat = await evaluate(`(() => {
+                document.querySelectorAll('.seat-btn.seat-sel[data-seat]').forEach(seat => seat.click());
+                const seat = document.querySelector('.seat-btn.seat-avail[data-seat]');
+                seat.click();
+                document.querySelector('#btn-view-3d').click();
+                document.querySelector('#vr-inline-frame').scrollIntoView({ block: 'center' });
+                return seat.dataset.seat;
+            })()`);
+            await until(() => frame(ready), 'The inline auditorium did not render.', 45000);
+            const inline = await evaluate(geometry);
+            await evaluate(`window.qaFrame = document.querySelector('#vr-inline-frame').contentWindow;
+                const opener = document.querySelector('#ar-preview-heading button'); opener.focus(); opener.click()`);
+            await until(() => frame(`previewFullscreen && renderer.getSize(new THREE.Vector2()).equals(
+                new THREE.Vector2(innerWidth, innerHeight))`), 'The renderer did not fill the resized frame.');
+            const enlarged = await evaluate(geometry);
+            assert.deepEqual(enlarged.bounds, [0, 0, ...enlarged.viewport]);
+            assert(enlarged.hidden.every(Boolean));
+            assert(enlarged.bounds[2] > inline.bounds[2] && enlarged.bounds[3] > inline.bounds[3]);
+            assert(await frame(`camera.aspect === innerWidth / innerHeight &&
+                renderer.domElement.width === Math.floor(innerWidth * renderer.getPixelRatio()) &&
+                renderer.domElement.height === Math.floor(innerHeight * renderer.getPixelRatio())`));
+            assert(await evaluate("document.activeElement.id === 'close-full-preview'"));
+            if (width < 768) {
+                assert(await frame(`document.querySelector('#lighting-controls').getBoundingClientRect().bottom <
+                    document.querySelector('#projection-toolbar').getBoundingClientRect().top`));
+            }
+
+            await evaluate("document.querySelector('#inline-camera-controls [data-preset=overview]').click()");
+            await until(() => frame(`cameraMode === 'overview' && camera.position.distanceTo(cameraTargetPos) < .07`),
+                'The full auditorium overview did not settle.');
+            assert(await frame(`(() => {
+                const point = screenCenterTarget.clone().project(camera);
+                return Math.abs(point.x) < .92 && Math.abs(point.y) < .92 && point.z < 1;
+            })()`));
+            await capture(`${width}-auditorium-full-normal`);
+            await checkLighting(frame, `Booking preview at ${width}px`, `${width}-auditorium-showtime`);
+            if (width === 1366) {
+                const angles = await frame('[targetYawOffset, targetPitchOffset]');
+                await browser.call('Input.dispatchMouseEvent', { type: 'mousePressed', x: 820, y: 330, button: 'left', clickCount: 1 });
+                await browser.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 880, y: 360, button: 'left', buttons: 1 });
+                await browser.call('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 880, y: 360, button: 'left', clickCount: 1 });
+                assert.notDeepEqual(await frame('[targetYawOffset, targetPitchOffset]'), angles);
+                const rotated = await frame('cameraTargetPos.toArray()');
+                await browser.call('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 820, y: 330, deltaX: 0, deltaY: -100 });
+                await until(async () => JSON.stringify(await frame('cameraTargetPos.toArray()')) !== JSON.stringify(rotated),
+                    'Zoom did not move the orbit camera.');
+            }
+            await evaluate("document.querySelector('#inline-camera-controls [data-preset=seat]').click()");
+            await until(() => frame(`cameraMode === 'seat' && activePOVSeatId === ${JSON.stringify(initialSeat)}`),
+                'The full preview could not enter the selected seat view.');
+            const newSeat = await frame(`(() => {
+                const seat = [...seatRegistry.values()].find(item => !selectedSeats.has(item.id) && !item.isOccupied);
+                selectAndFlyToSeat(seat.row, seat.num, true);
+                return activePOVSeatId;
+            })()`);
+            assert.notEqual(newSeat, initialSeat);
+            await until(() => evaluate(`document.querySelector('.seat-btn[data-seat="${newSeat}"]')?.classList.contains('seat-sel')`),
+                'Selecting a seat in the auditorium did not update the booking.');
+            if (width === 1366) {
+                await evaluate("document.querySelector('#close-full-preview').click()");
+            } else {
+                await frame("dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+            }
+            await until(() => frame('!previewFullscreen && renderer.getSize(new THREE.Vector2()).y === innerHeight'),
+                'The preview did not return to inline rendering.');
+            const restored = await evaluate(geometry);
+            assert.deepEqual(restored.bounds.slice(2), inline.bounds.slice(2));
+            assert.equal(restored.hidden[0], false);
+            assert(await evaluate(`document.activeElement === document.querySelector('#ar-preview-heading button') &&
+                qaFrame === document.querySelector('#vr-inline-frame').contentWindow &&
+                document.querySelectorAll('.seat-btn.seat-sel[data-seat]').length === 2`));
+            await evaluate("document.querySelector('#btn-view-2d').click()");
+            assert(await evaluate(`document.querySelector('#btn-view-2d').getAttribute('aria-pressed') === 'true' &&
+                document.querySelectorAll('.seat-btn.seat-sel[data-seat]').length === 2`));
+            console.log(`${width}px: fullscreen canvas, hidden sidebar, seat POV, exit and 2D selections verified.`);
+        }
+
+        await setViewport(1366);
+        await browser.call('Emulation.setTouchEmulationEnabled', { enabled: false });
+        assert.equal(Object.keys(info.auditoriumProfiles).length, 3);
+        for (const [profile, show] of Object.entries(info.auditoriumProfiles)) {
+            await go('/book/' + show + '/vr-preview', '#canvas-container');
+            await until(() => evaluate(ready), 'The auditorium did not render for ' + profile, 45000);
+            await until(() => evaluate('camera.position.distanceTo(cameraTargetPos) < .07'), 'The camera did not settle for ' + profile);
+            await checkLighting(evaluate, profile);
+        }
+        assert.deepEqual(browser.errors.map(error => error.exception?.description || error.text), []);
+    }
+
+    if (projectionOnly || auditoriumOnly) {
         await setViewport(1366);
         await go(fixture.login, '#login-username');
         await signIn();
         await until(() => evaluate("!!document.querySelector('.cw-movie-grid')"), 'The browser login failed.');
         await until(() => evaluate("!!document.querySelector('[data-post-show-dialog][open]')"), 'Review prompt did not open.');
         await evaluate("document.querySelector('[data-close-review]').click()");
-        await verifyScreenProjection();
+        if (auditoriumOnly) await verifyAuditorium();
+        else await verifyScreenProjection();
         return;
     }
 
@@ -602,7 +767,8 @@ async function main() {
     const scratch = await fs.realpath(await fs.mkdtemp(path.join(scratchRoot, 'cinewave-browser-')));
     assert.equal(path.dirname(scratch), scratchRoot);
     const profile = path.join(scratch, 'chrome');
-    const server = spawn(python, ['-m', 'tools.cinewave_experience_qa', scratch],
+    const server = spawn(python, ['-m', 'tools.cinewave_experience_qa', scratch,
+        ...(auditoriumOnly ? ['--auditorium-profiles'] : [])],
         { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let log = '';
     server.stderr.on('data', (chunk) => { log = (log + chunk).slice(-8000); });

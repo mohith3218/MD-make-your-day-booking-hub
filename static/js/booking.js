@@ -6,6 +6,8 @@ const draftKey = bookingContext.draftKey;
 const selected = new Map();
 let activePovSeat = null;
 let pendingPreviewTrailer = false;
+let fullPreviewTrigger = null;
+let fullPreviewOverflow = '';
 let showExitPathHighlight = false;
 const povView = { yaw: 0, pitch: 0, format: 'wide', crowd: true, dim: true, recline: 0, dragging: false, x: 0, y: 0 };
 const input = document.getElementById('selected_seats_input');
@@ -1428,24 +1430,41 @@ function suggestSmartSeats() {
 }
 
 function open3dArModal(showTrailer = false) {
+  const layout = document.getElementById('immersive-booking-layout');
+  if (layout.classList.contains('preview-fullscreen')) return;
+  fullPreviewTrigger = document.activeElement;
+  fullPreviewOverflow = document.body.style.overflow;
   toggleTheaterView('3d');
   pendingPreviewTrailer = showTrailer;
   activePovSeat ||= document.querySelector('.seat-btn.seat-sel[data-seat]') || document.querySelector('.seat-btn.seat-avail[data-seat]');
-  document.getElementById('immersive-booking-layout').classList.add('preview-fullscreen');
-  document.getElementById('close-full-preview').classList.remove('hidden');
+  layout.classList.add('preview-fullscreen');
+  const exitButton = document.getElementById('close-full-preview');
+  exitButton.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  exitButton.focus({ preventScroll: true });
+  syncVRPreviewFullscreen();
   syncVRPreviewActivity();
 }
 
 function close3dArModal() {
   const layout = document.getElementById('immersive-booking-layout');
-  if (layout?.classList.contains('preview-fullscreen')) {
-    document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:pause-trailer' }, location.origin);
-    layout.classList.remove('preview-fullscreen');
-  }
-  document.getElementById('close-full-preview')?.classList.add('hidden');
-  document.body.style.overflow = '';
   pendingPreviewTrailer = false;
+  if (!layout?.classList.contains('preview-fullscreen')) return;
+  document.getElementById('vr-inline-frame')?.contentWindow?.postMessage({ type: 'cinewave:pause-trailer' }, location.origin);
+  layout.classList.remove('preview-fullscreen');
+  document.getElementById('close-full-preview')?.classList.add('hidden');
+  document.body.style.overflow = fullPreviewOverflow;
+  fullPreviewTrigger?.focus({ preventScroll: true });
+  fullPreviewTrigger = null;
+  syncVRPreviewFullscreen();
+  syncVRPreviewActivity();
+}
+
+function syncVRPreviewFullscreen() {
+  const frame = document.getElementById('vr-inline-frame');
+  if (!frame?.dataset.loaded || !frame.contentWindow) return;
+  const active = document.getElementById('immersive-booking-layout')?.classList.contains('preview-fullscreen');
+  frame.contentWindow.postMessage({ type: 'cinewave:fullscreen', active }, location.origin);
 }
 
 function syncVRPreviewActivity() {
@@ -1492,6 +1511,10 @@ window.addEventListener('message', event => {
   }
   if (event.data?.type === 'cinewave:fallback-close') {
     toggleTheaterView('2d');
+    return;
+  }
+  if (event.data?.type === 'cinewave:exit-fullscreen') {
+    close3dArModal();
     return;
   }
   if (event.data?.type === 'cinewave:toggle-seat') {
@@ -1705,7 +1728,7 @@ const immersiveSection = document.createElement('section');
 immersiveSection.id = 'immersive-booking-layout';
 immersiveSection.className = 'immersive-booking-layout hidden';
 immersiveSection.innerHTML = `
-  <div class="immersive-viewer-column"><button id="close-full-preview" type="button" onclick="close3dArModal()" class="hidden absolute right-4 top-4 z-30 rounded-xl bg-slate-800 px-4 py-2 text-white">Close full preview</button></div>
+  <div class="immersive-viewer-column"></div>
   <aside id="immersive-seat-sidebar" class="immersive-seat-sidebar">
     <p class="immersive-eyebrow">SEAT CLASSES</p>
     <div data-seat-classes class="space-y-2.5"></div>
@@ -1738,6 +1761,7 @@ function ensureInlinePreview() {
     if (!inlineVrFrame.getAttribute('src')) return;
     inlineVrFrame.dataset.loaded = 'true';
     postVRPreviewState(true, inlineVrFrame);
+    syncVRPreviewFullscreen();
     syncVRPreviewActivity();
   };
   inlineVrFrame.src = inlineVrFrame.dataset.src;

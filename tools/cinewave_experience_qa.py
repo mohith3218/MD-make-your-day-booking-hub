@@ -24,6 +24,7 @@ from cinewave.models import Booking, Movie, Payment, Screen, Showtime, Theater, 
 from cinewave.workers import movie_sync
 from cinewave.integrations.tmdb import TMDBClient
 from cinewave.time import cinema_now
+from vizag_theaters import seed_vizag_theaters
 
 with app.app_context():
     config = Config('alembic.ini')
@@ -71,6 +72,21 @@ with app.app_context():
                            status='PENDING', ticket_amount=150, total_amount=160,
                            expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2)))
     db.session.commit()
+    auditorium_profiles = {}
+    if '--auditorium-profiles' in argv:
+        seed_vizag_theaters(db, Theater, Screen, verbose=False)
+        for key, theater_name, screen_name in (
+                ('inox', 'INOX Varun Beach', 'Screen 5'),
+                ('jagadamba', 'Jagadamba Theatre', '70MM Main'),
+                ('aaa', 'AAA Cinemas', 'Screen 7')):
+            venue = Theater.query.filter_by(name=theater_name).one()
+            auditorium = Screen.query.filter_by(theater_id=venue.id, name=screen_name).one()
+            show = Showtime(movie=demo_film, screen=auditorium, theater=venue.name,
+                            show_date=(now + timedelta(days=2)).date(), show_time='18:30')
+            db.session.add(show)
+            db.session.flush()
+            auditorium_profiles[key] = show.id
+        db.session.commit()
     title = 'Imported Film Fixture'
     details = {'id': 120025, 'title': title, 'overview': 'An imported festival film for browser testing.',
                'poster_path': '/browser-fixture.jpg', 'original_language': 'ta'}
@@ -85,6 +101,7 @@ with app.app_context():
                       'screen': screen.id, 'screenWithoutReviews': extra_screen.id,
                       'movie': upcoming.id, 'show': shows[-1].id, 'youtubeShow': youtube_show.id,
                       'uploadMovie': upload_film.id, 'uploadShow': upload_show.id,
+                      'auditoriumProfiles': auditorium_profiles,
                       'references': references,
                       'reviewMovie': demo_film.id, 'demoShow': demo_show_id, 'trailerMovie': film.id,
                       'importedMovie': imported.id, 'importedTitle': title}), flush=True)

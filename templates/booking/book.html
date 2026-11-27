@@ -87,7 +87,7 @@
 
 <!-- 🎥 AR SEAT PREVIEW PANEL -->
 <div id="ar-preview-panel" class="glass-card rounded-2xl p-4 border border-cyan-500/20 bg-slate-950/80 shadow-2xl hidden">
-  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+  <div id="ar-preview-heading" class="flex flex-wrap items-center justify-between gap-2 mb-3">
     <div class="flex items-center gap-2">
       <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm">👁️</span>
       <div>
@@ -108,12 +108,14 @@
     <iframe id="vr-inline-frame" title="Live 3D theater seat preview" data-src="{{ url_for('booking.vr_seat_preview', showtime_id=showtime.id, embed=1) }}" class="absolute inset-0 h-full w-full border-0 bg-[#07090e]" allow="fullscreen; autoplay"></iframe>
     <div id="inline-camera-controls" class="absolute z-20 top-3 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-1.5 rounded-2xl border border-white/10 bg-slate-950/85 p-1.5 shadow-xl backdrop-blur-md">
       <button type="button" data-preset="overview" onclick="setInlineCamera('overview')" class="inline-camera-btn active border border-cyan-400/40 bg-cyan-500/20 px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-white">Overview</button>
+      <button type="button" data-preset="seat" onclick="setInlineCamera('seat')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">Seat POV</button>
       <button type="button" data-preset="stage" onclick="setInlineCamera('stage')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">From stage</button>
       <button type="button" data-preset="balcony" onclick="setInlineCamera('balcony')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">Balcony</button>
       <button type="button" data-preset="birdseye" onclick="setInlineCamera('birdseye')" class="inline-camera-btn px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-slate-400">Bird’s eye</button>
       <button type="button" id="inline-tour-btn" onclick="toggleInlineTour()" class="px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-amber-300">Auto tour</button>
+      <button id="close-full-preview" type="button" onclick="close3dArModal()" class="hidden rounded-xl px-3 text-xs font-bold">Exit Full Preview</button>
     </div>
-    <div class="absolute left-3 bottom-3 z-10 rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-[10px] text-slate-200 backdrop-blur-md pointer-events-none">
+    <div id="inline-view-caption" class="absolute left-3 bottom-3 z-10 rounded-xl border border-white/10 bg-black/65 px-3 py-2 text-[10px] text-slate-200 backdrop-blur-md pointer-events-none">
       <span class="font-bold text-amber-200">Live theater view</span>
       <span class="ml-2 text-slate-400">Click an available seat in the room to select it</span>
     </div>

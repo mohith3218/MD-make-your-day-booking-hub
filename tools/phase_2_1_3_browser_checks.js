@@ -10,9 +10,7 @@
     };
     if (!location.pathname.endsWith('/vr-preview')) return;
     window.__qa = {
-        light(mode) {
-            for (let i = 0; i < 3 && lightingMode !== mode; i++) cycleHouseLights();
-        },
+        light(mode) { setAuditoriumLighting({ movie: 'showtime', preshow: 'normal', house: 'restore' }[mode]); },
         overview() { setCameraMode('overview'); },
         settleCamera() {
             hideHoverPreview();clearTimeout(hoverTimer);clearTimeout(hoverTelemetryTimer);clearTimeout(hoverEchoTimer);

@@ -7,6 +7,16 @@
     </select>
 </div>
 {% endmacro %}
+{% macro auditorium_lighting() %}
+<details id="lighting-controls" class="neo-panel">
+    <summary>Lighting</summary>
+    <div class="neo-panel lighting-menu" role="group" aria-label="Auditorium lighting">
+        <button type="button" data-lighting-mode="normal" aria-pressed="true" onclick="setAuditoriumLighting('normal')">Normal Theater Mode</button>
+        <button type="button" data-lighting-mode="showtime" aria-pressed="false" onclick="setAuditoriumLighting('showtime')">Showtime Mode</button>
+        <button type="button" data-lighting-mode="restore" onclick="setAuditoriumLighting('restore')">Restore Lights</button>
+    </div>
+</details>
+{% endmacro %}
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -52,6 +62,7 @@
             color: #e2e8f0;
         }
         #canvas-container { touch-action: none; }
+        #canvas-container canvas { display:block; width:100%; height:100%; }
 
         .font-display {
             font-family: 'Space Grotesk', sans-serif;
@@ -223,7 +234,29 @@
             font-size: 12px;
         }
         .preview-embedded #projection-toolbar { bottom: 52px; }
-        .webgl-fallback #projection-toolbar[data-native-projection] { display: none; }
+        #lighting-controls { position:relative; border-radius:10px; color:#f1f5f9; font-size:12px; }
+        #lighting-controls summary { cursor:pointer; padding:10px; white-space:nowrap; }
+        #lighting-controls .lighting-menu {
+            position:absolute; z-index:45; top:calc(100% + 5px); right:0;
+            width:max-content; padding:4px; border-radius:10px; background:#141820;
+        }
+        #lighting-controls button {
+            display:block; width:100%; min-height:40px; padding:6px 10px;
+            text-align:left; border-radius:6px;
+        }
+        #lighting-controls button:is(:hover,[aria-pressed="true"]) { background:#372e22; color:#fff3d5; }
+        #lighting-controls button[aria-pressed="true"]::after { content:' ✓'; }
+        .preview-embedded #lighting-controls { position:fixed; z-index:25; left:12px; bottom:52px; }
+        .preview-embedded #lighting-controls .lighting-menu { top:auto; bottom:calc(100% + 5px); right:auto; left:0; }
+        .preview-fullscreen #embedded-preview-tools {
+            position:fixed; z-index:25; left:12px; right:12px; bottom:max(12px, env(safe-area-inset-bottom));
+            display:flex; align-items:flex-end; justify-content:space-between; gap:8px; pointer-events:none;
+        }
+        .preview-fullscreen #embedded-preview-tools :is(#lighting-controls, #projection-toolbar) {
+            position:relative; inset:auto; pointer-events:auto;
+        }
+        .webgl-fallback #projection-toolbar[data-native-projection],
+        .webgl-fallback #lighting-controls { display: none; }
         #projection-video { display: none; }
         #projection-toolbar :is(button, a) {
             display: inline-flex; align-items: center; min-height: 38px; padding: 5px 9px;
@@ -237,6 +270,8 @@
         @media (max-width: 760px) {
             #projection-toolbar :is(button, a) { min-height: 42px; }
             .preview-embedded #projection-toolbar { bottom: 72px; }
+            .preview-embedded #lighting-controls { bottom:130px; }
+            .preview-fullscreen #embedded-preview-tools { flex-direction:column; align-items:flex-start; }
         }
         .cw-trailer-dialog { --cw-ink: #f1f5f9; --cw-surface: #121722; --cw-line: #72757c; margin: auto; }
         .cw-trailer-dialog button { padding: 8px 12px; border: 1px solid var(--cw-line); border-radius: 7px; }
@@ -478,10 +513,7 @@
                 <i class="fa-solid fa-vr-cardboard text-cyan-400"></i>
                 <span class="hidden md:inline">VR Stereo</span>
             </button>
-            <button onclick="cycleHouseLights()" id="btn-lights" class="neo-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-300 flex items-center gap-1" title="Cycle Cinema Lighting: Showtime Dark / Preshow Dim / Cleaning Lights">
-                <i class="fa-solid fa-lightbulb"></i>
-                <span id="lights-label" class="hidden sm:inline text-[11px]">Showtime</span>
-            </button>
+            {% if not embedded %}{{ auditorium_lighting() }}{% endif %}
             <label class="sr-only" for="quality-select">Preview quality</label>
             <select id="quality-select" onchange="setRenderQuality(this.value)" class="neo-btn max-w-[92px] rounded-lg px-1.5 py-1.5 text-[10px] text-slate-200" title="Adjust preview performance">
                 <option value="low">Low</option><option value="balanced">Balanced</option><option value="high">High</option>
@@ -770,6 +802,7 @@
         <span id="toast-text">Seat confirmed!</span>
     </div>
 
+    {% if embedded %}<div id="embedded-preview-tools">{{ auditorium_lighting() }}{% endif %}
     <div id="projection-toolbar" role="group" aria-label="Cinema screen trailer"{% if projection_trailer %} data-native-projection{% endif %}>
         {% if embedded %}{{ now_playing() }}{% endif %}
         {% if projection_trailer %}
@@ -786,6 +819,7 @@
         <p role="status">{{ projection_message }}</p>
         {% endif %}
     </div>
+    {% if embedded %}</div>{% endif %}
     {% if projection_trailer %}
     <video id="projection-video" data-src="{{ projection_trailer.url }}"
            {% if optimized_trailer_url %}data-optimized-src="{{ optimized_trailer_url }}"{% endif %}
@@ -894,7 +928,9 @@
 
         let cameraMode = 'overview'; // Start from the back of the auditorium, facing the screen.
         let isVRStereo = false;
-        let lightingMode = 'movie'; // 'movie' | 'preshow' | 'house'
+        let lightingMode = 'normal';
+        let lightingBlend = 0;
+        let lightingTransition = null;
         let reclineLevel = 0; // 0 = 0°, 1 = 25°, 2 = 45°
 
         // 3D Exit Doors & Floor Egress Path State
@@ -910,7 +946,9 @@
         scene.background = new THREE.Color(0x04060a);
         scene.fog = new THREE.FogExp2(0x04060a, 0.014);
 
-        const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 600);
+        let viewportWidth = Math.max(1, container.clientWidth);
+        let viewportHeight = Math.max(1, container.clientHeight);
+        const camera = new THREE.PerspectiveCamera(65, viewportWidth / viewportHeight, 0.1, 600);
         let dustParticles = null;
 
         const isLowPowerDevice = (navigator.deviceMemory && navigator.deviceMemory <= 2)
@@ -919,7 +957,7 @@
         const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
         let renderQuality = isLowPowerDevice ? 'low' : 'balanced';
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'default' });
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(viewportWidth, viewportHeight, false);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.2;
@@ -932,7 +970,6 @@
             const scale = renderQuality === 'low' ? 1 : (renderQuality === 'balanced' ? 1.5 : 1.75);
             const fps = renderQuality === 'low' ? 20 : (renderQuality === 'balanced' ? 30 : 60);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, scale));
-            renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.domElement.dataset.maxFps = String(fps);
             if (dustParticles) dustParticles.visible = renderQuality !== 'low' && !reducedMotion;
             updateSeatDetailForView();
@@ -942,6 +979,8 @@
         let lastFrameAt = 0;
         let animationDestroyed = false;
         let previewPausedByParent = false;
+        let previewFullscreen = false;
+        let previewResizeObserver = null;
         let projectionVisible = !document.body.classList.contains('preview-embedded');
         let lastScreenUpdateAt = -Infinity;
         let auditoriumBuildDurationMs = 0;
@@ -969,6 +1008,7 @@
         function destroyPreview() {
             if (animationDestroyed) return;
             animationDestroyed = true;
+            previewResizeObserver?.disconnect();
             pauseAnimationLoop();
             pausePreviewPlayback();
             projectionTrailer?.release();
@@ -1095,6 +1135,14 @@
             () => projectionVisible && !previewPausedByParent && !document.hidden &&
                 !animationDestroyed && !document.body.classList.contains('webgl-fallback'));
         const projectionLights = [screenLightLeft, screenLightCenter, screenLightRight];
+        const normalProjectionLights = projectionLights.map(light => ({
+            intensity: light.intensity * 0.2,
+            distance: light.distance,
+            position: light.position.clone()
+        }));
+        let showtimeLightPositions = [];
+        let showtimeLightRange = 0;
+        const exitSpillLights = [];
         const projectionLightColor = new THREE.Color();
         function setProjectionLight(zone, r, g, b) {
             projectionLights[zone].color.lerp(projectionLightColor.setRGB(r, g, b), 0.45);
@@ -1235,6 +1283,11 @@
         let architecturalAccentMaterials = [];
         function registerArchitecturalAccent(material, role = 'wall') {
             material.userData.accentRole = role;
+            if (role === 'ceiling') {
+                material.userData.litColor = material.color.clone();
+                material.userData.litRoughness = material.roughness;
+            }
+            if (role === 'frame') material.userData.litOpacity = material.opacity;
             architecturalAccentMaterials.push(material);
             return material;
         }
@@ -1318,8 +1371,9 @@
             });
             const requiredSlope = Math.max(verticalSlope, horizontalSlope / aspect);
             const fittedFov = THREE.MathUtils.radToDeg(2 * Math.atan(requiredSlope * 1.08));
+            const maxFov = previewFullscreen && aspect < 1 ? 100 : 72;
             auditoriumOverviewFov = Number.isFinite(fittedFov)
-                ? THREE.MathUtils.clamp(fittedFov, 32, 72) : targetFov;
+                ? THREE.MathUtils.clamp(fittedFov, 32, maxFov) : targetFov;
             if (cameraMode === 'overview') {
                 cameraTargetPos.copy(auditoriumOverviewCamera);
                 desiredLookAtTarget.copy(auditoriumOverviewTarget);
@@ -1418,6 +1472,7 @@
             interactiveSeatMeshes.length = 0;
             seatRegistry.clear();
             exitDoorsList.length = 0;
+            exitSpillLights.length = 0;
             architecturalAccentMaterials = [];
 
             const rows = config.rows;
@@ -1494,6 +1549,9 @@
             const thetaStart = -thetaLength / 2;
             const screenSurfaceZ = 0;
             const screenY = screenBottomM + screenHeightM / 2;
+            showtimeLightPositions = [-0.31, 0, 0.31].map(offset =>
+                new THREE.Vector3(screenWidthM * offset, screenY, screenSurfaceZ + Math.min(3, screenWidthM * 0.18)));
+            showtimeLightRange = THREE.MathUtils.clamp(screenWidthM * 1.65, 16, 36);
             auditoriumRearWallZ = Math.max(Number(physicalRoom.depth || farthestRowZ + 8), farthestRowZ + 5);
             const hallDepth = auditoriumRearWallZ + 4;
             auditoriumDepth = hallDepth;
@@ -1942,6 +2000,7 @@
 
                 // Emerald Emergency PointLight casting green floor glow
                 const exLight = new THREE.PointLight(0x10b981, 1.6, 8.5);
+                exitSpillLights.push({ light: exLight, intensity: exLight.intensity });
                 exLight.position.set(0, 2.6, 0.9);
                 exGroup.add(exLight);
 
@@ -2261,7 +2320,7 @@
                 mesh.instanceMatrix.needsUpdate = true;
             });
             auditoriumBuildDurationMs = performance.now() - buildStartedAt;
-            applyArchitecturalLightingMode();
+            applyAuditoriumLighting(lightingBlend);
             updateSeatDetailForView();
             populateInspectionLevels();
         }
@@ -3018,6 +3077,12 @@
                 receiveProjectSelectionState(event.data);
             } else if (event.data?.type === 'cinewave:camera-preset') {
                 setCameraPreset(event.data.preset);
+            } else if (event.data?.type === 'cinewave:fullscreen' && document.body.classList.contains('preview-embedded')) {
+                const active = event.data.active === true;
+                if (active === previewFullscreen) return;
+                previewFullscreen = active;
+                document.body.classList.toggle('preview-fullscreen', active);
+                resizePreview(true);
             }
         });
 
@@ -3343,6 +3408,11 @@
 
         // Keyboard Arrow Keys Support for Side-Seat & Row Hopping
         window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && previewFullscreen) {
+                e.preventDefault();
+                window.parent.postMessage({ type: 'cinewave:exit-fullscreen' }, location.origin);
+                return;
+            }
             if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
             if (e.key === 'ArrowLeft')  { e.preventDefault(); stepSeat(0, -1); }
             if (e.key === 'ArrowRight') { e.preventDefault(); stepSeat(0, 1); }
@@ -3363,38 +3433,70 @@
             document.getElementById('vr-stereo-overlay').classList.toggle('active', isVRStereo);
             document.getElementById('btn-vr-stereo').classList.toggle('active', isVRStereo);
             if (!isVRStereo) {
-                renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+                renderer.setViewport(0, 0, viewportWidth, viewportHeight);
                 renderer.setScissorTest(false);
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
             }
+            resizePreview(true);
         }
 
-        function applyArchitecturalLightingMode() {
-            const lightValues = lightingMode === 'movie'
-                ? { ambient: 0.7, house: 0.04, wall: 0.08, geometric: 0.055, speaker: 0.035, aisle: 0.07, ceiling: 0.02, stage: 0.04, frame: 0.025 }
-                : (lightingMode === 'preshow'
-                    ? { ambient: 1.15, house: 0.55, wall: 0.24, geometric: 0.18, speaker: 0.12, aisle: 0.2, ceiling: 0.22, stage: 0.12, frame: 0.07 }
-                    : { ambient: 1.45, house: 1.25, wall: 0.42, geometric: 0.32, speaker: 0.18, aisle: 0.32, ceiling: 0.42, stage: 0.24, frame: 0.11 });
-            ambientLight.intensity = lightValues.ambient;
-            houseLight.intensity = lightValues.house;
-            // In small rooms the legacy full-strength screen point lights
-            // overpowered the Showtime preset, even with house lights off.
-            // Retain the sampled screen hues with restrained bounced light.
-            const screenBounce = lightingMode === 'movie' ? 0.2 : (lightingMode === 'preshow' ? 0.45 : 0.65);
-            screenLightCenter.intensity = 2.8 * screenBounce;
-            screenLightLeft.intensity = screenLightRight.intensity = 2.0 * screenBounce;
+        const normalAccents = { wall: 0.08, geometric: 0.055, speaker: 0.035, aisle: 0.07, ceiling: 0.02, stage: 0.04, frame: 0.025 };
+        const showtimeAccents = { wall: 0.005, geometric: 0.009, speaker: 0.006, aisle: 0.032, ceiling: 0, stage: 0.012, frame: 0.045 };
+        const showtimeSpill = [0.44, 0.8, 0.44];
+        const lightingDuration = 1350;
+
+        function applyAuditoriumLighting(amount) {
+            lightingBlend = amount;
+            const lerp = THREE.MathUtils.lerp;
+            ambientLight.intensity = lerp(0.7, 0.2, amount);
+            houseLight.intensity = lerp(0.04, 0, amount);
+            projectionLights.forEach((light, zone) => {
+                const normal = normalProjectionLights[zone];
+                light.intensity = lerp(normal.intensity, showtimeSpill[zone], amount);
+                light.distance = lerp(normal.distance, showtimeLightRange, amount);
+                light.position.lerpVectors(normal.position, showtimeLightPositions[zone], amount);
+            });
+            exitSpillLights.forEach(({ light, intensity }) => { light.intensity = lerp(intensity, intensity * 0.3, amount); });
             architecturalAccentMaterials.forEach(material => {
-                material.emissiveIntensity = lightValues[material.userData.accentRole] ?? lightValues.wall;
+                const { accentRole: role, litColor, litRoughness, litOpacity } = material.userData;
+                material.emissiveIntensity = lerp(normalAccents[role] ?? normalAccents.wall, showtimeAccents[role] ?? showtimeAccents.wall, amount);
+                if (litColor) {
+                    material.color.copy(litColor).multiplyScalar(lerp(1, 0.12, amount));
+                    material.roughness = lerp(litRoughness, 0.95, amount);
+                }
+                // The translucent curved surround extends in front of the picture.
+                // Fade its tint so the screen texture reads clearly in the dark.
+                if (litOpacity !== undefined) material.opacity = lerp(litOpacity, 0.1, amount);
             });
         }
 
-        function cycleHouseLights() {
-            const modes = ['movie', 'preshow', 'house'];
-            lightingMode = modes[(modes.indexOf(lightingMode) + 1) % modes.length];
-            const labelEl = document.getElementById('lights-label');
-            applyArchitecturalLightingMode();
-            if (labelEl) labelEl.textContent = lightingMode === 'movie' ? 'Showtime' : (lightingMode === 'preshow' ? 'Preshow' : 'House On');
+        function updateLightingTransition(now) {
+            if (!lightingTransition) return;
+            const { started, from, to } = lightingTransition;
+            const progress = THREE.MathUtils.clamp((now - started) / lightingDuration, 0, 1);
+            const eased = progress * progress * (3 - 2 * progress);
+            applyAuditoriumLighting(THREE.MathUtils.lerp(from, to, eased));
+            if (progress === 1) lightingTransition = null;
+        }
+
+        function setAuditoriumLighting(mode) {
+            const now = performance.now();
+            updateLightingTransition(now);
+            lightingMode = mode === 'showtime' ? 'showtime' : 'normal';
+            document.querySelectorAll('[data-lighting-mode][aria-pressed]').forEach(button => {
+                button.setAttribute('aria-pressed', String(button.dataset.lightingMode === lightingMode));
+            });
+            const controls = document.getElementById('lighting-controls');
+            if (controls.open) {
+                if (controls.contains(document.activeElement)) controls.querySelector('summary').focus();
+                controls.open = false;
+            }
+            const target = lightingMode === 'showtime' ? 1 : 0;
+            if (mode === 'restore' || reducedMotion || target === lightingBlend) {
+                lightingTransition = null;
+                applyAuditoriumLighting(target);
+            } else {
+                lightingTransition = { started: now, from: lightingBlend, to: target };
+            }
         }
 
         let seatDetailsCollapsed = false;
@@ -3487,6 +3589,7 @@
             const elapsed = clock.elapsedTime;
             const cameraBlend = 1 - Math.exp(-6 * delta);
             const rotationBlend = 1 - Math.exp(-8 * delta);
+            updateLightingTransition(now);
 
             // 1. Update the cinema screen texture and its room lighting.
             // Canvas painting and texture uploads need not match camera FPS.
@@ -3538,8 +3641,8 @@
             if (!isVRStereo) {
                 renderer.render(scene, camera);
             } else {
-                const w = window.innerWidth;
-                const h = window.innerHeight;
+                const w = viewportWidth;
+                const h = viewportHeight;
                 const halfW = w / 2;
 
                 camera.aspect = halfW / h;
@@ -3572,20 +3675,26 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        function resizePreview() {
-            if (animationDestroyed || previewPausedByParent || window.innerWidth <= 0 || window.innerHeight <= 0) return;
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            renderer.setSize(w, h);
+        function resizePreview(force = false) {
+            if (animationDestroyed || previewPausedByParent) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            if (!w || !h || (!force && w === viewportWidth && h === viewportHeight)) return;
+            viewportWidth = w;
+            viewportHeight = h;
+            renderer.setSize(w, h, false);
             camera.aspect = (isVRStereo ? w / 2 : w) / h;
             if (cameraMode === 'overview') applyOverviewFieldOfView();
             else if (cameraMode === 'birdseye') applyBirdseyeFraming();
             else if (cameraMode === 'inspection') frameInspectionLevel();
             applyResponsivePreviewLayout();
             camera.updateProjectionMatrix();
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, renderQuality === 'high' ? 1.75 : (renderQuality === 'balanced' ? 1.5 : 1)));
         }
-        window.addEventListener('resize', resizePreview);
+        window.addEventListener('resize', () => resizePreview());
+        if ('ResizeObserver' in window) {
+            previewResizeObserver = new ResizeObserver(() => resizePreview());
+            previewResizeObserver.observe(container);
+        }
 
         // Start once after the DOM is ready. All dependencies are local and
         // loaded synchronously before this script.

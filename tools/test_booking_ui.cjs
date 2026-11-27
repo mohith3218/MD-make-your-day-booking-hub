@@ -29,6 +29,7 @@ class Element {
     setAttribute(k,v) { this.attrs[k]=v; }
     getAttribute(k) { return this.attrs[k] ?? null; }
     hasAttribute(k) { return k in this.attrs; }
+    focus() { this.focused = true; }
     getBoundingClientRect() { return { top: 20, bottom: 420, height: 400 }; }
     set src(value) { this.loads++; this.attrs.src=value; }
     replaceChildren(...children) { this.children=children; }
@@ -60,7 +61,7 @@ function booking() {
         input:{value:''},display:{},priceOut:{},btn:{},classLine:{},
         updateInspector(){},showSeatARPreview(){},renderVRCinemaSeatMap(){},draw3dArScreen(){},updateImmersiveBookingPanel(){},alert(){},
     });
-    vm.runInContext(`const selected=new Map(), reservedSeats=[], draftKey='test'; let activePovSeat=null,pendingPreviewTrailer=false,activePartyCode=''; const partyCSRF='fixture', MAX_SEATS=2;let inlineTourTimer=null; const inlineVrFrame=document.getElementById('vr-inline-frame');function toggleInlineTour(){inlineTourTimer=null;}`
+    vm.runInContext(`const selected=new Map(), reservedSeats=[], draftKey='test'; let activePovSeat=null,pendingPreviewTrailer=false,activePartyCode='',fullPreviewTrigger=null,fullPreviewOverflow=''; const partyCSRF='fixture', MAX_SEATS=2;let inlineTourTimer=null; const inlineVrFrame=document.getElementById('vr-inline-frame');function toggleInlineTour(){inlineTourTimer=null;}`
         + slice('  function paint(', '  // Build the booking view')
         + slice('  function toggleSeatSelection(', "  document.querySelectorAll('.seat-btn').forEach(b => {")
         + slice('  // ---- WATCH TOGETHER:', '  let availabilityPollRunning')
@@ -101,6 +102,23 @@ test('an iframe finishing load after return to 2D stays paused',()=>{
     const p=booking(); p.run("toggleTheaterView('3d');toggleTheaterView('2d')");
     p.elements['vr-inline-frame'].onload();
     assert.equal(p.messages.at(-1).type,'cinewave:pause');
+});
+
+test('fullscreen state reaches the existing iframe and exit restores overflow, focus and picks',()=>{
+    const p=booking(), frame=p.elements['vr-inline-frame'];
+    p.ctx.document.activeElement = p.elements['btn-view-3d'];
+    p.ctx.document.body.style.overflow = 'auto';
+    p.run("selected.set('A1',{price:190,cls:'Premium'});open3dArModal()");
+    frame.onload();
+    assert.equal(p.elements['close-full-preview'].focused,true);
+    assert.equal(p.ctx.document.body.style.overflow,'hidden');
+    assert.equal(p.messages.some(message=>message.type==='cinewave:fullscreen' && message.active),true);
+    p.listeners.message({origin:'http://localhost',source:frame.contentWindow,data:{type:'cinewave:exit-fullscreen'}});
+    assert.equal(p.elements['btn-view-3d'].focused,true);
+    assert.equal(p.ctx.document.body.style.overflow,'auto');
+    assert.equal(p.elements['close-full-preview'].classes.has('hidden'),true);
+    assert.equal(p.messages.some(message=>message.type==='cinewave:fullscreen' && !message.active),true);
+    assert.equal(p.run("selected.get('A1').price"),190);
 });
 
 test('the trailer shortcut waits for the same-origin preview and sends one play request',()=>{

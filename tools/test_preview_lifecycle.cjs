@@ -24,7 +24,7 @@ function preview() {
     const messageEnd = source.indexOf('        // Ambient & House Lights', visibility);
     assert.ok(start > 0 && end > start && visibility > end && messageEnd > visibility);
     const handlers = source.slice(visibility, messageEnd);
-    vm.runInContext('let animationDestroyed=false, previewPausedByParent=false, projectionVisible=true, animationFrameId=0;'
+    vm.runInContext('let animationDestroyed=false, previewPausedByParent=false, projectionVisible=true, animationFrameId=0, previewResizeObserver=null;'
         + source.slice(start, end) + handlers, ctx);
     const send = (type, origin='http://localhost', sender=window.parent) =>
         listeners.message({origin, source:sender, data:{type}});
