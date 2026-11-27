@@ -1,5 +1,5 @@
 {% extends "admin/admin_base.html" %}
-{% from "components/trailer.html" import trailer_button, trailer_modal %}
+{% from "components/trailer.html" import trailer_button, trailer_modal, trailer_upload %}
 {% block title %}Edit Movie · CineWave Admin{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/trailer.css') }}">{% endblock %}
 {% block trailer_player %}{% if movie.trailer %}{{ trailer_modal() }}<script src="{{ url_for('static', filename='js/trailer.js') }}" defer></script>{% endif %}{% endblock %}
@@ -35,14 +35,17 @@
     <h2 id="edit-trailer-title" class="text-xl font-bold">Trailer</h2>
     {{ trailer_button(movie.trailer, 'Preview saved trailer') }}
     {% if not movie.trailer %}<p class="cw-muted">No trailer is currently available.</p>{% endif %}
-    <form method="post" action="{{ url_for('admin.update_movie_trailer', movie_id=movie.id) }}" class="grid gap-3">
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('admin.update_movie_trailer', movie_id=movie.id) }}" class="grid gap-3">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      {% set selected = movie.trailer_source or ('youtube' if movie.trailer_video_key else 'auto') %}
+      {% set selected = movie.trailer_source or ('upload' if movie.trailer_video_path else 'youtube' if movie.trailer_video_key else 'auto') %}
       <label>Trailer source
         <select name="trailer_source" class="cw-form-control block w-full px-3">
           <option value="auto" {{ 'selected' if selected == 'auto' }}>Automatic (TMDB)</option>
           <option value="youtube" {{ 'selected' if selected == 'youtube' }}>Manual YouTube</option>
           <option value="cloudinary" {{ 'selected' if selected == 'cloudinary' }}>Manual Cloudinary</option>
+          {% if movie.trailer_video_path %}
+          <option value="upload" {{ 'selected' if selected == 'upload' }}>Use saved upload</option>
+          {% endif %}
           <option value="none" {{ 'selected' if selected == 'none' }}>Hide trailer</option>
         </select>
       </label>
@@ -51,6 +54,7 @@
       <label>Cloudinary video URL<input class="cw-form-control block w-full px-3" name="cloudinary_trailer" type="url" maxlength="500"
              value="{{ movie.cloudinary_trailer_url or '' }}"></label>
       <p class="cw-muted text-sm">Use a direct Cloudinary MP4 or WebM URL for a video you have permission to publish. Prefer a compressed 360p or 480p file.</p>
+      {{ trailer_upload() }}
       <div class="flex flex-wrap gap-2">
         <button class="cw-button cw-button-primary">Save trailer</button>
         <button class="cw-button cw-button-white" name="trailer_action" value="auto" formnovalidate>Restore automatic</button>

@@ -1,5 +1,5 @@
 import seat_layout as sl
-from cinewave.integrations.trailers import optimized_projection_url
+from cinewave.integrations.trailers import NATIVE_TRAILER_PROVIDERS, optimized_projection_url
 from cinewave.models import Screen, Showtime
 from cinewave.services import admin_required, purge_expired_holds
 from datetime import date
@@ -111,7 +111,7 @@ def vr_seat_preview(showtime_id):
 
     preview = {
         'name': f'{showtime.theater} · {showtime.screen.name}',
-        'movieTitle': showtime.movie.title,
+        'movieTitle': showtime.movie.title if admin_screen_id is None else '',
         'sub': f'{showtime.screen.screen_type} · {len(row_defs)} rows · {sum(len(r["seats"]) for r in row_defs)} seats' + (' · dimensions estimated' if geometry.get('estimated') else ''),
         'rows': [row['label'] for row in row_defs], 'rowDefs': row_defs,
         'cols': max_seat, 'aislesAfter': [], 'vipRows': [], 'reclinerRows': [],
@@ -138,10 +138,21 @@ def vr_seat_preview(showtime_id):
         'defaultSeat': default_seat,
     }
     trailer = showtime.movie.trailer
+    projection_trailer = trailer if trailer and trailer['provider'] in NATIVE_TRAILER_PROVIDERS else None
     optimized_url = (optimized_projection_url(trailer['url'])
                      if trailer and trailer['provider'] == 'cloudinary' else None)
+    if admin_screen_id is not None:
+        projection_message = 'No screening selected for this auditorium.'
+    elif not trailer:
+        projection_message = 'No trailer is available for this movie.'
+    elif not projection_trailer:
+        projection_message = 'Watch this trailer in the video player.'
+    else:
+        projection_message = ''
+    preview['projectionMessage'] = projection_message
     return render_template('booking/vr_seat_preview.html', showtime=showtime,
                            screen_type=showtime.screen.screen_type or 'Cinema screen',
                            movie=showtime.movie, preview=preview, trailer=trailer,
+                           projection_trailer=projection_trailer, projection_message=projection_message,
                            optimized_trailer_url=optimized_url,
                            embedded=request.args.get('embed') == '1')

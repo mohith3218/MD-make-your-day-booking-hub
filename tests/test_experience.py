@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -169,6 +172,10 @@ class ExperienceTests(unittest.TestCase):
         self.admin.post(edit_path, data={'csrf_token': 'experience-token',
                                         'trailer_source': 'cloudinary', 'cloudinary_trailer': source})
         preview = self.client.get(path).get_data(as_text=True)
+        self.assertEqual(preview.count('<option value="now-playing"'), 1)
+        self.assertIn('>Now Playing</option>', preview)
+        self.assertNotIn('Sci-Fi screen demo', preview)
+        self.assertNotIn('Sightline calibration grid', preview)
         self.assertIn(f'data-src="{source}"', preview)
         self.assertIn('/upload/c_limit,h_480,w_960/q_auto/v42/trailers/film.mp4', preview)
         self.assertNotIn('TearsOfSteel', preview)
@@ -186,6 +193,83 @@ class ExperienceTests(unittest.TestCase):
         self.assertIn('https://www.youtube-nocookie.com/embed/Matching_01', preview)
         self.assertIn('id="trailer-modal"', preview)
         self.assertNotIn('id="projection-video"', preview)
+
+    def test_uploaded_trailer_is_bound_to_the_movie_and_served_with_byte_ranges(self):
+        with TemporaryDirectory() as folder:
+            self.app.config['TRAILER_UPLOAD_DIR'] = folder
+            show = self.screening(2)
+            other_film = Movie(title='Second film', description='Fixture', duration=100)
+            other_venue = Theater(name='Second theatre')
+            other_screen = Screen(name='Screen Two', theater=other_venue, layout_json=self.screen.layout_json)
+            other_show = Showtime(movie=other_film, screen=other_screen, theater=other_venue.name,
+                                  show_date=show.show_date, show_time=show.show_time)
+            db.session.add(other_show)
+            db.session.commit()
+            url = f'/admin/movie/{self.movie.id}/trailer'
+            payload = b'\x00\x00\x00\x18ftypisom' + b'container test bytes'
+            def upload(content):
+                return BytesIO(content), 'movie.mp4'
+
+            token = {'csrf_token': 'experience-token'}
+            self.assertEqual(self.admin.post(url, data={'trailer_video': upload(payload)}).status_code, 400)
+            self.assertEqual(self.client.post(url, data={**token, 'trailer_video': upload(payload)}).status_code, 302)
+            self.admin.post(url, data={**token, 'trailer_video': upload(b'<html>invalid</html>')})
+            self.assertIsNone(self.movie.trailer_video_path)
+            self.assertEqual(list(Path(folder).iterdir()), [])
+            self.assertEqual(self.admin.post(url, data={**token, 'trailer_video': upload(payload)}).status_code, 303)
+            path = self.movie.trailer_video_path
+            file = Path(folder, Path(path).name)
+            self.assertEqual(file.read_bytes(), payload)
+            self.assertEqual(self.movie.trailer_source, 'upload')
+            file_url = self.movie.trailer['url']
+            with self.client.get(file_url, headers={'Range': 'bytes=0-11'}) as response:
+                self.assertEqual(response.status_code, 206)
+                self.assertEqual(response.mimetype, 'video/mp4')
+                self.assertEqual(response.data, payload[:12])
+            self.assertEqual(self.app.test_client().get(file_url).status_code, 302)
+            self.assertEqual(self.client.get(file_url.replace(f'/movies/{self.movie.id}/',
+                                                             f'/movies/{other_film.id}/')).status_code, 404)
+            self.assertEqual(self.client.get('/static/' + path).status_code, 404)
+            first = self.client.get(f'/book/{show.id}/vr-preview').get_data(as_text=True)
+            second = self.client.get(f'/book/{other_show.id}/vr-preview').get_data(as_text=True)
+            self.assertIn(file_url, first)
+            self.assertIn('Second film', second)
+            self.assertIn('No trailer is available for this movie.', second)
+            self.assertNotIn(file_url, second)
+            self.admin.post(url, data={**token, 'trailer_action': 'none'})
+            self.assertIsNone(self.movie.trailer)
+            self.assertEqual(self.client.get(file_url).status_code, 404)
+            self.assertEqual(file.read_bytes(), payload)
+            self.admin.post(url, data={**token, 'trailer_source': 'upload'})
+            self.assertEqual(self.movie.trailer['url'], file_url)
+
+    def test_add_movie_and_tmdb_import_persist_their_own_uploaded_trailers(self):
+        with TemporaryDirectory() as folder:
+            self.app.config['TRAILER_UPLOAD_DIR'] = folder
+            first = b'\x00\x00\x00\x18ftypisom' + b'manual file'
+            second = b'\x1a\x45\xdf\xa3\x42\x82\x84webm' + b'import file'
+            response = self.admin.post('/admin/add_movie', data={
+                'csrf_token': 'experience-token', 'title': 'Manual upload',
+                'description': 'Manual movie fixture', 'duration': '95',
+                'trailer_video': (BytesIO(first), 'manual.mp4'),
+            })
+            self.assertEqual(response.status_code, 302)
+            detail = {'id': 88, 'title': 'Imported upload', 'overview': 'An imported movie fixture.',
+                      'poster_path': '/fixture.jpg', 'original_language': 'en'}
+            with patch.object(TMDBClient, 'details', return_value=detail):
+                response = self.admin.post('/admin/import_movie/add/88', data={
+                    'csrf_token': 'experience-token', 'trailer_video': (BytesIO(second), 'import.webm'),
+                })
+            self.assertEqual(response.status_code, 303)
+            manual = Movie.query.filter_by(title='Manual upload').one()
+            imported = Movie.query.filter_by(tmdb_id=88).one()
+            self.assertNotEqual(manual.trailer_video_path, imported.trailer_video_path)
+            self.assertEqual(Path(folder, Path(manual.trailer_video_path).name).read_bytes(), first)
+            self.assertEqual(Path(folder, Path(imported.trailer_video_path).name).read_bytes(), second)
+            self.assertEqual(imported.trailer_source, 'upload')
+            with self.client.get(imported.trailer['url']) as response:
+                self.assertEqual(response.mimetype, 'video/webm')
+                self.assertEqual(response.data, second)
 
     def test_review_prompt_booking_eligibility_and_venue_edit(self):
         completed = self.paid(self.screening(-2))

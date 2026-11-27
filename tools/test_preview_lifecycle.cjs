@@ -11,7 +11,8 @@ function preview() {
     const frames = new Set();
     let next = 0;
     const document = {hidden:false, getElementById:() => null, addEventListener:(type, fn) => { listeners[type] = fn; }};
-    const video = { pauses: 0, releases: 0, pause() { this.pauses++; }, release() { this.releases++; } };
+    const video = { pauses: 0, releases: 0, starts: 0,
+        start() { this.starts++; }, pause() { this.pauses++; }, release() { this.releases++; } };
     const window = {parent:{}, addEventListener:(type, fn) => { listeners[type] = fn; }};
     const ctx = vm.createContext({document, window, projectionTrailer: video, location:{origin:'http://localhost'},
         container:{isConnected:true}, clock:{start() {}}, animate() {}, resizePreview() {},
@@ -23,7 +24,7 @@ function preview() {
     const messageEnd = source.indexOf('        // Ambient & House Lights', visibility);
     assert.ok(start > 0 && end > start && visibility > end && messageEnd > visibility);
     const handlers = source.slice(visibility, messageEnd);
-    vm.runInContext('let animationDestroyed=false, previewPausedByParent=false, animationFrameId=0;'
+    vm.runInContext('let animationDestroyed=false, previewPausedByParent=false, projectionVisible=true, animationFrameId=0;'
         + source.slice(start, end) + handlers, ctx);
     const send = (type, origin='http://localhost', sender=window.parent) =>
         listeners.message({origin, source:sender, data:{type}});
@@ -94,4 +95,17 @@ test('untrusted message origins and senders cannot resume the preview', () => {
     assert.equal(p.frames.size, 0);
     p.send('cinewave:resume');
     assert.equal(p.frames.size, 1);
+});
+
+test('switching away from the 3D view releases its video source', () => {
+    const p = preview();
+    p.send('cinewave:resume');
+    assert.equal(p.video.starts, 1);
+    p.send('cinewave:pause');
+    p.send('cinewave:release-trailer');
+    assert.equal(p.video.pauses, 1);
+    assert.equal(p.video.releases, 1);
+    assert.equal(p.frames.size, 0);
+    p.send('cinewave:release-trailer', 'https://untrusted.invalid');
+    assert.equal(p.video.releases, 1);
 });

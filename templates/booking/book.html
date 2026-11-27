@@ -51,7 +51,7 @@
     </div>
   </div>
 
-  {% if trailer and trailer.provider == 'cloudinary' %}
+  {% if trailer and trailer.provider in ('upload', 'cloudinary') %}
   <button type="button" id="open-seat-trailer" onclick="open3dArModal(true)" class="cw-button cw-button-white">Trailer in seat preview</button>
   {% elif trailer %}
   {{ trailer_button(trailer) }}

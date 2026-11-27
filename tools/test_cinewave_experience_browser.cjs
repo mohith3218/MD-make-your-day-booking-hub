@@ -146,6 +146,22 @@ async function verify(browser, info) {
         document.querySelector('.cw-auth-form').requestSubmit()`);
 
     async function verifyScreenProjection() {
+        const uploadEdit = '/admin/movie/' + info.uploadMovie + '/edit';
+        const uploadBook = '/book/' + info.uploadShow;
+        await go(uploadEdit, '#trailer input[type=file]');
+        await browser.call('DOM.enable');
+        const document = await browser.call('DOM.getDocument');
+        const { nodeId } = await browser.call('DOM.querySelector', {
+            nodeId: document.root.nodeId, selector: '#trailer input[type=file]',
+        });
+        await browser.call('DOM.setFileInputFiles', { nodeId, files: [path.join(root, 'artifacts', 'MD-CineWave-Intro.mp4')] });
+        await evaluate("document.querySelector('#trailer form').requestSubmit()");
+        await until(() => evaluate("!!document.querySelector('#trailer [data-trailer-provider=upload]')"),
+            'The admin form did not save the uploaded trailer.');
+        const savedTrailer = await evaluate("document.querySelector('#trailer [data-trailer-provider=upload]').href");
+        assert(savedTrailer.includes('/movies/' + info.uploadMovie + '/trailer-file/'));
+        assert(!await evaluate("[...document.querySelectorAll('#trailer option')].some(option => /cloudflare/i.test(option.textContent))"));
+
         const frame = (expression) => evaluate(`document.querySelector('#vr-inline-frame').contentWindow.eval(${JSON.stringify(expression)})`);
         const video = `document.querySelector('#projection-video')`;
         const button = (selector) => frame(`document.querySelector('[data-projection-${selector}]').click()`);
@@ -160,11 +176,7 @@ async function verify(browser, info) {
         for (const width of [1366, 390]) {
             await setViewport(width);
             await browser.call('Emulation.setTouchEmulationEnabled', { enabled: width < 768 });
-            if (width === 390) {
-                await browser.call('Network.enable');
-                await browser.call('Network.setBlockedURLs', { urls: ['*res.cloudinary.com/*/c_limit,*'] });
-            }
-            await go(fixture.seats, '#open-seat-trailer');
+            await go(uploadBook, '#open-seat-trailer');
             assert.equal(await evaluate("document.querySelector('#vr-inline-frame').getAttribute('src')"), null);
             if (width === 1366) {
                 await evaluate("document.querySelector('#open-seat-trailer').click()");
@@ -175,14 +187,12 @@ async function verify(browser, info) {
                 const doc = document.querySelector('#vr-inline-frame').contentDocument;
                 return doc?.body?.classList.contains('preview-ready') && !!doc.querySelector('#projection-video');
             })()`), 'The booking preview did not render.', 45000);
-            if (width === 390) {
-                assert.equal(await frame(`${video}.hasAttribute('src')`), false);
-                await button('toggle');
-            }
-            await until(() => frame(`${video}.currentTime > 0.3 && screenChannel === 'trailer'`),
-                'The Cloudinary trailer never started on the cinema screen.', 45000);
-            if (width === 390) assert(await frame(`${video}.currentSrc === ${video}.dataset.src`),
-                'Playback did not fall back to the original upload when the rendition was blocked.');
+            assert.deepEqual(await frame("[...document.querySelector('#screen-content-select').options].map(option => option.textContent)"), ['Now Playing']);
+            assert(await frame("document.querySelector('#screen-content-select').getBoundingClientRect().height > 0"));
+            assert.equal(await frame("document.querySelector('#active-movie-title').textContent"), 'Harbour Lights');
+            await until(() => frame(`${video}.currentTime > 0.3 && projectionTrailer.hasFrame()`),
+                'The uploaded trailer never started on the cinema screen.', 45000);
+            assert.equal(await frame(`${video}.currentSrc`), savedTrailer);
             assert(await frame(`${video}.muted && ${video}.loop && ${video}.playsInline &&
                 ${video}.crossOrigin === 'anonymous' && getComputedStyle(${video}).display === 'none'`));
             assert.equal(await frame("document.querySelector('#trailer-modal')"), null);
@@ -239,31 +249,42 @@ async function verify(browser, info) {
                 await button('play');
             }
             await evaluate("document.querySelector('#btn-view-2d').click()");
-            await until(() => frame(`${video}.paused && previewPausedByParent`), 'Switching to 2D did not pause the trailer.');
+            await until(() => frame(`${video}.paused && previewPausedByParent && !${video}.hasAttribute('src')`),
+                'Switching to 2D did not release the trailer.');
             assert(await evaluate(`document.querySelector('.seat-btn[data-seat="${activeSeat}"]').classList.contains('seat-sel')`));
             await frame("dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
             assert.equal(await frame(`${video}.hasAttribute('src')`), false);
-            console.log(`Moving Cloudinary video, mesh texture, lighting, and playback controls verified at ${width}px.`);
+            console.log(`Uploaded video, mesh texture, lighting, camera, seat selection and cleanup verified at ${width}px.`);
         }
-        await browser.call('Network.setBlockedURLs', { urls: [] });
 
-        await go(`${fixture.seats}/vr-preview`, '#projection-video');
-        await evaluate(`(() => {
-            const video = ${video};
-            video.play = () => Promise.reject(new DOMException('Test autoplay restriction', 'NotAllowedError'));
-            document.querySelector('[data-projection-toggle]').click();
-        })()`);
+        const { identifier } = await browser.call('Page.addScriptToEvaluateOnNewDocument', {
+            source: `window.qaOriginalPlay = HTMLMediaElement.prototype.play;
+                HTMLMediaElement.prototype.play = () => Promise.reject(new DOMException('Test autoplay restriction', 'NotAllowedError'));`,
+        });
+        await go(`${uploadBook}/vr-preview`, '#projection-video');
+        await browser.call('Page.removeScriptToEvaluateOnNewDocument', { identifier });
         await until(() => evaluate("document.querySelector('[data-projection-status]').textContent.includes('Press Play')"),
             'An autoplay restriction did not expose a Play prompt.');
-        await evaluate(`delete ${video}.play; document.querySelector('[data-projection-play]').click()`);
+        await evaluate(`HTMLMediaElement.prototype.play = window.qaOriginalPlay;
+            document.querySelector('[data-projection-play]').click()`);
         await until(() => evaluate(`${video}.currentTime > 0.3`), 'The Play control did not recover from autoplay rejection.');
-        await browser.call('Network.setBlockedURLs', { urls: ['*res.cloudinary.com/*/cinewave-qa-blocked.mp4'] });
-        await evaluate(`${video}.src = 'https://res.cloudinary.com/demo/video/upload/cinewave-qa-blocked.mp4';
+        await evaluate(`${video}.src = '/cinewave-qa-missing-trailer.mp4';
             ${video}.play().catch(() => {})`);
         await until(() => evaluate("!document.querySelector('[data-projection-external]').hidden"),
             'A failed media load did not show the external fallback.');
-        await browser.call('Network.setBlockedURLs', { urls: [] });
         console.log('Blocked autoplay and a failed network load showed actionable controls.');
+
+        await go(`${fixture.seats}/vr-preview`, '#projection-video');
+        assert.equal(await evaluate("document.querySelector('#active-movie-title').textContent"), 'A Night by the Coast');
+        assert.notEqual(await evaluate(`${video}.dataset.src`), savedTrailer);
+        await until(() => evaluate(`${video}.currentTime > 0.3 && projectionTrailer.hasFrame()`),
+            'The existing hosted trailer did not project after switching venues.', 45000);
+        await go(`/book/${info.demoShow}/vr-preview`, '#projection-toolbar');
+        assert.equal(await evaluate(video), null);
+        assert(await evaluate("document.querySelector('#projection-toolbar').textContent.includes('No trailer is available')"));
+        await go(`/book/0/vr-preview?admin_screen=${info.screen}&embed=1`, '#projection-toolbar');
+        assert(await evaluate("document.querySelector('#projection-toolbar').textContent.includes('No screening selected')"));
+        console.log('Changing the theatre and screen updated the movie, hosted trailer and missing-media states.');
 
         await go(`/book/${info.youtubeShow}/vr-preview`, '#projection-toolbar');
         assert.equal(await evaluate("document.querySelector('#projection-video')"), null);
@@ -271,6 +292,8 @@ async function verify(browser, info) {
         assert(await evaluate("document.querySelector('#trailer-modal iframe').src.startsWith('https://www.youtube-nocookie.com/embed/')"));
         await evaluate("document.querySelector('#trailer-modal').close()");
         await until(() => evaluate("!document.querySelector('#trailer-modal iframe')"), 'The YouTube fallback did not unload.');
+        assert.deepEqual(browser.errors.map(error => error.exception?.description || error.text), [],
+            'The upload and preview flow raised an uncaught JavaScript error.');
         console.log('The 3D preview opens the standard YouTube fallback for YouTube-only movies.');
     }
 

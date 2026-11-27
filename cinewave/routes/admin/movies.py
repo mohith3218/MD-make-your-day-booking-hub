@@ -135,7 +135,8 @@ def add_movie():
     if request.method == 'POST':
         featured_position = _parse_featured_position(request.form.get('featured_order'))
         try:
-            source, trailer_key, cloudinary_url = trailer_selection(request.form)
+            source, trailer_key, cloudinary_url, trailer_path = trailer_selection(
+                request.form, upload=request.files.get('trailer_video'))
         except ValueError as error:
             flash(str(error))
             return render_template('admin/add_movie.html'), 400
@@ -162,7 +163,7 @@ def add_movie():
                       is_rerelease=is_rerelease,
                       release_date=rel_date,
                       trailer_source=source, youtube_trailer_key=trailer_key,
-                      cloudinary_trailer_url=cloudinary_url)
+                      cloudinary_trailer_url=cloudinary_url, trailer_video_path=trailer_path)
         db.session.add(movie)
         db.session.flush()
         if featured_position is not None:
@@ -183,13 +184,16 @@ def update_movie_trailer(movie_id):
         return guard
     movie = Movie.query.filter_by(id=movie_id).with_for_update().first_or_404()
     try:
-        source, key, cloudinary_url = trailer_selection(request.form)
+        source, key, cloudinary_url, trailer_path = trailer_selection(
+            request.form, upload=request.files.get('trailer_video'), existing_path=movie.trailer_video_path)
     except ValueError as error:
         flash(str(error))
         return redirect(url_for('admin.edit_movie', movie_id=movie.id, _anchor='trailer'), code=303)
     movie.trailer_source = source
     movie.youtube_trailer_key = key
     movie.cloudinary_trailer_url = cloudinary_url
+    if trailer_path:
+        movie.trailer_video_path = trailer_path
     db.session.commit()
     flash('Trailer settings saved.')
     return redirect(url_for('admin.edit_movie', movie_id=movie.id, _anchor='trailer'), code=303)
@@ -285,7 +289,8 @@ def import_movie_add(tmdb_id):
             return render_template('admin/import_movie.html', results=[import_result(detail, fields)],
                                    query=query, page=page, total_pages=0, completion=request.form,
                                    missing_description=not fields['description'], missing_poster=not fields['poster']), 422
-        trailer_source, trailer_key, cloudinary_url = trailer_selection(request.form)
+        trailer_source, trailer_key, cloudinary_url, trailer_path = trailer_selection(
+            request.form, upload=request.files.get('trailer_video'))
         movie = matching_local_movie(fields)
         if movie is None:
             movie = create_movie(tmdb_id, fields)
@@ -310,6 +315,8 @@ def import_movie_add(tmdb_id):
             movie.trailer_source = trailer_source
             movie.youtube_trailer_key = trailer_key
             movie.cloudinary_trailer_url = cloudinary_url
+            if trailer_path:
+                movie.trailer_video_path = trailer_path
         db.session.flush()
         if featured_position is not None and not movie.is_archived:
             _apply_featured_order(movie, featured_position)

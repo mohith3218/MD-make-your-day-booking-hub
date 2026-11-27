@@ -7,6 +7,13 @@
   {% endif %}
 {% endmacro %}
 
+{% macro trailer_upload() %}
+  <label class="block cw-muted text-sm">Upload a trailer (MP4 or WebM)
+    <input class="block w-full mt-1" type="file" name="trailer_video" accept=".mp4,.webm,video/mp4,video/webm">
+    <span class="block text-xs">A new upload becomes this movie’s trailer. Use a file under 50 MB.</span>
+  </label>
+{% endmacro %}
+
 {% macro trailer_modal() %}
   <dialog class="cw-trailer-dialog" id="trailer-modal" aria-labelledby="trailer-title">
     <div class="cw-trailer-header">
